@@ -94,3 +94,7 @@ def invalidate_all():
     global sheets, data
     sheets = None
     data = None
+
+
+# cache data from the start
+get_cached_data()

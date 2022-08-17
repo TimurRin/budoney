@@ -66,16 +66,18 @@ def init():
 
 def send_message_to_authorized(message):
     print(print_label, "send_message_to_authorized", message)
-    for authorized in telegram_config["authorized"]:
-        updater.bot.send_message(
-            chat_id=authorized, text=message)
+    if not telegram_config["quiet_mode"]:
+        for authorized in telegram_config["authorized"]:
+            updater.bot.send_message(
+                chat_id=authorized, text=message)
 
 
 def send_info_message(message):
     print(print_label, "send_info_message", message)
-    for info_chat in telegram_config["info_chats"]:
-        updater.bot.send_message(
-            chat_id=info_chat, text=message)
+    if not telegram_config["quiet_mode"]:
+        for info_chat in telegram_config["info_chats"]:
+            updater.bot.send_message(
+                chat_id=info_chat, text=message)
 
 
 def auth_filter():

@@ -58,8 +58,24 @@ def init():
     print(print_label, "Starting Telegram polling...")
     updater.start_polling()
 
+    send_message_to_authorized("Hello, I've just started, so I need you to type /start")
+
     print(print_label, "Started")
     updater.idle()
+
+
+def send_message_to_authorized(message):
+    print(print_label, "send_message_to_authorized", message)
+    for authorized in telegram_config["authorized"]:
+        updater.bot.send_message(
+            chat_id=authorized, text=message)
+
+
+def send_info_message(message):
+    print(print_label, "send_info_message", message)
+    for info_chat in telegram_config["info_chats"]:
+        updater.bot.send_message(
+            chat_id=info_chat, text=message)
 
 
 def auth_filter():
@@ -81,7 +97,7 @@ def default_keyboard():
 
 def command_start(update: Update, context: CallbackContext):
     update.message.reply_text(
-        "🍏Fresh start! " + main_entry_text, reply_markup=command_main_keyboard())
+        "🍏 Fresh start! " + main_entry_text, reply_markup=command_main_keyboard())
     return states["main"]
 
 
@@ -94,10 +110,10 @@ def command_main(update: Update, context: CallbackContext):
 def command_main_keyboard():
     reply_keyboard = [[telegram.InlineKeyboardButton(
         text="See categories", callback_data="categories")]]
-    return InlineKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    return InlineKeyboardMarkup(reply_keyboard)
 
 
-def command_main_callback(update, context):
+def command_main_callback(update: Update, context: CallbackContext):
     if update.callback_query.data == "categories":
         return command_categories(update, context)
     else:
@@ -117,19 +133,23 @@ def command_categories_keyboard():
 
     current_row = 0
 
-    for category in data["categories"][1:]:
+    for category in data["categories"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=category[2] + " " + category[1], callback_data=category[0]))
+            text=category["emoji"] + " " + category["name"], callback_data=category["id"]))
         if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    return InlineKeyboardMarkup(
-        reply_keyboard, resize_keyboard=True, one_time_keyboard=True)
+    return InlineKeyboardMarkup(reply_keyboard)
 
 
-def command_categories_callback(update, context):
+def command_categories_callback(update: Update, context: CallbackContext):
     # print("command_categories_callback", update)
+
+    data = gsh.get_cached_data()
+
+    send_info_message(update.callback_query.from_user.first_name + " has selected " + data["categories"]["dict"][update.callback_query.data]["emoji"] + " "
+                      + data["categories"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
     return command_main(update, context)
 
 

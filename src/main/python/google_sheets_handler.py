@@ -1,7 +1,10 @@
+from datetime import datetime
+import string
 import gspread
 from gspread import Spreadsheet
 from oauth2client.service_account import ServiceAccountCredentials
 
+import utils.date_utils as date_utils
 import utils.yaml_manager as yaml_manager
 
 print_label = "[google_sheets_handler]"
@@ -38,28 +41,48 @@ def fetch_sheet(name):
     return gspread_client.open_by_key(sheet_credentials["bookKey"]).get_worksheet_by_id(sheet_credentials["sheetId"])
 
 
-def fetch_flow_sheet():
+def fetch_flow_sheet(flow_code):
     check_authorization()
-    print(print_label, "Opening the flow sheet")
+    print(print_label, "Opening the flow sheet '" + flow_code + "'")
     sheet_credentials = google_sheets_config["sheets"]["flow"]
-    sheet_name = sheet_credentials["sheetPrefix"] + "2022_08"
+    sheet_name = sheet_credentials["sheetPrefix"] + flow_code
     return gspread_client.open_by_key(sheet_credentials["bookKey"]).worksheet(sheet_name)
 
 
-def fetch_data(sheet: Spreadsheet):
+def fetch_data(name: str, sheet: Spreadsheet):
     print(print_label, "Getting data from the sheet '" +
-          str(sheet.title) + "' (" + str(sheet.id) + ")")
-    return sheet.get_values()
+          name + "' (" + str(sheet.title) + ", " + str(sheet.id) + ")")
+
+    if name == "categories":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for category in sheet.get_values()[1:]:
+            entry = {
+                "id": category[0],
+                "name": category[1],
+                "emoji": category[2]
+            }
+            data["dict"][category[0]] = entry
+            data["list"].append(entry)
+        return data
+    else:
+        return sheet.get_values()
 
 
 def fetch_all_sheets():
+    flows = {}
+
+    date = datetime.strptime(google_sheets_config["flow_start"], '%Y-%m-%d')
+    for flow_code in date_utils.flow_codes_range(date, date.today()):
+        flows[flow_code] = fetch_flow_sheet(flow_code)
+
     return {
         "categories": fetch_sheet("categories"),
         "methods": fetch_sheet("methods"),
         "venues": fetch_sheet("venues"),
-        "flow": {
-            "2022_08": fetch_flow_sheet()
-        },
+        "flow": flows
     }
 
 
@@ -67,11 +90,12 @@ def fetch_all_data(sheets):
     data = {"flow": {}}
     for sheet in sheets:
         if sheet == "flow":
-            pass
-            # for flow_sheet in sheets["flow"]:
-            #     data["flow"][flow_sheet] = fetch_data(sheets["flow"][flow_sheet])
+            # pass
+            for flow_sheet in sheets["flow"]:
+                data["flow"][flow_sheet] = fetch_data(
+                    flow_sheet, sheets["flow"][flow_sheet])
         else:
-            data[sheet] = fetch_data(sheets[sheet])
+            data[sheet] = fetch_data(sheet, sheets[sheet])
         pass
     return data
 

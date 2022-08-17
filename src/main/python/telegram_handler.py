@@ -76,7 +76,7 @@ def add_command(name, callback):
 
 
 def default_keyboard():
-    return [[telegram.InlineKeyboardButton(text="🔙Back", callback_data="_BACK")]]
+    return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK")]]
 
 
 def command_start(update: Update, context: CallbackContext):
@@ -117,7 +117,7 @@ def command_categories_keyboard():
 
     current_row = 0
 
-    for category in data["categories"]:
+    for category in data["categories"][1:]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
             text=category[2] + " " + category[1], callback_data=category[0]))
         if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
@@ -138,12 +138,12 @@ def command_help(update: Update, context: CallbackContext):
 
 
 def fallback(update: Update, context: CallbackContext):
-    # print(print_label, update.message)
+    # print(print_label, "fallback", update)
     update.message.reply_text(error_text)
 
 
 def fallback_callback_query_handler(update: Update, context: CallbackContext):
-    print("fallback_callback_query_handler")
+    # print(print_label, "fallback_callback_query_handler", update)
     update.callback_query.message.reply_text(error_text)
 
 

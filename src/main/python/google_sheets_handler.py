@@ -1,7 +1,7 @@
 from datetime import datetime
 import string
 import gspread
-from gspread import Spreadsheet
+from gspread import Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
 
 import utils.date_utils as date_utils
@@ -141,6 +141,14 @@ def get_cached_data():
     if not data:
         data = fetch_all_data(get_cached_sheets())
     return data
+
+
+def insert_into_flow_sheet(id: str, row: list):
+    insert_into_sheet(sheets["flow"][id], row)
+
+
+def insert_into_sheet(sheet: Worksheet, row: list):
+    sheet.append_row(row)
 
 
 def invalidate_all():

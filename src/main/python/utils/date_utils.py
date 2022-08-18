@@ -1,12 +1,23 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 
-def flow_codes_range(start_date, end_date):
+def get_date_flow_code(date: datetime):
+    return date.strftime('%Y_%m')
+
+
+def get_today_flow_code():
+    return datetime.today().strftime('%Y_%m')
+
+
+def get_today_text():
+    return datetime.today().strftime('%Y-%m-%d')
+
+
+def flow_codes_range(start_date: datetime, end_date: datetime):
     so = []
     for n in range(int((end_date - start_date).days)):
         d = start_date + timedelta(n)
-        df = d.strftime('%Y_%m')    
+        df = d.strftime('%Y_%m')
         if df not in so:
             so.append(df)
             yield df
-        

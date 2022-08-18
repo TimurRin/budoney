@@ -1,4 +1,5 @@
 import json
+import datetime
 from random import random
 
 import telegram
@@ -15,6 +16,7 @@ from telegram.update import Update
 
 import google_sheets_handler as gsh
 import utils.transliterate as transliterate
+import utils.date_utils as date_utils
 import utils.yaml_manager as yaml_manager
 
 print_label = "[telegram_handler]"
@@ -46,6 +48,8 @@ states = {
 
 main_entry_text = "Shall we begin?"
 error_text = "This action has been skipped (due to old session or other error), type /start to restart a conversation..."
+
+authorized_data = {}
 
 
 def init():
@@ -92,6 +96,12 @@ def init():
     print(print_label, "Starting Telegram polling...")
     updater.start_polling()
 
+    for authorized in telegram_config["authorized"]:
+        if authorized not in authorized_data:
+            authorized_data[authorized] = {
+                "flow_add": {}
+            }
+
     send_message_to_authorized(
         "Hello, I've just started, so I need you to type /start")
 
@@ -137,6 +147,22 @@ def add_command(name, callback):
 
 def check_common_data():
     pass
+
+
+def display_text_add_flow(add_flow: dict):
+    data = gsh.get_cached_data()
+
+    text = str(add_flow["sum"]) + " RUB"
+    try:
+        if "method" in add_flow:
+            text = text + " — " + \
+                data["methods"]["dict"][add_flow["method"]]["name"]
+        if "venue" in add_flow:
+            text = text + " — " + \
+                data["venues"]["dict"][add_flow["venue"]]["name"]
+    except:
+        pass
+    return str(text)
 
 
 # keyboards
@@ -293,24 +319,42 @@ def handle_flow_add_sum(update: Update, context: CallbackContext):
     try:
         sum = float(update.message.text)
 
-        update.message.reply_text(str(sum) + " roubles. How?",
+        authorized_data[update.message.chat.id]["flow_add"]["sum"] = sum
+
+        update.message.reply_text(display_text_add_flow(authorized_data[update.message.chat.id]["flow_add"]) + ". How?",
                                   reply_markup=keyboard_methods())
 
         return states["flow_add_method"]
     except ValueError:
-        return states["main"]
-
-    return state_main(update.callback_query.message)
+        return state_main(update.message)
 
 
 def handle_flow_add_method(update: Update, context: CallbackContext):
-    update.callback_query.message.edit_text(str(update.callback_query.data) + ". Where?",
+    authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"] = update.callback_query.data
+
+    update.callback_query.message.edit_text(display_text_add_flow(authorized_data[update.callback_query.message.chat.id]["flow_add"]) + ". Where?",
                                             reply_markup=keyboard_venues())
 
     return states["flow_add_venue"]
 
 
 def handle_flow_add_venue(update: Update, context: CallbackContext):
+    authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"] = update.callback_query.data
+
+    send_info_message(display_text_add_flow(
+        authorized_data[update.callback_query.message.chat.id]["flow_add"]))
+
+    gsh.insert_into_flow_sheet(date_utils.get_today_flow_code(), [
+        "EXPENSE",
+        (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+        authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"],
+        "",
+        authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"],
+        authorized_data[update.callback_query.message.chat.id]["flow_add"]["sum"],
+        "RUB"
+    ])
+
+    authorized_data[update.callback_query.message.chat.id]["flow_add"] = {}
     return state_main(update.callback_query.message)
 
 

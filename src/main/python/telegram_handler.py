@@ -1,6 +1,4 @@
-import json
 import datetime
-from random import random
 
 import telegram
 from telegram import (InlineKeyboardMarkup, Message, ReplyKeyboardMarkup,
@@ -157,9 +155,14 @@ def display_text_add_flow(add_flow: dict):
         if "method" in add_flow:
             text = text + " — " + \
                 data["methods"]["dict"][add_flow["method"]]["name"]
-        if "venue" in add_flow:
+        if "venue" in add_flow and "description" in add_flow:
+            text = text + " — " + \
+                data["venues"]["dict"][add_flow["venue"]]["name"] + " (" + add_flow["description"] + ")"
+        elif "venue" in add_flow:
             text = text + " — " + \
                 data["venues"]["dict"][add_flow["venue"]]["name"]
+        elif "description" in add_flow:
+            text = text + " — " + add_flow["description"]
     except:
         pass
     return str(text)
@@ -291,7 +294,7 @@ def handle_main(update: Update, context: CallbackContext):
             "List of flows", reply_markup=keyboard_with_back())
         return states["flows"]
     elif update.callback_query.data == "flow_add_sum":
-        update.callback_query.message.edit_text("Enter sum")
+        update.callback_query.message.edit_text("Enter sum and (optionally, after comma) description")
         return states["flow_add_sum"]
     elif update.callback_query.data == "venues":
         update.callback_query.message.edit_text("List of venues",
@@ -317,9 +320,15 @@ def handle_flows(update: Update, context: CallbackContext):
 
 def handle_flow_add_sum(update: Update, context: CallbackContext):
     try:
-        sum = float(update.message.text)
+        splitted = update.message.text.split(", ")
+
+        sum = float(splitted[0])
+
+        description = len(splitted) >= 2 and (", ".join(splitted[1:])) or None
 
         authorized_data[update.message.chat.id]["flow_add"]["sum"] = sum
+        if description:
+            authorized_data[update.message.chat.id]["flow_add"]["description"] = description
 
         update.message.reply_text(display_text_add_flow(authorized_data[update.message.chat.id]["flow_add"]) + ". How?",
                                   reply_markup=keyboard_methods())
@@ -348,7 +357,7 @@ def handle_flow_add_venue(update: Update, context: CallbackContext):
         "EXPENSE",
         (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"],
-        "",
+        authorized_data[update.callback_query.message.chat.id]["flow_add"]["description"] or "",
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"],
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["sum"],
         "RUB"

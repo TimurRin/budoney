@@ -58,14 +58,43 @@ def fetch_data(name: str, sheet: Spreadsheet):
             "dict": {},
             "list": []
         }
-        for category in sheet.get_values()[1:]:
+        for value in sheet.get_values()[1:]:
             entry = {
-                "id": category[0],
-                "name": category[1],
-                "emoji": category[2]
+                "id": value[0],
+                "name": value[1],
+                "emoji": value[2]
             }
-            data["dict"][category[0]] = entry
-            data["list"].append(entry)
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+        return data
+    elif name == "venues":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for value in sheet.get_values()[1:]:
+            entry = {
+                "id": value[0],
+                "name": value[1],
+                "category": value[3]
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+        return data
+    elif name == "methods":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for value in sheet.get_values()[1:]:
+            entry = {
+                "id": value[0],
+                "name": value[1],
+                "credit": value[2] == "TRUE" and True or False,
+                "owner": value[3]
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
         return data
     else:
         return sheet.get_values()

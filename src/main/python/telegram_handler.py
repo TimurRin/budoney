@@ -1,4 +1,5 @@
 from random import random
+import json
 import telegram
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, bot
 from telegram.ext import Handler
@@ -20,10 +21,13 @@ updater = None
 
 states = {
     "main": 0,
-    "categories": 1
+    "categories": 1,
+    "flow_sum": 2,
+    "flow_method": 3,
+    "flow_venue": 4,
 }
 
-main_entry_text = "Start typing a new expense or select a specific action"
+main_entry_text = "Shall we begin?"
 error_text = "This action has been skipped (due to old session or other error), type /start to restart a conversation..."
 
 
@@ -38,6 +42,9 @@ def init():
         states={
             states["main"]: [CallbackQueryHandler(command_main_callback)],
             states["categories"]: [CallbackQueryHandler(command_categories_callback)],
+            states["flow_sum"]: [default_text_parse_handler()],
+            states["flow_method"]: [CallbackQueryHandler(command_methods_callback)],
+            states["flow_venue"]: [CallbackQueryHandler(command_venues_callback)],
         },
         fallbacks=[CommandHandler('start', command_start)],
     )
@@ -58,10 +65,16 @@ def init():
     print(print_label, "Starting Telegram polling...")
     updater.start_polling()
 
-    send_message_to_authorized("Hello, I've just started, so I need you to type /start")
+    send_message_to_authorized(
+        "Hello, I've just started, so I need you to type /start")
 
     print(print_label, "Started")
     updater.idle()
+
+
+def default_text_parse_handler():
+    return MessageHandler(
+        Filters.text & auth_filter() & conversation_filter(), default_text_parse)
 
 
 def send_message_to_authorized(message):
@@ -94,7 +107,8 @@ def add_command(name, callback):
 
 
 def default_keyboard():
-    return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK")]]
+    return [[]]
+    # return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK")]]
 
 
 def command_start(update: Update, context: CallbackContext):
@@ -111,21 +125,21 @@ def command_main(update: Update, context: CallbackContext):
 
 def command_main_keyboard():
     reply_keyboard = [[telegram.InlineKeyboardButton(
+        text="Add flow entry", callback_data="flow_sum"), telegram.InlineKeyboardButton(
         text="See categories", callback_data="categories")]]
     return InlineKeyboardMarkup(reply_keyboard)
 
 
 def command_main_callback(update: Update, context: CallbackContext):
     if update.callback_query.data == "categories":
-        return command_categories(update, context)
+        update.callback_query.message.edit_text("Select your category",
+                                                reply_markup=command_categories_keyboard())
+        return states["categories"]
+    elif update.callback_query.data == "flow_sum":
+        update.callback_query.message.edit_text("Enter sum")
+        return states["flow_sum"]
     else:
         return states["main"]
-
-
-def command_categories(update: Update, context: CallbackContext):
-    update.callback_query.message.edit_text("Select your category",
-                                            reply_markup=command_categories_keyboard())
-    return states["categories"]
 
 
 def command_categories_keyboard():
@@ -135,9 +149,43 @@ def command_categories_keyboard():
 
     current_row = 0
 
-    for category in data["categories"]["list"]:
+    for category_id in data["categories"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=category["emoji"] + " " + category["name"], callback_data=category["id"]))
+            text=data["categories"]["dict"][category_id]["emoji"] + " " + data["categories"]["dict"][category_id]["name"], callback_data=data["categories"]["dict"][category_id]["id"]))
+        if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
+            reply_keyboard.append([])
+            current_row = current_row + 1
+
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def command_methods_keyboard():
+    data = gsh.get_cached_data()
+
+    reply_keyboard = default_keyboard()
+
+    current_row = 0
+
+    for category_id in data["methods"]["list"]:
+        reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
+            text=data["methods"]["dict"][category_id]["name"], callback_data=data["methods"]["dict"][category_id]["id"]))
+        if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
+            reply_keyboard.append([])
+            current_row = current_row + 1
+
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def command_venues_keyboard():
+    data = gsh.get_cached_data()
+
+    reply_keyboard = default_keyboard()
+
+    current_row = 0
+
+    for category_id in data["venues"]["list"]:
+        reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
+            text=data["venues"]["dict"][category_id]["name"], callback_data=data["venues"]["dict"][category_id]["id"]))
         if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
             reply_keyboard.append([])
             current_row = current_row + 1
@@ -148,15 +196,55 @@ def command_categories_keyboard():
 def command_categories_callback(update: Update, context: CallbackContext):
     # print("command_categories_callback", update)
 
-    data = gsh.get_cached_data()
+    if (update.callback_query.data != "_BACK"):
+        data = gsh.get_cached_data()
+        send_info_message(update.callback_query.from_user.first_name + " has selected " + data["categories"]["dict"][update.callback_query.data]["emoji"] + " "
+                          + data["categories"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
 
-    send_info_message(update.callback_query.from_user.first_name + " has selected " + data["categories"]["dict"][update.callback_query.data]["emoji"] + " "
-                      + data["categories"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
+    return command_main(update, context)
+
+
+def command_methods_callback(update: Update, context: CallbackContext):
+    # print("command_categories_callback", update)
+
+    if (update.callback_query.data != "_BACK"):
+        data = gsh.get_cached_data()
+        send_info_message(update.callback_query.from_user.first_name + " has selected " +
+                          data["methods"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
+
+    update.callback_query.message.reply_text("Where?",
+                                             reply_markup=command_venues_keyboard())
+    return states["flow_venue"]
+
+
+def command_venues_callback(update: Update, context: CallbackContext):
+    # print("command_categories_callback", update)
+
+    if (update.callback_query.data != "_BACK"):
+        data = gsh.get_cached_data()
+        send_info_message(update.callback_query.from_user.first_name + " has selected " +
+                          data["venues"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
+
     return command_main(update, context)
 
 
 def command_help(update: Update, context: CallbackContext):
     update.message.reply_text("You'll get no help here. Run.")
+
+
+def default_text_parse(update: Update, context: CallbackContext):
+    print("command_main_text_parse", update.message.text)
+    # context.bot.delete_message(update.message.chat_id, str(update.message.message_id))
+
+    try:
+        sum = float(update.message.text)
+
+        update.message.reply_text("How?",
+                                  reply_markup=command_methods_keyboard())
+
+        return states["flow_method"]
+    except ValueError:
+        return states["main"]
 
 
 def fallback(update: Update, context: CallbackContext):

@@ -25,14 +25,14 @@ states = {
     "main": 0,
     "wip": 1,
 
-    "flows": 100,
-    "flow_add_sum": 105,
-    "flow_add_method": 106,
-    "flow_add_venue": 107,
+    "transactions": 100,
+    "transaction_add_sum": 105,
+    "transaction_add_method": 106,
+    "transaction_add_merchant": 107,
 
-    "venues": 200,
-    "venue_add_name": 205,
-    "venue_add_category": 210,
+    "merchants": 200,
+    "merchant_add_name": 205,
+    "merchant_add_category": 210,
 
     "methods": 300,
     "method_add_name": 305,
@@ -61,13 +61,13 @@ def init():
         states={
             states["main"]: [CallbackQueryHandler(handle_main)],
             states["wip"]: [CallbackQueryHandler(handle_wip)],
-            states["flows"]: [CallbackQueryHandler(handle_flows)],
-            states["flow_add_sum"]: [MessageHandler(text_filters(), handle_flow_add_sum)],
-            states["flow_add_method"]: [CallbackQueryHandler(handle_flow_add_method)],
-            states["flow_add_venue"]: [CallbackQueryHandler(handle_flow_add_venue)],
-            states["venues"]: [CallbackQueryHandler(handle_venues)],
-            states["venue_add_name"]: [MessageHandler(text_filters(), handle_venue_add_name)],
-            states["venue_add_category"]: [CallbackQueryHandler(handle_venue_add_category)],
+            states["transactions"]: [CallbackQueryHandler(handle_transactions)],
+            states["transaction_add_sum"]: [MessageHandler(text_filters(), handle_transaction_add_sum)],
+            states["transaction_add_method"]: [CallbackQueryHandler(handle_transaction_add_method)],
+            states["transaction_add_merchant"]: [CallbackQueryHandler(handle_transaction_add_merchant)],
+            states["merchants"]: [CallbackQueryHandler(handle_merchants)],
+            states["merchant_add_name"]: [MessageHandler(text_filters(), handle_merchant_add_name)],
+            states["merchant_add_category"]: [CallbackQueryHandler(handle_merchant_add_category)],
             states["methods"]: [CallbackQueryHandler(handle_methods)],
             states["method_add_name"]: [MessageHandler(text_filters(), handle_method_add_name)],
             states["method_add_is_credit"]: [CallbackQueryHandler(handle_method_add_is_credit)],
@@ -97,7 +97,7 @@ def init():
     for authorized in telegram_config["authorized"]:
         if authorized not in authorized_data:
             authorized_data[authorized] = {
-                "flow_add": {}
+                "transaction_add": {}
             }
 
     send_message_to_authorized(
@@ -147,22 +147,24 @@ def check_common_data():
     pass
 
 
-def display_text_add_flow(add_flow: dict):
+def display_text_add_transaction(add_transaction: dict):
     data = gsh.get_cached_data()
 
-    text = str(add_flow["sum"]) + " RUB"
+    text = str(add_transaction["sum"]) + " " + \
+        ("currency" in add_transaction and add_transaction["currency"] or "RUB")
     try:
-        if "method" in add_flow:
+        if "method" in add_transaction:
             text = text + " — " + \
-                data["methods"]["dict"][add_flow["method"]]["name"]
-        if "venue" in add_flow and "description" in add_flow:
+                data["methods"]["dict"][add_transaction["method"]]["name"]
+        if "merchant" in add_transaction and "description" in add_transaction:
             text = text + " — " + \
-                data["venues"]["dict"][add_flow["venue"]]["name"] + " (" + add_flow["description"] + ")"
-        elif "venue" in add_flow:
+                data["merchants"]["dict"][add_transaction["merchant"]]["name"] + \
+                " (" + add_transaction["description"] + ")"
+        elif "merchant" in add_transaction:
             text = text + " — " + \
-                data["venues"]["dict"][add_flow["venue"]]["name"]
-        elif "description" in add_flow:
-            text = text + " — " + add_flow["description"]
+                data["merchants"]["dict"][add_transaction["merchant"]]["name"]
+        elif "description" in add_transaction:
+            text = text + " — " + add_transaction["description"]
     except:
         pass
     return str(text)
@@ -183,15 +185,15 @@ def keyboard_main():
     reply_keyboard = [
         [
             telegram.InlineKeyboardButton(
-                text="👛 Flows", callback_data="flows"),
+                text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
-                text="💸 Add expense", callback_data="flow_add_sum"),
+                text="💸 Add expense", callback_data="transaction_add_sum"),
             telegram.InlineKeyboardButton(
-                text="💰 Add income", callback_data="flow_add_sum"),
+                text="💰 Add income", callback_data="transaction_add_sum"),
         ],
         [
             telegram.InlineKeyboardButton(
-                text="🏪 Venues", callback_data="venues"),
+                text="🏪 Merchants", callback_data="merchants"),
         ],
         [
             telegram.InlineKeyboardButton(
@@ -200,10 +202,10 @@ def keyboard_main():
         [
             telegram.InlineKeyboardButton(
                 text="🏷 Categories", callback_data="categories"),
-        ],
-        [
             telegram.InlineKeyboardButton(
                 text="💱 Currencies", callback_data="currencies"),
+            telegram.InlineKeyboardButton(
+                text="👫 Users", callback_data="users"),
         ]
     ]
     return InlineKeyboardMarkup(reply_keyboard)
@@ -219,7 +221,7 @@ def keyboard_categories():
     for category_id in data["categories"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
             text=data["categories"]["dict"][category_id]["emoji"] + " " + data["categories"]["dict"][category_id]["name"], callback_data=data["categories"]["dict"][category_id]["id"]))
-        if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
+        if len(reply_keyboard[current_row]) >= 3:
             reply_keyboard.append([])
             current_row = current_row + 1
 
@@ -236,23 +238,23 @@ def keyboard_methods():
     for category_id in data["methods"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
             text=data["methods"]["dict"][category_id]["name"], callback_data=data["methods"]["dict"][category_id]["id"]))
-        if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
+        if len(reply_keyboard[current_row]) >= 2:
             reply_keyboard.append([])
             current_row = current_row + 1
 
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_venues():
+def keyboard_merchants():
     data = gsh.get_cached_data()
 
     reply_keyboard = keyboard_template_with_back()
 
     current_row = 0
 
-    for category_id in data["venues"]["list"]:
+    for category_id in data["merchants"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=data["venues"]["dict"][category_id]["name"], callback_data=data["venues"]["dict"][category_id]["id"]))
+            text=data["merchants"]["dict"][category_id]["name"], callback_data=data["merchants"]["dict"][category_id]["id"]))
         if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
             reply_keyboard.append([])
             current_row = current_row + 1
@@ -289,17 +291,18 @@ def state_main(message: Message):
 def handle_main(update: Update, context: CallbackContext):
     if update.callback_query.data == "main":
         return states["main"]
-    elif update.callback_query.data == "flows":
+    elif update.callback_query.data == "transactions":
         update.callback_query.message.edit_text(
-            "List of flows", reply_markup=keyboard_with_back())
-        return states["flows"]
-    elif update.callback_query.data == "flow_add_sum":
-        update.callback_query.message.edit_text("Enter sum and (optionally, after comma) description")
-        return states["flow_add_sum"]
-    elif update.callback_query.data == "venues":
-        update.callback_query.message.edit_text("List of venues",
-                                                reply_markup=keyboard_venues())
-        return states["venues"]
+            "List of transactions", reply_markup=keyboard_with_back())
+        return states["transactions"]
+    elif update.callback_query.data == "transaction_add_sum":
+        update.callback_query.message.edit_text(
+            "Enter sum and (optionally, after comma) description")
+        return states["transaction_add_sum"]
+    elif update.callback_query.data == "merchants":
+        update.callback_query.message.edit_text("List of merchants",
+                                                reply_markup=keyboard_merchants())
+        return states["merchants"]
     elif update.callback_query.data == "methods":
         update.callback_query.message.edit_text("List of methods",
                                                 reply_markup=keyboard_methods())
@@ -314,11 +317,11 @@ def handle_main(update: Update, context: CallbackContext):
         return states["wip"]
 
 
-def handle_flows(update: Update, context: CallbackContext):
+def handle_transactions(update: Update, context: CallbackContext):
     return state_main(update.callback_query.message)
 
 
-def handle_flow_add_sum(update: Update, context: CallbackContext):
+def handle_transaction_add_sum(update: Update, context: CallbackContext):
     try:
         splitted = update.message.text.split(", ")
 
@@ -326,61 +329,62 @@ def handle_flow_add_sum(update: Update, context: CallbackContext):
 
         description = len(splitted) >= 2 and (", ".join(splitted[1:])) or None
 
-        authorized_data[update.message.chat.id]["flow_add"]["sum"] = sum
+        authorized_data[update.message.chat.id]["transaction_add"]["sum"] = sum
         if description:
-            authorized_data[update.message.chat.id]["flow_add"]["description"] = description
+            authorized_data[update.message.chat.id]["transaction_add"]["description"] = description
 
-        update.message.reply_text(display_text_add_flow(authorized_data[update.message.chat.id]["flow_add"]) + ". How?",
+        update.message.reply_text(display_text_add_transaction(authorized_data[update.message.chat.id]["transaction_add"]) + ". How?",
                                   reply_markup=keyboard_methods())
 
-        return states["flow_add_method"]
+        return states["transaction_add_method"]
     except ValueError:
         return state_main(update.message)
 
 
-def handle_flow_add_method(update: Update, context: CallbackContext):
-    authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"] = update.callback_query.data
+def handle_transaction_add_method(update: Update, context: CallbackContext):
+    authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"] = update.callback_query.data
 
-    update.callback_query.message.edit_text(display_text_add_flow(authorized_data[update.callback_query.message.chat.id]["flow_add"]) + ". Where?",
-                                            reply_markup=keyboard_venues())
+    update.callback_query.message.edit_text(display_text_add_transaction(authorized_data[update.callback_query.message.chat.id]["transaction_add"]) + ". Where?",
+                                            reply_markup=keyboard_merchants())
 
-    return states["flow_add_venue"]
+    return states["transaction_add_merchant"]
 
 
-def handle_flow_add_venue(update: Update, context: CallbackContext):
-    authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"] = update.callback_query.data
+def handle_transaction_add_merchant(update: Update, context: CallbackContext):
+    authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"] = update.callback_query.data
 
-    send_info_message(display_text_add_flow(
-        authorized_data[update.callback_query.message.chat.id]["flow_add"]))
+    send_info_message(display_text_add_transaction(
+        authorized_data[update.callback_query.message.chat.id]["transaction_add"]))
 
-    gsh.insert_into_flow_sheet(date_utils.get_today_flow_code(), [
+    gsh.insert_into_transaction_sheet(date_utils.get_today_transaction_code(), [
         "EXPENSE",
         (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
-        authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"],
-        "description" in authorized_data[update.callback_query.message.chat.id]["flow_add"] and authorized_data[update.callback_query.message.chat.id]["flow_add"]["description"] or "",
-        authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"],
-        authorized_data[update.callback_query.message.chat.id]["flow_add"]["sum"],
+        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"],
+        "description" in authorized_data[update.callback_query.message.chat.id]["transaction_add"] and authorized_data[
+            update.callback_query.message.chat.id]["transaction_add"]["description"] or "",
+        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"],
+        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["sum"],
         "RUB"
     ])
 
-    authorized_data[update.callback_query.message.chat.id]["flow_add"] = {}
+    authorized_data[update.callback_query.message.chat.id]["transaction_add"] = {}
     return state_main(update.callback_query.message)
 
 
-def handle_venues(update: Update, context: CallbackContext):
+def handle_merchants(update: Update, context: CallbackContext):
     if (update.callback_query.data != "_BACK"):
         data = gsh.get_cached_data()
         send_info_message(update.callback_query.from_user.first_name + " has selected " +
-                          data["venues"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
+                          data["merchants"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
 
     return state_main(update.callback_query.message)
 
 
-def handle_venue_add_name(update: Update, context: CallbackContext):
+def handle_merchant_add_name(update: Update, context: CallbackContext):
     return state_main(update.callback_query.message)
 
 
-def handle_venue_add_category(update: Update, context: CallbackContext):
+def handle_merchant_add_category(update: Update, context: CallbackContext):
     return state_main(update.callback_query.message)
 
 

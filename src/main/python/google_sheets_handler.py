@@ -41,11 +41,11 @@ def fetch_sheet(name):
     return gspread_client.open_by_key(sheet_credentials["bookKey"]).get_worksheet_by_id(sheet_credentials["sheetId"])
 
 
-def fetch_flow_sheet(flow_code):
+def fetch_transaction_sheet(transaction_code):
     check_authorization()
-    print(print_label, "Opening the flow sheet '" + flow_code + "'")
-    sheet_credentials = google_sheets_config["sheets"]["flow"]
-    sheet_name = sheet_credentials["sheetPrefix"] + flow_code
+    print(print_label, "Opening the transaction sheet '" + transaction_code + "'")
+    sheet_credentials = google_sheets_config["sheets"]["transactions"]
+    sheet_name = sheet_credentials["sheetPrefix"] + transaction_code
     return gspread_client.open_by_key(sheet_credentials["bookKey"]).worksheet(sheet_name)
 
 
@@ -67,7 +67,7 @@ def fetch_data(name: str, sheet: Spreadsheet):
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
-    elif name == "venues":
+    elif name == "merchants":
         data = {
             "dict": {},
             "list": []
@@ -96,33 +96,48 @@ def fetch_data(name: str, sheet: Spreadsheet):
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
+    elif name == "currencies" or name == "users":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for value in sheet.get_values()[1:]:
+            entry = {
+                "id": value[0],
+                "name": value[1]
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+        return data
     else:
         return sheet.get_values()
 
 
 def fetch_all_sheets():
-    flows = {}
+    transactions = {}
 
-    date = datetime.strptime(google_sheets_config["flow_start"], '%Y-%m-%d')
-    for flow_code in date_utils.flow_codes_range(date, date.today()):
-        flows[flow_code] = fetch_flow_sheet(flow_code)
+    date = datetime.strptime(google_sheets_config["transactions_start"], '%Y-%m-%d')
+    for transaction_code in date_utils.transaction_codes_range(date, date.today()):
+        transactions[transaction_code] = fetch_transaction_sheet(transaction_code)
 
     return {
+        "users": fetch_sheet("users"),
         "categories": fetch_sheet("categories"),
         "methods": fetch_sheet("methods"),
-        "venues": fetch_sheet("venues"),
-        "flow": flows
+        "merchants": fetch_sheet("merchants"),
+        "currencies": fetch_sheet("currencies"),
+        "transactions": transactions
     }
 
 
 def fetch_all_data(sheets):
-    data = {"flow": {}}
+    data = {"transactions": {}}
     for sheet in sheets:
-        if sheet == "flow":
+        if sheet == "transactions":
             # pass
-            for flow_sheet in sheets["flow"]:
-                data["flow"][flow_sheet] = fetch_data(
-                    flow_sheet, sheets["flow"][flow_sheet])
+            for transaction_sheet in sheets["transactions"]:
+                data["transactions"][transaction_sheet] = fetch_data(
+                    transaction_sheet, sheets["transactions"][transaction_sheet])
         else:
             data[sheet] = fetch_data(sheet, sheets[sheet])
         pass
@@ -143,8 +158,8 @@ def get_cached_data():
     return data
 
 
-def insert_into_flow_sheet(id: str, row: list):
-    insert_into_sheet(sheets["flow"][id], row)
+def insert_into_transaction_sheet(id: str, row: list):
+    insert_into_sheet(sheets["transactions"][id], row)
 
 
 def insert_into_sheet(sheet: Worksheet, row: list):

@@ -357,7 +357,7 @@ def handle_flow_add_venue(update: Update, context: CallbackContext):
         "EXPENSE",
         (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["venue"],
-        authorized_data[update.callback_query.message.chat.id]["flow_add"]["description"] or "",
+        "description" in authorized_data[update.callback_query.message.chat.id]["flow_add"] and authorized_data[update.callback_query.message.chat.id]["flow_add"]["description"] or "",
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["method"],
         authorized_data[update.callback_query.message.chat.id]["flow_add"]["sum"],
         "RUB"

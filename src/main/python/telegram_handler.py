@@ -218,9 +218,9 @@ def keyboard_categories():
 
     current_row = 0
 
-    for category_id in data["categories"]["list"]:
+    for id in data["categories"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=data["categories"]["dict"][category_id]["emoji"] + " " + data["categories"]["dict"][category_id]["name"], callback_data=data["categories"]["dict"][category_id]["id"]))
+            text=data["categories"]["dict"][id]["emoji"] + " " + data["categories"]["dict"][id]["name"], callback_data=id))
         if len(reply_keyboard[current_row]) >= 3:
             reply_keyboard.append([])
             current_row = current_row + 1
@@ -235,9 +235,9 @@ def keyboard_methods():
 
     current_row = 0
 
-    for category_id in data["methods"]["list"]:
+    for id in data["methods"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=data["methods"]["dict"][category_id]["name"], callback_data=data["methods"]["dict"][category_id]["id"]))
+            text=data["methods"]["dict"][id]["name"], callback_data=id))
         if len(reply_keyboard[current_row]) >= 2:
             reply_keyboard.append([])
             current_row = current_row + 1
@@ -252,10 +252,10 @@ def keyboard_merchants():
 
     current_row = 0
 
-    for category_id in data["merchants"]["list"]:
+    for id in data["merchants"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=data["merchants"]["dict"][category_id]["name"], callback_data=data["merchants"]["dict"][category_id]["id"]))
-        if len(reply_keyboard[current_row]) >= telegram_config["keyboard_size"]:
+            text=(data["merchants"]["dict"][id]["emoji"] or data["categories"]["dict"][data["merchants"]["dict"][id]["category"]]["emoji"]) + " " + data["merchants"]["dict"][id]["name"], callback_data=id))
+        if len(reply_keyboard[current_row]) >= 3:
             reply_keyboard.append([])
             current_row = current_row + 1
 
@@ -279,6 +279,7 @@ def command_help(update: Update, context: CallbackContext):
 
 
 # states
+
 
 def state_main(message: Message):
     message.edit_text(

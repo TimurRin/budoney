@@ -76,7 +76,8 @@ def fetch_data(name: str, sheet: Spreadsheet):
             entry = {
                 "id": value[0],
                 "name": value[1],
-                "category": value[3]
+                "category": value[3],
+                "emoji": value[4]
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

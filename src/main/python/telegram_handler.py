@@ -181,6 +181,10 @@ def keyboard_template_with_back():
     return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK")]]
 
 
+def keyboard_template_with_back_and_add():
+    return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK"), telegram.InlineKeyboardButton(text="➕ Add new", callback_data="_ADD")]]
+
+
 def keyboard_main():
     reply_keyboard = [
         [
@@ -188,8 +192,6 @@ def keyboard_main():
                 text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
                 text="💸 Add expense", callback_data="transaction_add_sum"),
-            telegram.InlineKeyboardButton(
-                text="💰 Add income", callback_data="transaction_add_sum"),
         ],
         [
             telegram.InlineKeyboardButton(
@@ -208,6 +210,12 @@ def keyboard_main():
                 text="👫 Users", callback_data="users"),
         ]
     ]
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_transactions():
+    reply_keyboard = keyboard_template_with_back_and_add()
+
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -231,7 +239,7 @@ def keyboard_categories():
 def keyboard_methods():
     data = gsh.get_cached_data()
 
-    reply_keyboard = keyboard_template_with_back()
+    reply_keyboard = keyboard_template_with_back_and_add()
 
     current_row = 0
 
@@ -248,7 +256,7 @@ def keyboard_methods():
 def keyboard_merchants():
     data = gsh.get_cached_data()
 
-    reply_keyboard = keyboard_template_with_back()
+    reply_keyboard = keyboard_template_with_back_and_add()
 
     current_row = 0
 
@@ -294,7 +302,7 @@ def handle_main(update: Update, context: CallbackContext):
         return states["main"]
     elif update.callback_query.data == "transactions":
         update.callback_query.message.edit_text(
-            "List of transactions", reply_markup=keyboard_with_back())
+            "List of transactions", reply_markup=keyboard_transactions())
         return states["transactions"]
     elif update.callback_query.data == "transaction_add_sum":
         update.callback_query.message.edit_text(

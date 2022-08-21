@@ -92,7 +92,9 @@ def fetch_data(name: str, sheet: Spreadsheet):
                 "id": value[0],
                 "name": value[1],
                 "credit": value[2] == "TRUE" and True or False,
-                "owner": value[3]
+                "mir": value[3] == "TRUE" and True or False,
+                "cashback": value[4] == "TRUE" and True or False,
+                "owner": value[5]
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

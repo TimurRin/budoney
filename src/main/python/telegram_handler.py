@@ -19,6 +19,7 @@ import utils.yaml_manager as yaml_manager
 
 print_label = "[telegram_handler]"
 
+
 updater = None
 
 states = {
@@ -26,9 +27,9 @@ states = {
     "wip": 1,
 
     "transactions": 100,
-    "transaction_add_sum": 105,
-    "transaction_add_method": 106,
-    "transaction_add_merchant": 107,
+    "transaction_fast_add_sum": 105,
+    "transaction_fast_add_method": 106,
+    "transaction_fast_add_merchant": 107,
 
     "merchants": 200,
     "merchant_add_name": 205,
@@ -62,9 +63,9 @@ def init():
             states["main"]: [CallbackQueryHandler(handle_main)],
             states["wip"]: [CallbackQueryHandler(handle_wip)],
             states["transactions"]: [CallbackQueryHandler(handle_transactions)],
-            states["transaction_add_sum"]: [MessageHandler(text_filters(), handle_transaction_add_sum)],
-            states["transaction_add_method"]: [CallbackQueryHandler(handle_transaction_add_method)],
-            states["transaction_add_merchant"]: [CallbackQueryHandler(handle_transaction_add_merchant)],
+            states["transaction_fast_add_sum"]: [MessageHandler(text_filters(), handle_transaction_fast_add_sum)],
+            states["transaction_fast_add_method"]: [CallbackQueryHandler(handle_transaction_fast_add_method)],
+            states["transaction_fast_add_merchant"]: [CallbackQueryHandler(handle_transaction_fast_add_merchant)],
             states["merchants"]: [CallbackQueryHandler(handle_merchants)],
             states["merchant_add_name"]: [MessageHandler(text_filters(), handle_merchant_add_name)],
             states["merchant_add_category"]: [CallbackQueryHandler(handle_merchant_add_category)],
@@ -191,7 +192,7 @@ def keyboard_main():
             telegram.InlineKeyboardButton(
                 text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
-                text="💸 Add expense", callback_data="transaction_add_sum"),
+                text="💸 Add fast transaction", callback_data="transaction_fast_add_sum"),
         ],
         [
             telegram.InlineKeyboardButton(
@@ -304,10 +305,10 @@ def handle_main(update: Update, context: CallbackContext):
         update.callback_query.message.edit_text(
             "List of transactions", reply_markup=keyboard_transactions())
         return states["transactions"]
-    elif update.callback_query.data == "transaction_add_sum":
+    elif update.callback_query.data == "transaction_fast_add_sum":
         update.callback_query.message.edit_text(
-            "Enter sum and (optionally, after comma) description")
-        return states["transaction_add_sum"]
+            "Enter sum (and, optionally, after comma: currency (" + telegram_config["main_currency"] + " is default) and description)")
+        return states["transaction_fast_add_sum"]
     elif update.callback_query.data == "merchants":
         update.callback_query.message.edit_text("List of merchants",
                                                 reply_markup=keyboard_merchants())
@@ -330,36 +331,42 @@ def handle_transactions(update: Update, context: CallbackContext):
     return state_main(update.callback_query.message)
 
 
-def handle_transaction_add_sum(update: Update, context: CallbackContext):
+def handle_transaction_fast_add_sum(update: Update, context: CallbackContext):
     try:
+        data = gsh.get_cached_data()
+
         splitted = update.message.text.split(", ")
 
         sum = float(splitted[0])
 
-        description = len(splitted) >= 2 and (", ".join(splitted[1:])) or None
+        currency_presented = len(splitted) >= 2 and splitted[1].upper() in data["currencies"]["dict"]
+        currency = currency_presented and splitted[1] or telegram_config["main_currency"]
+
+        description = currency_presented and len(splitted) >= 3 and (", ".join(splitted[2:])) or len(splitted) >= 2 and (", ".join(splitted[1:])) or None
 
         authorized_data[update.message.chat.id]["transaction_add"]["sum"] = sum
+        authorized_data[update.message.chat.id]["transaction_add"]["currency"] = currency
         if description:
             authorized_data[update.message.chat.id]["transaction_add"]["description"] = description
 
         update.message.reply_text(display_text_add_transaction(authorized_data[update.message.chat.id]["transaction_add"]) + ". How?",
                                   reply_markup=keyboard_methods())
 
-        return states["transaction_add_method"]
+        return states["transaction_fast_add_method"]
     except ValueError:
         return state_main(update.message)
 
 
-def handle_transaction_add_method(update: Update, context: CallbackContext):
+def handle_transaction_fast_add_method(update: Update, context: CallbackContext):
     authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"] = update.callback_query.data
 
     update.callback_query.message.edit_text(display_text_add_transaction(authorized_data[update.callback_query.message.chat.id]["transaction_add"]) + ". Where?",
                                             reply_markup=keyboard_merchants())
 
-    return states["transaction_add_merchant"]
+    return states["transaction_fast_add_merchant"]
 
 
-def handle_transaction_add_merchant(update: Update, context: CallbackContext):
+def handle_transaction_fast_add_merchant(update: Update, context: CallbackContext):
     authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"] = update.callback_query.data
 
     send_info_message(display_text_add_transaction(
@@ -373,7 +380,7 @@ def handle_transaction_add_merchant(update: Update, context: CallbackContext):
             update.callback_query.message.chat.id]["transaction_add"]["description"] or "",
         authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"],
         authorized_data[update.callback_query.message.chat.id]["transaction_add"]["sum"],
-        "RUB"
+        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["currency"]
     ])
 
     authorized_data[update.callback_query.message.chat.id]["transaction_add"] = {}

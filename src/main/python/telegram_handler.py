@@ -31,12 +31,13 @@ states = {
     "transaction_add_fast_method": 106,
     "transaction_add_fast_merchant": 107,
     "transaction": 110,
-    "transaction_date": 111,
-    "transaction_sum": 112,
-    "transaction_currency": 113,
-    "transaction_method": 114,
-    "transaction_merchant": 115,
-    "transaction_description": 116,
+    "transaction_type": 111,
+    "transaction_date": 112,
+    "transaction_sum": 113,
+    "transaction_currency": 114,
+    "transaction_method": 115,
+    "transaction_merchant": 116,
+    "transaction_description": 117,
 
     "merchants": 200,
     "merchant": 201,
@@ -61,6 +62,10 @@ error_text = "This action has been skipped (due to old session or other error), 
 
 authorized_data = {}
 
+handler_data_back = "_BACK"
+handler_data_add = "_ADD"
+handler_data_submit = "_SUBMIT"
+
 
 def init():
     global updater
@@ -73,20 +78,33 @@ def init():
         states={
             states["main"]: [CallbackQueryHandler(handle_main)],
             states["wip"]: [CallbackQueryHandler(handle_wip)],
+
             states["transactions"]: [CallbackQueryHandler(handle_transactions)],
             states["transaction_add_fast_sum"]: [MessageHandler(text_filters(), handle_transaction_add_fast_sum)],
             states["transaction_add_fast_method"]: [CallbackQueryHandler(handle_transaction_add_fast_method)],
             states["transaction_add_fast_merchant"]: [CallbackQueryHandler(handle_transaction_add_fast_merchant)],
+            states["transaction"]: [CallbackQueryHandler(handle_transaction)],
+            states["transaction_type"]: [CallbackQueryHandler(handle_transaction_type)],
+            states["transaction_date"]: [CallbackQueryHandler(handle_transaction_date)],
+            states["transaction_sum"]: [MessageHandler(text_filters(), handle_transaction_sum)],
+            states["transaction_currency"]: [CallbackQueryHandler(handle_transaction_currency)],
+            states["transaction_method"]: [CallbackQueryHandler(handle_transaction_method)],
+            states["transaction_merchant"]: [CallbackQueryHandler(handle_transaction_merchant)],
+            states["transaction_description"]: [MessageHandler(text_filters(), handle_transaction_description)],
+
             states["merchants"]: [CallbackQueryHandler(handle_merchants)],
             states["merchant_name"]: [MessageHandler(text_filters(), handle_merchant_name)],
             states["merchant_category"]: [CallbackQueryHandler(handle_merchant_category)],
+
             states["methods"]: [CallbackQueryHandler(handle_methods)],
             states["method_name"]: [MessageHandler(text_filters(), handle_method_name)],
             states["method_is_mir"]: [CallbackQueryHandler(handle_method_is_mir)],
             states["method_is_credit"]: [CallbackQueryHandler(handle_method_is_credit)],
             states["method_is_cashback"]: [CallbackQueryHandler(handle_method_is_cashback)],
             states["method_owner"]: [CallbackQueryHandler(handle_method_owner)],
+
             states["categories"]: [CallbackQueryHandler(handle_categories)],
+
             states["currencies"]: [CallbackQueryHandler(handle_currencies)],
         },
         fallbacks=[CommandHandler('start', command_start)],
@@ -161,10 +179,22 @@ def check_common_data():
     pass
 
 
+def is_handler_data_not_back(text: str):
+    return text != handler_data_back
+
+
+def is_handler_data_add(text: str):
+    return text == handler_data_add
+
+
+def is_handler_data_submit(text: str):
+    return text == handler_data_submit
+
+
 def display_text_add_transaction(add_transaction: dict):
     data = gsh.get_cached_data()
 
-    text = str(add_transaction["sum"]) + " " + \
+    text = str("sum" in add_transaction and add_transaction["sum"] or 0) + " " + \
         ("currency" in add_transaction and add_transaction["currency"] or "RUB")
     try:
         if "method" in add_transaction:
@@ -184,19 +214,58 @@ def display_text_add_transaction(add_transaction: dict):
     return str(text)
 
 
+def transaction_submit(message: Message):
+    data = authorized_data[message.chat.id]["transaction_add"]
+
+    if ("type" in data) and ("sum" in data and data["sum"] > 0) and ("currency" in data) and ("method" in data) and (data["type"] == "TRANSFER" and "target_merchant" in data or "merchant" in data):
+        send_info_message(display_text_add_transaction(data))
+
+        gsh.insert_into_transaction_sheet(date_utils.get_today_transaction_code(), [
+            data["type"],
+            (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+            data["sum"],
+            data["currency"],
+            data["method"],
+            data["merchant"],
+            "description" in data and data["description"] or ""
+        ])
+
+        authorized_data[message.chat.id]["transaction_add"] = {}
+
+        return state_main(message)
+    else:
+        return state_transaction(message)
+
+
 # keyboards
 
 
-def keyboard_template_default():
-    return [[]]
+# keyboard rows
 
 
-def keyboard_template_with_back():
-    return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK")]]
+def keyboard_row_back():
+    return [telegram.InlineKeyboardButton(text="🔙 Back", callback_data=handler_data_back)]
 
 
-def keyboard_template_with_back_and_add():
-    return [[telegram.InlineKeyboardButton(text="🔙 Back", callback_data="_BACK"), telegram.InlineKeyboardButton(text="➕ Add new", callback_data="_ADD")]]
+def keyboard_row_back_and_add():
+    return [
+        telegram.InlineKeyboardButton(
+            text="🔙 Back", callback_data=handler_data_back),
+        telegram.InlineKeyboardButton(
+            text="➕ Add new", callback_data=handler_data_add)
+    ]
+
+
+def keyboard_row_back_and_submit():
+    return [
+        telegram.InlineKeyboardButton(
+            text="🔙 Back", callback_data=handler_data_back),
+        telegram.InlineKeyboardButton(
+            text="✅ Submit", callback_data=handler_data_submit)
+    ]
+
+
+# full keyboards
 
 
 def keyboard_main():
@@ -228,7 +297,23 @@ def keyboard_main():
 
 
 def keyboard_transactions():
-    reply_keyboard = keyboard_template_with_back_and_add()
+    reply_keyboard = [keyboard_row_back_and_add()]
+
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_transaction():
+    reply_keyboard = []
+
+    # reply_keyboard.append([telegram.InlineKeyboardButton("Edit type", callback_data="_EDIT_TYPE"),
+    #                       telegram.InlineKeyboardButton("Edit date", callback_data="_EDIT_DATE")])
+    # reply_keyboard.append([telegram.InlineKeyboardButton("Edit sum", callback_data="_EDIT_SUM"),
+    #                       telegram.InlineKeyboardButton("Edit currency", callback_data="_EDIT_CURRENCY")])
+    # reply_keyboard.append([telegram.InlineKeyboardButton("Edit method", callback_data="_EDIT_METHOD"),
+    #                       telegram.InlineKeyboardButton("Edit merchant", callback_data="_EDIT_MERCHANT")])
+    # reply_keyboard.append([telegram.InlineKeyboardButton(
+    #     "Edit description", callback_data="_EDIT_DESCRIPTION")])
+    reply_keyboard.append(keyboard_row_back_and_submit())
 
     return InlineKeyboardMarkup(reply_keyboard)
 
@@ -236,7 +321,7 @@ def keyboard_transactions():
 def keyboard_categories():
     data = gsh.get_cached_data()
 
-    reply_keyboard = keyboard_template_with_back()
+    reply_keyboard = [keyboard_row_back()]
 
     current_row = 0
 
@@ -253,7 +338,7 @@ def keyboard_categories():
 def keyboard_methods():
     data = gsh.get_cached_data()
 
-    reply_keyboard = keyboard_template_with_back_and_add()
+    reply_keyboard = [keyboard_row_back_and_add()]
 
     current_row = 0
 
@@ -270,7 +355,7 @@ def keyboard_methods():
 def keyboard_merchants():
     data = gsh.get_cached_data()
 
-    reply_keyboard = keyboard_template_with_back_and_add()
+    reply_keyboard = [keyboard_row_back_and_add()]
 
     current_row = 0
 
@@ -285,7 +370,7 @@ def keyboard_merchants():
 
 
 def keyboard_with_back():
-    return InlineKeyboardMarkup(keyboard_template_with_back())
+    return InlineKeyboardMarkup([keyboard_row_back()])
 
 
 # commands
@@ -309,38 +394,74 @@ def state_main(message: Message):
     return states["main"]
 
 
+def state_transactions(message: Message):
+    message.edit_text(
+        "List of transactions", reply_markup=keyboard_transactions())
+    return states["transactions"]
+
+
+def state_transaction(message: Message):
+    message.edit_text(
+        display_text_add_transaction(authorized_data[message.chat.id]["transaction_add"]), reply_markup=keyboard_transaction())
+    return states["transaction"]
+
+
+def state_transaction_add_fast_sum(message: Message):
+    message.edit_text(
+        "Enter sum (and, optionally, after comma: currency (" + telegram_config["main_currency"] + " is default) and description)")
+    return states["transaction_add_fast_sum"]
+
+
+def state_merchants(message: Message):
+    message.edit_text("List of merchants",
+                      reply_markup=keyboard_merchants())
+    return states["merchants"]
+
+
+def state_methods(message: Message):
+    message.edit_text("List of methods",
+                      reply_markup=keyboard_methods())
+    return states["methods"]
+
+
+def state_categories(message: Message):
+    message.edit_text("List of categories",
+                      reply_markup=keyboard_categories())
+    return states["categories"]
+
+
+def state_wip(message: Message):
+    message.edit_text("🏗️ This section is not ready",
+                      reply_markup=keyboard_with_back())
+    return states["wip"]
+
+
 # handlers
+
 
 def handle_main(update: Update, context: CallbackContext):
     if update.callback_query.data == "main":
-        return states["main"]
+        return state_main(update.callback_query.message)
     elif update.callback_query.data == "transactions":
-        update.callback_query.message.edit_text(
-            "List of transactions", reply_markup=keyboard_transactions())
-        return states["transactions"]
+        return state_transactions(update.callback_query.message)
     elif update.callback_query.data == "transaction_add_fast_sum":
-        update.callback_query.message.edit_text(
-            "Enter sum (and, optionally, after comma: currency (" + telegram_config["main_currency"] + " is default) and description)")
-        return states["transaction_add_fast_sum"]
+        return state_transaction_add_fast_sum(update.callback_query.message)
     elif update.callback_query.data == "merchants":
-        update.callback_query.message.edit_text("List of merchants",
-                                                reply_markup=keyboard_merchants())
-        return states["merchants"]
+        return state_merchants(update.callback_query.message)
     elif update.callback_query.data == "methods":
-        update.callback_query.message.edit_text("List of methods",
-                                                reply_markup=keyboard_methods())
-        return states["methods"]
+        return state_methods(update.callback_query.message)
     elif update.callback_query.data == "categories":
-        update.callback_query.message.edit_text("List of categories",
-                                                reply_markup=keyboard_categories())
-        return states["categories"]
+        return state_categories(update.callback_query.message)
     else:
-        update.callback_query.message.edit_text("🏗️ This section is not ready",
-                                                reply_markup=keyboard_with_back())
-        return states["wip"]
+        return state_wip(update.callback_query.message)
 
 
 def handle_transactions(update: Update, context: CallbackContext):
+    if is_handler_data_add(update.callback_query.data):
+        return state_transaction(update.callback_query.message)
+    elif is_handler_data_not_back(update.callback_query.data):
+        pass
+
     return state_main(update.callback_query.message)
 
 
@@ -359,6 +480,7 @@ def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
         description = currency_presented and len(splitted) >= 3 and (", ".join(
             splitted[2:])) or len(splitted) >= 2 and (", ".join(splitted[1:])) or None
 
+        authorized_data[update.message.chat.id]["transaction_add"]["type"] = "EXPENSE"
         authorized_data[update.message.chat.id]["transaction_add"]["sum"] = sum
         authorized_data[update.message.chat.id]["transaction_add"]["currency"] = currency
         if description:
@@ -384,26 +506,49 @@ def handle_transaction_add_fast_method(update: Update, context: CallbackContext)
 def handle_transaction_add_fast_merchant(update: Update, context: CallbackContext):
     authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"] = update.callback_query.data
 
-    send_info_message(display_text_add_transaction(
-        authorized_data[update.callback_query.message.chat.id]["transaction_add"]))
+    return state_transaction(update.callback_query.message)
 
-    gsh.insert_into_transaction_sheet(date_utils.get_today_transaction_code(), [
-        "EXPENSE",
-        (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
-        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"],
-        "description" in authorized_data[update.callback_query.message.chat.id]["transaction_add"] and authorized_data[
-            update.callback_query.message.chat.id]["transaction_add"]["description"] or "",
-        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"],
-        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["sum"],
-        authorized_data[update.callback_query.message.chat.id]["transaction_add"]["currency"]
-    ])
 
-    authorized_data[update.callback_query.message.chat.id]["transaction_add"] = {}
-    return state_main(update.callback_query.message)
+def handle_transaction(update: Update, context: CallbackContext):
+    if is_handler_data_not_back(update.callback_query.data):
+        if is_handler_data_submit(update.callback_query.data):
+            return transaction_submit(update.callback_query.message)
+
+    return state_transactions(update.callback_query.message)
+
+
+def handle_transaction_type(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_date(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_sum(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_currency(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_method(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_merchant(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_description(update: Update, context: CallbackContext):
+    return state_transaction(update.callback_query.message)
 
 
 def handle_merchants(update: Update, context: CallbackContext):
-    if (update.callback_query.data != "_BACK"):
+    if is_handler_data_add(update.callback_query.data):
+        pass
+    elif is_handler_data_not_back(update.callback_query.data):
         data = gsh.get_cached_data()
         send_info_message(update.callback_query.from_user.first_name + " has selected " +
                           data["merchants"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
@@ -420,7 +565,9 @@ def handle_merchant_category(update: Update, context: CallbackContext):
 
 
 def handle_methods(update: Update, context: CallbackContext):
-    if (update.callback_query.data != "_BACK"):
+    if is_handler_data_add(update.callback_query.data):
+        pass
+    elif is_handler_data_not_back(update.callback_query.data):
         data = gsh.get_cached_data()
         send_info_message(update.callback_query.from_user.first_name + " has selected " +
                           data["methods"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
@@ -449,7 +596,9 @@ def handle_method_owner(update: Update, context: CallbackContext):
 
 
 def handle_categories(update: Update, context: CallbackContext):
-    if (update.callback_query.data != "_BACK"):
+    if is_handler_data_add(update.callback_query.data):
+        pass
+    elif is_handler_data_not_back(update.callback_query.data):
         data = gsh.get_cached_data()
         send_info_message(update.callback_query.from_user.first_name + " has selected " + data["categories"]["dict"][update.callback_query.data]["emoji"] + " "
                           + data["categories"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
@@ -462,9 +611,7 @@ def handle_currencies(update: Update, context: CallbackContext):
 
 
 def handle_wip(update: Update, context: CallbackContext):
-    update.callback_query.message.edit_text(
-        main_entry_text, reply_markup=keyboard_main())
-    return states["main"]
+    return state_main(update.callback_query.message)
 
 
 # context.bot.delete_message(update.message.chat_id, str(update.message.message_id))

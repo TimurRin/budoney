@@ -1,10 +1,11 @@
 from datetime import datetime
-import string
+import difflib
 import gspread
 from gspread import Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
 
 import utils.date_utils as date_utils
+import utils.string_utils as string_utils
 import utils.yaml_manager as yaml_manager
 
 print_label = "[google_sheets_handler]"
@@ -70,7 +71,8 @@ def fetch_data(name: str, sheet: Spreadsheet):
     elif name == "merchants":
         data = {
             "dict": {},
-            "list": []
+            "list": [],
+            "keywords": {}
         }
         for value in sheet.get_values()[1:]:
             entry = {
@@ -81,6 +83,15 @@ def fetch_data(name: str, sheet: Spreadsheet):
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
+
+            data["keywords"][value[0].casefold()] = value[0]
+            data["keywords"][value[1].casefold()] = value[0]
+            for keyword in value[2].split(","):
+                data["keywords"][keyword.casefold()] = value[0]
+                # for edited_keyword in string_utils.edits1(keyword):
+                #     data["keywords"][edited_keyword.casefold()] = value[0]
+                # difflib.get_close_matches(keyword)
+
         return data
     elif name == "methods":
         data = {

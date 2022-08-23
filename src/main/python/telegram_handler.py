@@ -27,9 +27,11 @@ states = {
     "wip": 1,
 
     "transactions": 100,
-    "transaction_add_fast_sum": 105,
-    "transaction_add_fast_method": 106,
-    "transaction_add_fast_merchant": 107,
+    "transaction_add_fast_type": 105,
+    "transaction_add_fast_sum": 106,
+    "transaction_add_fast_method": 107,
+    "transaction_add_fast_merchant": 108,
+    "transaction_add_fast_target_method": 109,
     "transaction": 110,
     "transaction_type": 111,
     "transaction_date": 112,
@@ -80,9 +82,11 @@ def init():
             states["wip"]: [CallbackQueryHandler(handle_wip)],
 
             states["transactions"]: [CallbackQueryHandler(handle_transactions)],
+            states["transaction_add_fast_type"]: [CallbackQueryHandler(handle_transaction_add_fast_type)],
             states["transaction_add_fast_sum"]: [MessageHandler(text_filters(), handle_transaction_add_fast_sum)],
             states["transaction_add_fast_method"]: [CallbackQueryHandler(handle_transaction_add_fast_method)],
             states["transaction_add_fast_merchant"]: [CallbackQueryHandler(handle_transaction_add_fast_merchant)],
+            states["transaction_add_fast_target_method"]: [CallbackQueryHandler(handle_transaction_add_fast_target_method)],
             states["transaction"]: [CallbackQueryHandler(handle_transaction)],
             states["transaction_type"]: [CallbackQueryHandler(handle_transaction_type)],
             states["transaction_date"]: [CallbackQueryHandler(handle_transaction_date)],
@@ -194,21 +198,34 @@ def is_handler_data_submit(text: str):
 def display_text_add_transaction(add_transaction: dict):
     data = gsh.get_cached_data()
 
-    text = str("sum" in add_transaction and add_transaction["sum"] or 0) + " " + \
+    text = ""
+
+    if "type" in add_transaction and add_transaction["type"] != "EXPENSE":
+        text = add_transaction["type"] + " — "
+
+    text = text + str("sum" in add_transaction and add_transaction["sum"] or 0) + " " + \
         ("currency" in add_transaction and add_transaction["currency"] or "RUB")
     try:
         if "method" in add_transaction:
             text = text + " — " + \
                 data["methods"]["dict"][add_transaction["method"]]["name"]
-        if "merchant" in add_transaction and "description" in add_transaction:
-            text = text + " — " + \
-                data["merchants"]["dict"][add_transaction["merchant"]]["name"] + \
-                " (" + add_transaction["description"] + ")"
-        elif "merchant" in add_transaction:
-            text = text + " — " + \
-                data["merchants"]["dict"][add_transaction["merchant"]]["name"]
-        elif "description" in add_transaction:
-            text = text + " — " + add_transaction["description"]
+
+        if "type" in add_transaction and add_transaction["type"] == "TRANSFER":
+            if "target_method" in add_transaction:
+                text = text + " > " + \
+                    data["methods"]["dict"][add_transaction["target_method"]]["name"]
+            if "description" in add_transaction:
+                text = text + " — " + add_transaction["description"]
+        else:
+            if "merchant" in add_transaction and "description" in add_transaction:
+                text = text + " — " + \
+                    data["merchants"]["dict"][add_transaction["merchant"]]["name"] + \
+                    " (" + add_transaction["description"] + ")"
+            elif "merchant" in add_transaction:
+                text = text + " — " + \
+                    data["merchants"]["dict"][add_transaction["merchant"]]["name"]
+            elif "description" in add_transaction:
+                text = text + " — " + add_transaction["description"]
     except:
         pass
     return str(text)
@@ -217,7 +234,11 @@ def display_text_add_transaction(add_transaction: dict):
 def transaction_submit(message: Message):
     data = authorized_data[message.chat.id]["transaction_add"]
 
-    if ("type" in data) and ("sum" in data and data["sum"] > 0) and ("currency" in data) and ("method" in data) and (data["type"] == "TRANSFER" and "target_merchant" in data or "merchant" in data):
+    target = ("type" in data and data["type"] ==
+              "TRANSFER") and "target_method" or "merchant"
+
+    if ("type" in data) and ("sum" in data and data["sum"] > 0) and ("currency" in data) and ("method" in data) and (data["type"] ==
+              "CORRECTION" or target in data):
         send_info_message(display_text_add_transaction(data))
 
         gsh.insert_into_transaction_sheet(date_utils.get_today_transaction_code(), [
@@ -226,7 +247,7 @@ def transaction_submit(message: Message):
             data["sum"],
             data["currency"],
             data["method"],
-            data["merchant"],
+            data["type"] != "CORRECTION" and data[target] or "",
             "description" in data and data["description"] or ""
         ])
 
@@ -235,9 +256,6 @@ def transaction_submit(message: Message):
         return state_main(message)
     else:
         return state_transaction(message)
-
-
-# keyboards
 
 
 # keyboard rows
@@ -274,7 +292,7 @@ def keyboard_main():
             telegram.InlineKeyboardButton(
                 text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
-                text="💸 Add fast transaction", callback_data="transaction_add_fast_sum"),
+                text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
         ],
         [
             telegram.InlineKeyboardButton(
@@ -298,6 +316,18 @@ def keyboard_main():
 
 def keyboard_transactions():
     reply_keyboard = [keyboard_row_back_and_add()]
+
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_add_fast_type():
+    reply_keyboard = []
+
+    reply_keyboard.append([telegram.InlineKeyboardButton("Expense", callback_data="EXPENSE"),
+                          telegram.InlineKeyboardButton("Income", callback_data="INCOME")])
+    reply_keyboard.append([telegram.InlineKeyboardButton("Transfer", callback_data="TRANSFER"),
+                          telegram.InlineKeyboardButton("Correction", callback_data="CORRECTION")])
+    reply_keyboard.append(keyboard_row_back())
 
     return InlineKeyboardMarkup(reply_keyboard)
 
@@ -377,7 +407,7 @@ def keyboard_with_back():
 
 def command_start(update: Update, context: CallbackContext):
     update.message.reply_text(
-        "🍏 Fresh start! " + main_entry_text, reply_markup=keyboard_main())
+        "🍏 A fresh start! " + main_entry_text, reply_markup=keyboard_main())
     return states["main"]
 
 
@@ -394,6 +424,12 @@ def state_main(message: Message):
     return states["main"]
 
 
+def state_main_reply(message: Message):
+    message.reply_text(
+        main_entry_text, reply_markup=keyboard_main())
+    return states["main"]
+
+
 def state_transactions(message: Message):
     message.edit_text(
         "List of transactions", reply_markup=keyboard_transactions())
@@ -406,9 +442,16 @@ def state_transaction(message: Message):
     return states["transaction"]
 
 
+def state_transaction_add_fast_type(message: Message):
+    message.edit_text("Select transaction type",
+                      reply_markup=keyboard_add_fast_type())
+    return states["transaction_add_fast_type"]
+
+
 def state_transaction_add_fast_sum(message: Message):
     message.edit_text(
-        "Enter sum (and, optionally, after comma: currency (" + telegram_config["main_currency"] + " is default) and description)")
+        "Enter transaction data in this sequence \(data in _italic_ may be ommited\): _date_, _type_, *sum* _currency_, _method_, _merchant/target_, _description_",
+        parse_mode='MarkdownV2')
     return states["transaction_add_fast_sum"]
 
 
@@ -444,8 +487,8 @@ def handle_main(update: Update, context: CallbackContext):
         return state_main(update.callback_query.message)
     elif update.callback_query.data == "transactions":
         return state_transactions(update.callback_query.message)
-    elif update.callback_query.data == "transaction_add_fast_sum":
-        return state_transaction_add_fast_sum(update.callback_query.message)
+    elif update.callback_query.data == "transaction_add_fast_type":
+        return state_transaction_add_fast_type(update.callback_query.message)
     elif update.callback_query.data == "merchants":
         return state_merchants(update.callback_query.message)
     elif update.callback_query.data == "methods":
@@ -465,6 +508,11 @@ def handle_transactions(update: Update, context: CallbackContext):
     return state_main(update.callback_query.message)
 
 
+def handle_transaction_add_fast_type(update: Update, context: CallbackContext):
+    authorized_data[update.callback_query.message.chat.id]["transaction_add"]["type"] = update.callback_query.data
+    return state_transaction_add_fast_sum(update.callback_query.message)
+
+
 def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
     try:
         data = gsh.get_cached_data()
@@ -480,7 +528,6 @@ def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
         description = currency_presented and len(splitted) >= 3 and (", ".join(
             splitted[2:])) or len(splitted) >= 2 and (", ".join(splitted[1:])) or None
 
-        authorized_data[update.message.chat.id]["transaction_add"]["type"] = "EXPENSE"
         authorized_data[update.message.chat.id]["transaction_add"]["sum"] = sum
         authorized_data[update.message.chat.id]["transaction_add"]["currency"] = currency
         if description:
@@ -491,20 +538,34 @@ def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
 
         return states["transaction_add_fast_method"]
     except ValueError:
-        return state_main(update.message)
+        return state_main_reply(update.message)
 
 
 def handle_transaction_add_fast_method(update: Update, context: CallbackContext):
     authorized_data[update.callback_query.message.chat.id]["transaction_add"]["method"] = update.callback_query.data
 
-    update.callback_query.message.edit_text(display_text_add_transaction(authorized_data[update.callback_query.message.chat.id]["transaction_add"]) + ". Where?",
-                                            reply_markup=keyboard_merchants())
+    if authorized_data[update.callback_query.message.chat.id]["transaction_add"]["type"] == "TRANSFER":
+        update.callback_query.message.edit_text(display_text_add_transaction(
+            authorized_data[update.callback_query.message.chat.id]["transaction_add"]) + ". To what method?", reply_markup=keyboard_methods())
 
-    return states["transaction_add_fast_merchant"]
+        return states["transaction_add_fast_target_method"]
+    elif authorized_data[update.callback_query.message.chat.id]["transaction_add"]["type"] == "CORRECTION":
+        return state_transaction(update.callback_query.message)
+    else:
+        update.callback_query.message.edit_text(display_text_add_transaction(authorized_data[update.callback_query.message.chat.id]["transaction_add"]) + ". Where?",
+                                                reply_markup=keyboard_merchants())
+
+        return states["transaction_add_fast_merchant"]
 
 
 def handle_transaction_add_fast_merchant(update: Update, context: CallbackContext):
     authorized_data[update.callback_query.message.chat.id]["transaction_add"]["merchant"] = update.callback_query.data
+
+    return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_add_fast_target_method(update: Update, context: CallbackContext):
+    authorized_data[update.callback_query.message.chat.id]["transaction_add"]["target_method"] = update.callback_query.data
 
     return state_transaction(update.callback_query.message)
 

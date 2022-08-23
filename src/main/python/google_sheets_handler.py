@@ -1,11 +1,9 @@
 from datetime import datetime
-import difflib
 import gspread
 from gspread import Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
 
 import utils.date_utils as date_utils
-import utils.string_utils as string_utils
 import utils.yaml_manager as yaml_manager
 
 print_label = "[google_sheets_handler]"
@@ -174,6 +172,10 @@ def get_cached_data():
 
 def insert_into_transaction_sheet(id: str, row: list):
     insert_into_sheet(sheets["transactions"][id], row)
+
+
+def insert_into_sheet_name(name: str, row: list):
+    insert_into_sheet(sheets[name], row)
 
 
 def insert_into_sheet(sheet: Worksheet, row: list):

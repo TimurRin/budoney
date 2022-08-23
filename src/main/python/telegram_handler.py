@@ -1,5 +1,7 @@
 import datetime
-
+import re
+import difflib
+import math
 import telegram
 from telegram import (InlineKeyboardMarkup, Message, ReplyKeyboardMarkup,
                       ReplyKeyboardRemove, Update, bot)
@@ -187,6 +189,32 @@ def add_command(name, callback):
         CommandHandler(name, callback, auth_filter() & conversation_filter()))
 
 
+def generate_id(type: str, name: str):
+    data = gsh.get_cached_data()
+    # int(math.log10(n))+1
+
+    transliterated = transliterate.russian_to_latin(name).upper()
+    code = re.sub(r'[^A-Z0-9]+', '', transliterated)
+    id = code[:7]
+    id_len = len(id)
+
+    if id not in data[type]["dict"]:
+        return id
+    else:
+        loop = 0
+        while(loop <= 999999):
+            digits = loop > 0 and (int(math.log10(loop))+1) or 1
+            temp_id = None
+            if id_len + digits > 7:
+                temp_id = id[:-digits] + str(loop)
+            else:
+                temp_id = id + str(loop)
+            if temp_id not in data[type]["dict"]:
+                return temp_id
+            else:
+                loop = loop + 1
+
+
 def display_text_add_transaction(add_transaction: dict):
     data = gsh.get_cached_data()
 
@@ -256,7 +284,7 @@ def merchant_submit(message: Message):
     if "id" in data:
         send_info_message("New merchant: " + data["id"])
 
-        gsh.insert_into_sheet("merchants", [
+        gsh.insert_into_sheet_name("merchants", [
             data["id"],
             "name" in data and data["name"] or data["id"],
             "keywords" in data and data["keywords"] or "",
@@ -277,7 +305,7 @@ def method_submit(message: Message):
     if "id" in data:
         send_info_message("New method: " + data["id"])
 
-        gsh.insert_into_sheet("methods", [
+        gsh.insert_into_sheet_name("methods", [
             data["id"],
             "name" in data and data["name"] or data["id"],
             "is_mir" in data and data["is_mir"] and "TRUE" or "FALSE",
@@ -451,6 +479,9 @@ def keyboard_merchants():
 def keyboard_merchant():
     reply_keyboard = []
 
+    reply_keyboard.append([telegram.InlineKeyboardButton("Edit name", callback_data="_EDIT_NAME"),
+                           telegram.InlineKeyboardButton("Edit category", callback_data="_EDIT_CATEGORY")])
+
     reply_keyboard.append(keyboard_row_back_and_submit())
 
     return InlineKeyboardMarkup(reply_keyboard)
@@ -519,9 +550,27 @@ def state_merchants(message: Message):
 
 
 def state_merchant(message: Message):
-    message.edit_text("state_merchant",
+    message.edit_text(str(authorized_data[message.chat.id]["merchant"]),
                       reply_markup=keyboard_merchant())
     return states["merchant"]
+
+
+def state_merchant_reply(message: Message):
+    message.reply_text(str(authorized_data[message.chat.id]["merchant"]),
+                       reply_markup=keyboard_merchant())
+    return states["merchant"]
+
+
+def state_merchant_name(message: Message):
+    message.edit_text(
+        "Enter merchant name")
+    return states["merchant_name"]
+
+
+def state_merchant_category(message: Message):
+    message.edit_text("Select merchant category",
+                      reply_markup=keyboard_categories())
+    return states["merchant_category"]
 
 
 def state_methods(message: Message):
@@ -552,9 +601,7 @@ def state_wip(message: Message):
 
 
 def handle_main(update: Update, context: CallbackContext):
-    if update.callback_query.data == "main":
-        return state_main(update.callback_query.message)
-    elif update.callback_query.data == "transactions":
+    if update.callback_query.data == "transactions":
         return state_transactions(update.callback_query.message)
     elif update.callback_query.data == "transaction_add_fast_type":
         return state_transaction_add_fast_type(update.callback_query.message)
@@ -677,6 +724,7 @@ def handle_transaction_description(update: Update, context: CallbackContext):
 
 def handle_merchants(update: Update, context: CallbackContext):
     if update.callback_query.data == handler_data_add:
+        authorized_data[update.callback_query.message.chat.id]["merchant"]["_NEW"] = True
         return state_merchant(update.callback_query.message)
     elif update.callback_query.data != handler_data_back:
         data = gsh.get_cached_data()
@@ -690,28 +738,41 @@ def handle_merchant(update: Update, context: CallbackContext):
     if update.callback_query.data != handler_data_back:
         if update.callback_query.data == handler_data_submit:
             return merchant_submit(update.callback_query.message)
+        elif update.callback_query.data == "_EDIT_NAME":
+            return state_merchant_name(update.callback_query.message)
+        elif update.callback_query.data == "_EDIT_CATEGORY":
+            return state_merchant_category(update.callback_query.message)
 
     return state_merchants(update.callback_query.message)
 
 
 def handle_merchant_name(update: Update, context: CallbackContext):
-    return state_merchant(update.callback_query.message)
+    authorized_data[update.message.chat.id]["merchant"]["name"] = update.message.text
+    if "_NEW" in authorized_data[update.message.chat.id]["merchant"] or "id" not in authorized_data[update.message.chat.id]["merchant"]:
+        authorized_data[update.message.chat.id]["merchant"]["id"] = generate_id(
+            "merchants", update.message.text)
+
+    return state_merchant_reply(update.message)
 
 
 def handle_merchant_keywords(update: Update, context: CallbackContext):
-    return state_merchant(update.callback_query.message)
+    return state_merchant_reply(update.message)
 
 
 def handle_merchant_category(update: Update, context: CallbackContext):
+    if update.callback_query.data != handler_data_back:
+        authorized_data[update.callback_query.message.chat.id]["merchant"]["category"] = update.callback_query.data
+
     return state_merchant(update.callback_query.message)
 
 
 def handle_merchant_emoji(update: Update, context: CallbackContext):
-    return state_merchant(update.callback_query.message)
+    return state_merchant_reply(update.message)
 
 
 def handle_methods(update: Update, context: CallbackContext):
     if update.callback_query.data == handler_data_add:
+        authorized_data[update.callback_query.message.chat.id]["method"]["_NEW"] = True
         return state_method(update.callback_query.message)
     elif update.callback_query.data != handler_data_back:
         data = gsh.get_cached_data()

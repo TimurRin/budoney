@@ -1,7 +1,9 @@
 from datetime import datetime
+import string
 import gspread
-from gspread import Spreadsheet, Worksheet
+from gspread import Client, Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
+import dateutil.parser as dp
 
 import utils.date_utils as date_utils
 import utils.yaml_manager as yaml_manager
@@ -22,33 +24,46 @@ google_sheets_credentials = ServiceAccountCredentials.from_json_keyfile_name(
     '../../../config/local/google-api.json', scope)
 
 gspread_client = None
-sheets = None
-data = None
+book_cache = {}
+books_by_sheet = {}
+sheets = {"transactions": {}}
+data = {"transactions": {}}
+
+cached_data = {}
 
 
-def check_authorization():
-    global gspread_client
-    if not gspread_client:
+def check_authorization(gspread_client: Client):
+    if gspread_client:
+        return gspread_client
+    else:
         print(print_label, "Authorizing Google client")
-        gspread_client = gspread.authorize(google_sheets_credentials)
+        return gspread.authorize(google_sheets_credentials)
 
 
-def fetch_sheet(name):
-    check_authorization()
+def fetch_sheet(name: string):
+    global gspread_client
+    gspread_client = check_authorization(gspread_client)
     print(print_label, "Opening the sheet '" + name + "'")
     sheet_credentials = google_sheets_config["sheets"][name]
-    return gspread_client.open_by_key(sheet_credentials["bookKey"]).get_worksheet_by_id(sheet_credentials["sheetId"])
+    if sheet_credentials["bookKey"] not in book_cache:
+        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(sheet_credentials["bookKey"])
+    books_by_sheet[name] = book_cache[sheet_credentials["bookKey"]]
+    return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
 
 
-def fetch_transaction_sheet(transaction_code):
-    check_authorization()
+def fetch_transaction_sheet(transaction_code: str):
+    global gspread_client
+    gspread_client = check_authorization(gspread_client)
     print(print_label, "Opening the transaction sheet '" + transaction_code + "'")
     sheet_credentials = google_sheets_config["sheets"]["transactions"]
     sheet_name = sheet_credentials["sheetPrefix"] + transaction_code
-    return gspread_client.open_by_key(sheet_credentials["bookKey"]).worksheet(sheet_name)
+    if sheet_credentials["bookKey"] not in book_cache:
+        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(sheet_credentials["bookKey"])
+    books_by_sheet[transaction_code] = book_cache[sheet_credentials["bookKey"]]
+    return books_by_sheet[transaction_code].worksheet(sheet_name)
 
 
-def fetch_data(name: str, sheet: Spreadsheet):
+def fetch_data(name: str, sheet: Worksheet):
     print(print_label, "Getting data from the sheet '" +
           name + "' (" + str(sheet.title) + ", " + str(sheet.id) + ")")
 
@@ -128,9 +143,11 @@ def fetch_data(name: str, sheet: Spreadsheet):
 def fetch_all_sheets():
     transactions = {}
 
-    date = datetime.strptime(google_sheets_config["transactions_start"], '%Y-%m-%d')
+    date = datetime.strptime(
+        google_sheets_config["transactions_start"], '%Y-%m-%d')
     for transaction_code in date_utils.transaction_codes_range(date, date.today()):
-        transactions[transaction_code] = fetch_transaction_sheet(transaction_code)
+        transactions[transaction_code] = fetch_transaction_sheet(
+            transaction_code)
 
     return {
         "users": fetch_sheet("users"),
@@ -142,35 +159,31 @@ def fetch_all_sheets():
     }
 
 
-def fetch_all_data(sheets):
-    data = {"transactions": {}}
-    for sheet in sheets:
+def fetch_all_data(requests):
+    for sheet in requests:
         if sheet == "transactions":
-            # pass
-            for transaction_sheet in sheets["transactions"]:
-                data["transactions"][transaction_sheet] = fetch_data(
-                    transaction_sheet, sheets["transactions"][transaction_sheet])
+            pass
+            # for transaction_sheet in sheets["transactions"]:
+            #     data["transactions"][transaction_sheet] = fetch_data(
+            #         transaction_sheet, sheets["transactions"][transaction_sheet])
         else:
-            data[sheet] = fetch_data(sheet, sheets[sheet])
-        pass
+            if (sheet not in sheets) or (sheet not in cached_data):
+                sheets[sheet] = fetch_sheet(sheet)
+            if (sheet not in data) or (sheet not in cached_data):
+                data[sheet] = fetch_data(sheet, sheets[sheet])
+            cached_data[sheet] = True
     return data
 
 
-def get_cached_sheets():
-    global sheets
-    if not sheets:
-        sheets = fetch_all_sheets()
-    return sheets
-
-
-def get_cached_data():
+def get_cached_data(requests):
     global data
-    if not data:
-        data = fetch_all_data(get_cached_sheets())
+    data = fetch_all_data(requests)
     return data
 
 
 def insert_into_transaction_sheet(id: str, row: list):
+    if id not in sheets["transactions"]:
+        sheets["transactions"][id] = fetch_transaction_sheet(id)
     insert_into_sheet(sheets["transactions"][id], row)
 
 
@@ -183,10 +196,9 @@ def insert_into_sheet(sheet: Worksheet, row: list):
 
 
 def invalidate_all():
-    global sheets, data
-    sheets = None
-    data = None
-
+    global cached_data
+    cached_data = {}
+    get_cached_data(["users", "categories", "methods", "merchants", "currencies"])
 
 # cache data from the start
-get_cached_data()
+get_cached_data(["users", "categories", "methods", "merchants", "currencies"])

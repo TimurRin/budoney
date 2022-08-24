@@ -235,6 +235,9 @@ def display_text_add_transaction(add_transaction: dict):
     if "type" in add_transaction:
         text = add_transaction["type"] + "\n"
 
+    if "date" in add_transaction and add_transaction["date"].date() != datetime.datetime.today().date():
+        text = text + "(" + add_transaction["date"].strftime("%Y-%m-%d") + ") "
+
     text = text + str("sum" in add_transaction and add_transaction["sum"] or 0) + " " + \
         ("currency" in add_transaction and add_transaction["currency"] or "RUB")
     try:
@@ -277,9 +280,11 @@ def transaction_submit(message: Message):
                                                                                                                      "CORRECTION" or target in data):
         send_info_message(display_text_add_transaction(data))
 
-        gsh.insert_into_transaction_sheet(date_utils.get_today_transaction_code(), [
+        date = "date" in data and data["date"] or datetime.datetime.today()
+
+        gsh.insert_into_transaction_sheet(date_utils.get_date_transaction_code(date), [
             data["type"],
-            (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+            (date - datetime.datetime(1899, 12, 30)).days,
             data["sum"],
             data["currency"],
             data["method"],
@@ -560,6 +565,17 @@ def keyboard_users():
 
     return InlineKeyboardMarkup(reply_keyboard)
 
+def keyboard_dates():
+    reply_keyboard = []
+
+    dates = date_utils.date_range(datetime.datetime(2022, 8, 19), datetime.datetime.today())
+
+    for date in dates:
+        reply_keyboard.append([telegram.InlineKeyboardButton(date.strftime("%Y-%m-%d"), callback_data=date.strftime("%Y-%m-%d"))])
+
+    reply_keyboard.append(keyboard_row_back())
+
+    return InlineKeyboardMarkup(reply_keyboard)
 
 def keyboard_with_back():
     return InlineKeyboardMarkup([keyboard_row_back()])
@@ -618,8 +634,9 @@ def state_transaction_add_fast_sum(message: Message):
 
 def state_transaction_add_fast_method(message: Message):
     message.reply_text(display_text_add_transaction(authorized_data[message.chat.id]["transaction"]) + ". How?",
-                              reply_markup=keyboard_methods())
+                       reply_markup=keyboard_methods())
     return states["transaction_add_fast_method"]
+
 
 def state_transaction_add_fast_target(message: Message):
     if authorized_data[message.chat.id]["transaction"]["type"] == "TRANSFER":
@@ -627,7 +644,7 @@ def state_transaction_add_fast_target(message: Message):
             authorized_data[message.chat.id]["transaction"]) + ". To what method?", reply_markup=keyboard_methods())
     else:
         message.edit_text(display_text_add_transaction(authorized_data[message.chat.id]["transaction"]) + ". Where?",
-                                                reply_markup=keyboard_merchants())
+                          reply_markup=keyboard_merchants())
     return states["transaction_add_fast_target"]
 
 
@@ -651,7 +668,7 @@ def state_transaction_type(message: Message):
 
 def state_transaction_date(message: Message):
     message.edit_text("state_transaction_date",
-                      reply_markup=keyboard_with_back())
+                      reply_markup=keyboard_dates())
     return states["transaction_date"]
 
 
@@ -824,7 +841,8 @@ def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
                 merchant_ids = difflib.get_close_matches(
                     splitted_text, data["merchants"]["keywords"]["list"])
                 if len(merchant_ids) > 0:
-                    merchant = merchant_ids[0] in data["merchants"]["keywords"]["dict"] and data["merchants"]["keywords"]["dict"][merchant_ids[0]]
+                    merchant = merchant_ids[0] in data["merchants"]["keywords"][
+                        "dict"] and data["merchants"]["keywords"]["dict"][merchant_ids[0]]
                     add_description = False
 
             if add_description:
@@ -853,7 +871,8 @@ def handle_transaction_add_fast_method(update: Update, context: CallbackContext)
     else:
         authorized_data[update.callback_query.message.chat.id]["transaction"]["method"] = update.callback_query.data
 
-        target = get_transaction_target_type(authorized_data[update.callback_query.message.chat.id]["transaction"])
+        target = get_transaction_target_type(
+            authorized_data[update.callback_query.message.chat.id]["transaction"])
 
         if authorized_data[update.callback_query.message.chat.id]["transaction"]["type"] == "CORRECTION":
             return state_transaction(update.callback_query.message)
@@ -906,7 +925,19 @@ def handle_transaction_type(update: Update, context: CallbackContext):
 
 
 def handle_transaction_date(update: Update, context: CallbackContext):
-    return state_transaction(update.callback_query.message)
+    try:
+        authorized_data[update.callback_query.message.chat.id]["transaction"]["date"] = datetime.datetime.strptime(
+            update.callback_query.data, "%Y-%m-%d")
+    finally:
+        return state_transaction(update.callback_query.message)
+
+
+def handle_transaction_date_text(update: Update, context: CallbackContext):
+    try:
+        authorized_data[update.message.chat.id]["transaction"]["date"] = datetime.datetime.strptime(
+            update.message.text, "%Y-%m-%d")
+    finally:
+        return state_transaction_reply(update.message)
 
 
 def handle_transaction_sum(update: Update, context: CallbackContext):
@@ -938,7 +969,7 @@ def handle_transaction_method(update: Update, context: CallbackContext):
 
 def handle_transaction_target(update: Update, context: CallbackContext):
     target = get_transaction_target_type(
-            authorized_data[update.callback_query.message.chat.id]["transaction"])
+        authorized_data[update.callback_query.message.chat.id]["transaction"])
 
     if update.callback_query.data == handler_data_add:
         if target == "target_method":

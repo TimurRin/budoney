@@ -21,3 +21,10 @@ def transaction_codes_range(start_date: datetime, end_date: datetime):
         if df not in so:
             so.append(df)
             yield df
+
+def date_range(start_date: datetime, end_date: datetime):
+    so = []
+    for n in range(int((end_date - start_date).days) + 1):
+        d = start_date + timedelta(n)
+        so.append(d)
+        yield d

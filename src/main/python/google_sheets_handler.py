@@ -3,14 +3,16 @@ import string
 import gspread
 from gspread import Client, Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
-import dateutil.parser as dp
 
 import utils.date_utils as date_utils
 import utils.yaml_manager as yaml_manager
 
 print_label = "[google_sheets_handler]"
 
-print(print_label, "Loading google-sheets configs")
+sheet_types = ["users", "categories", "methods", "merchants", "currencies"]
+
+print(print_label, "Loading configs")
+general_config = yaml_manager.load("config/local/general")
 google_sheets_config = yaml_manager.load("config/local/google-sheets")
 
 print(print_label, "Setting scope to use when authenticating")
@@ -198,7 +200,7 @@ def insert_into_sheet(sheet: Worksheet, row: list):
 def invalidate_all():
     global cached_data
     cached_data = {}
-    get_cached_data(["users", "categories", "methods", "merchants", "currencies"])
+    get_cached_data(sheet_types)
 
 # cache data from the start
-get_cached_data(["users", "categories", "methods", "merchants", "currencies"])
+get_cached_data(not general_config["quiet_mode"] and sheet_types or [])

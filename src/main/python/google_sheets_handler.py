@@ -5,6 +5,7 @@ from gspread import Client, Spreadsheet, Worksheet
 from oauth2client.service_account import ServiceAccountCredentials
 
 import utils.date_utils as date_utils
+import utils.transliterate as transliterate
 import utils.yaml_manager as yaml_manager
 
 print_label = "[google_sheets_handler]"
@@ -48,7 +49,8 @@ def fetch_sheet(name: string):
     print(print_label, "Opening the sheet '" + name + "'")
     sheet_credentials = google_sheets_config["sheets"][name]
     if sheet_credentials["bookKey"] not in book_cache:
-        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(sheet_credentials["bookKey"])
+        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
+            sheet_credentials["bookKey"])
     books_by_sheet[name] = book_cache[sheet_credentials["bookKey"]]
     return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
 
@@ -60,7 +62,8 @@ def fetch_transaction_sheet(transaction_code: str):
     sheet_credentials = google_sheets_config["sheets"]["transactions"]
     sheet_name = sheet_credentials["sheetPrefix"] + transaction_code
     if sheet_credentials["bookKey"] not in book_cache:
-        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(sheet_credentials["bookKey"])
+        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
+            sheet_credentials["bookKey"])
     books_by_sheet[transaction_code] = book_cache[sheet_credentials["bookKey"]]
     return books_by_sheet[transaction_code].worksheet(sheet_name)
 
@@ -87,7 +90,10 @@ def fetch_data(name: str, sheet: Worksheet):
         data = {
             "dict": {},
             "list": [],
-            "keywords": {}
+            "keywords": {
+                "dict": {},
+                "list": [],
+            }
         }
         for value in sheet.get_values()[1:]:
             entry = {
@@ -99,14 +105,18 @@ def fetch_data(name: str, sheet: Worksheet):
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
 
-            data["keywords"][value[0].casefold()] = value[0]
-            data["keywords"][value[1].casefold()] = value[0]
-            for keyword in value[2].split(","):
-                data["keywords"][keyword.casefold()] = value[0]
-                # for edited_keyword in string_utils.edits1(keyword):
-                #     data["keywords"][edited_keyword.casefold()] = value[0]
-                # difflib.get_close_matches(keyword)
+            keywords_to_add = [value[0].casefold(), value[1].casefold(
+            ), transliterate.russian_to_latin(value[1].casefold())]
 
+            for keyword in value[2].split(","):
+                keywords_to_add.append(keyword.casefold())
+                keywords_to_add.append(
+                    transliterate.russian_to_latin(keyword.casefold()))
+
+            for keyword in keywords_to_add:
+                if keyword and keyword not in data["keywords"]["dict"]:
+                    data["keywords"]["list"].append(keyword)
+                    data["keywords"]["dict"][keyword] = value[0]
         return data
     elif name == "methods":
         data = {
@@ -201,6 +211,7 @@ def invalidate_all():
     global cached_data
     cached_data = {}
     get_cached_data(sheet_types)
+
 
 # cache data from the start
 get_cached_data(not general_config["quiet_mode"] and sheet_types or [])

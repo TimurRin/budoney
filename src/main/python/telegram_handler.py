@@ -383,8 +383,8 @@ def keyboard_row_back_and_submit():
 def keyboard_main():
     reply_keyboard = [
         [
-            # telegram.InlineKeyboardButton(
-            #     text="👛 Transactions", callback_data="transactions"),
+            telegram.InlineKeyboardButton(
+                text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
                 text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
         ],

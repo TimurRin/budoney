@@ -127,10 +127,12 @@ def fetch_data(name: str, sheet: Worksheet):
             entry = {
                 "id": value[0],
                 "name": value[1],
-                "credit": value[2] == "TRUE" and True or False,
-                "mir": value[3] == "TRUE" and True or False,
-                "cashback": value[4] == "TRUE" and True or False,
-                "owner": value[5]
+                "emoji": value[2],
+                "account": value[3] == "TRUE" and True or False,
+                "mir": value[4] == "TRUE" and True or False,
+                "credit": value[5] == "TRUE" and True or False,
+                "cashback": value[6] == "TRUE" and True or False,
+                "owner": value[7]
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
@@ -143,7 +145,8 @@ def fetch_data(name: str, sheet: Worksheet):
         for value in sheet.get_values()[1:]:
             entry = {
                 "id": value[0],
-                "name": value[1]
+                "name": value[1],
+                "emoji": value[2],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

@@ -52,6 +52,7 @@ states = {
     "methods": 300,
     "method": 301,
     "method_name": 302,
+    "method_is_account": 307,
     "method_is_mir": 303,
     "method_is_credit": 304,
     "method_is_cashback": 305,
@@ -110,6 +111,7 @@ def init():
             states["methods"]: [CallbackQueryHandler(handle_methods)],
             states["method"]: [CallbackQueryHandler(handle_method)],
             states["method_name"]: [MessageHandler(text_filters(), handle_method_name)],
+            states["method_is_account"]: [CallbackQueryHandler(handle_method_is_account)],
             states["method_is_mir"]: [CallbackQueryHandler(handle_method_is_mir)],
             states["method_is_credit"]: [CallbackQueryHandler(handle_method_is_credit)],
             states["method_is_cashback"]: [CallbackQueryHandler(handle_method_is_cashback)],
@@ -227,6 +229,20 @@ def generate_id(type: str, name: str):
                 loop = loop + 1
 
 
+def display_text_method(method: dict, button = False):
+    data = gsh.get_cached_data(["users"])
+
+    owner_emoji = data["users"]["dict"][method["owner"]]["emoji"]
+    method_name = method["name"]
+    method_emoji = method.get("emoji", False) and (" " + method["emoji"]) or ""
+    method_is_account = method.get("account", False) and " Account" or ""
+    method_is_mir = method.get("mir", False) and " MIR" or ""
+    method_is_credit = method.get("credit", False) and " Credit" or ""
+    method_is_cashback = method.get("cashback", False) and " Cashback" or ""
+
+    return owner_emoji + method_emoji + " " + method_name + method_is_account + method_is_mir + method_is_credit + method_is_cashback
+
+
 def display_text_add_transaction(add_transaction: dict):
     data = gsh.get_cached_data(["methods", "merchants"])
 
@@ -243,12 +259,14 @@ def display_text_add_transaction(add_transaction: dict):
     try:
         if "method" in add_transaction:
             text = text + " — " + \
-                data["methods"]["dict"][add_transaction["method"]]["name"]
+                display_text_method(
+                    data["methods"]["dict"][add_transaction["method"]])
 
         if "type" in add_transaction and add_transaction["type"] == "TRANSFER":
             if "target_method" in add_transaction:
                 text = text + " > " + \
-                    data["methods"]["dict"][add_transaction["target_method"]]["name"]
+                    display_text_method(
+                        data["methods"]["dict"][add_transaction["target_method"]])
             if "description" in add_transaction:
                 text = text + " — " + add_transaction["description"]
         else:
@@ -330,11 +348,14 @@ def method_submit(message: Message):
     data = authorized_data[message.chat.id]["method"]
 
     if "id" in data:
-        send_info_message("New method: " + data["id"])
+        send_info_message(
+            "New method: " + data["id"] + " — " + display_text_method(data))
 
         gsh.insert_into_sheet_name("methods", [
             data["id"],
             "name" in data and data["name"] or data["id"],
+            "emoji" in data and data["emoji"] or "🆕",
+            "is_account" in data and data["is_account"] and "TRUE" or "FALSE",
             "is_mir" in data and data["is_mir"] and "TRUE" or "FALSE",
             "is_credit" in data and data["is_credit"] and "TRUE" or "FALSE",
             "is_cashback" in data and data["is_cashback"] and "TRUE" or "FALSE",
@@ -472,7 +493,7 @@ def keyboard_methods():
 
     for id in data["methods"]["list"]:
         reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
-            text=data["methods"]["dict"][id]["name"], callback_data=id))
+            text=display_text_method(data["methods"]["dict"][id]), callback_data=id))
         if len(reply_keyboard[current_row]) >= 2:
             reply_keyboard.append([])
             current_row = current_row + 1
@@ -488,7 +509,9 @@ def keyboard_method():
     reply_keyboard.append([telegram.InlineKeyboardButton("Edit name", callback_data="name"),
                            telegram.InlineKeyboardButton("Edit owner", callback_data="owner")])
 
-    reply_keyboard.append([telegram.InlineKeyboardButton("Is MIR", callback_data="is_mir"),
+    reply_keyboard.append([telegram.InlineKeyboardButton("Is account", callback_data="is_account"),
+                           telegram.InlineKeyboardButton(
+                               "Is MIR", callback_data="is_mir"),
                            telegram.InlineKeyboardButton(
                                "Is credit", callback_data="is_credit"),
                            telegram.InlineKeyboardButton("Has cashback", callback_data="is_cashback")])
@@ -565,17 +588,21 @@ def keyboard_users():
 
     return InlineKeyboardMarkup(reply_keyboard)
 
+
 def keyboard_dates():
     reply_keyboard = []
 
-    dates = date_utils.date_range(datetime.datetime(2022, 8, 19), datetime.datetime.today())
+    dates = date_utils.date_range(datetime.datetime(
+        2022, 8, 19), datetime.datetime.today())
 
     for date in dates:
-        reply_keyboard.append([telegram.InlineKeyboardButton(date.strftime("%Y-%m-%d"), callback_data=date.strftime("%Y-%m-%d"))])
+        reply_keyboard.append([telegram.InlineKeyboardButton(
+            date.strftime("%Y-%m-%d"), callback_data=date.strftime("%Y-%m-%d"))])
 
     reply_keyboard.append(keyboard_row_back())
 
     return InlineKeyboardMarkup(reply_keyboard)
+
 
 def keyboard_with_back():
     return InlineKeyboardMarkup([keyboard_row_back()])
@@ -737,13 +764,13 @@ def state_methods(message: Message):
 
 
 def state_method(message: Message):
-    message.edit_text(str(authorized_data[message.chat.id]["method"]),
+    message.edit_text(display_text_method(authorized_data[message.chat.id]["method"]),
                       reply_markup=keyboard_method())
     return states["method"]
 
 
 def state_method_reply(message: Message):
-    message.reply_text(str(authorized_data[message.chat.id]["method"]),
+    message.reply_text(display_text_method(authorized_data[message.chat.id]["method"]),
                        reply_markup=keyboard_method())
     return states["method"]
 
@@ -1061,6 +1088,11 @@ def handle_method(update: Update, context: CallbackContext):
             return state_method_name(update.callback_query.message)
         elif update.callback_query.data == "owner":
             return state_method_owner(update.callback_query.message)
+        elif update.callback_query.data == "is_account":
+            if "is_account" not in method:
+                method["is_account"] = False
+            method["is_account"] = not method["is_account"]
+            return state_method(update.callback_query.message)
         elif update.callback_query.data == "is_mir":
             if "is_mir" not in method:
                 method["is_mir"] = False
@@ -1086,6 +1118,10 @@ def handle_method_name(update: Update, context: CallbackContext):
         authorized_data[update.message.chat.id]["method"]["id"] = generate_id(
             "methods", update.message.text)
     return state_method_reply(update.message)
+
+
+def handle_method_is_account(update: Update, context: CallbackContext):
+    return state_method(update.callback_query.message)
 
 
 def handle_method_is_mir(update: Update, context: CallbackContext):

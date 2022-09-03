@@ -232,8 +232,8 @@ def generate_id(type: str, name: str):
 def display_text_method(method: dict, button = False):
     data = gsh.get_cached_data(["users"])
 
-    owner_emoji = data["users"]["dict"][method["owner"]]["emoji"]
-    method_name = method["name"]
+    owner_emoji = method.get("owner", False) and (data["users"]["dict"][method["owner"]]["emoji"]) or ""
+    method_name = method.get("name", "New method")
     method_emoji = method.get("emoji", False) and (" " + method["emoji"]) or ""
     method_is_account = method.get("account", False) and " Account" or ""
     method_is_mir = method.get("mir", False) and " MIR" or ""

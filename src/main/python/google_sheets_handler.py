@@ -1,12 +1,12 @@
-from datetime import datetime
 import string
-import gspread
-from gspread import Client, Spreadsheet, Worksheet
-from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
+import gspread
 import utils.date_utils as date_utils
 import utils.transliterate as transliterate
 import utils.yaml_manager as yaml_manager
+from gspread import Client, Spreadsheet, Worksheet
+from oauth2client.service_account import ServiceAccountCredentials
 
 print_label = "[google_sheets_handler]"
 

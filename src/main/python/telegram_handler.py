@@ -1,12 +1,16 @@
 import datetime
-import re
 import difflib
 import math
+import re
+
+import google_sheets_handler as gsh
 import telegram
-from telegram import (InlineKeyboardMarkup, Message, ReplyKeyboardMarkup,
-                      ReplyKeyboardRemove, Update, bot)
+import utils.date_utils as date_utils
+import utils.transliterate as transliterate
+import utils.yaml_manager as yaml_manager
+from telegram import InlineKeyboardMarkup, Message, Update
 from telegram.ext import (CallbackQueryHandler, ConversationHandler, Filters,
-                          Handler, Updater)
+                          Updater)
 from telegram.ext.callbackcontext import CallbackContext
 from telegram.ext.commandhandler import CommandHandler
 from telegram.ext.filters import Filters
@@ -14,56 +18,67 @@ from telegram.ext.messagehandler import MessageHandler
 from telegram.ext.updater import Updater
 from telegram.update import Update
 
-import google_sheets_handler as gsh
-import utils.transliterate as transliterate
-import utils.date_utils as date_utils
-import utils.yaml_manager as yaml_manager
-
 print_label = "[telegram_handler]"
 
 
 updater = None
 
-states = {
-    "main": 0,
-    "wip": 1,
+states_count = 0
 
-    "transactions": 100,
-    "transaction_add_fast_type": 105,
-    "transaction_add_fast_sum": 106,
-    "transaction_add_fast_method": 107,
-    "transaction_add_fast_target": 108,
-    "transaction": 110,
-    "transaction_type": 111,
-    "transaction_date": 112,
-    "transaction_sum": 113,
-    "transaction_currency": 114,
-    "transaction_method": 115,
-    "transaction_target": 116,
-    "transaction_description": 117,
+states_list = [
+    "main",
+    "wip",
 
-    "merchants": 200,
-    "merchant": 201,
-    "merchant_name": 202,
-    "merchant_keywords": 203,
-    "merchant_category": 204,
-    "merchant_emoji": 205,
+    "finances",
 
-    "methods": 300,
-    "method": 301,
-    "method_name": 302,
-    "method_is_account": 307,
-    "method_is_mir": 303,
-    "method_is_credit": 304,
-    "method_is_cashback": 305,
-    "method_owner": 306,
+    "transactions",
+    "transaction_add_fast_type",
+    "transaction_add_fast_sum",
+    "transaction_add_fast_method",
+    "transaction_add_fast_target",
+    "transaction",
+    "transaction_type",
+    "transaction_date",
+    "transaction_sum",
+    "transaction_currency",
+    "transaction_method",
+    "transaction_target",
+    "transaction_description",
 
-    "categories": 400,
+    "merchants",
+    "merchant",
+    "merchant_name",
+    "merchant_keywords",
+    "merchant_category",
+    "merchant_emoji",
 
-    "currencies": 500,
+    "methods",
+    "method",
+    "method_name",
+    "method_is_account",
+    "method_is_mir",
+    "method_is_credit",
+    "method_is_cashback",
+    "method_owner",
 
-    "users": 600,
-}
+    "categories",
+
+    "currencies",
+
+    "tasks",
+
+    "plants",
+
+    "users",
+]
+
+states = {}
+
+for state in states_list:
+    states[state] = states_count
+    states_count += 1
+
+print(states)
 
 main_entry_text = "Shall we begin?"
 error_text = "This action has been skipped (due to old session or other error), type /start to restart a conversation..."
@@ -86,6 +101,8 @@ def init():
         states={
             states["main"]: [CallbackQueryHandler(handle_main)],
             states["wip"]: [CallbackQueryHandler(handle_wip)],
+
+            states["finances"]: [CallbackQueryHandler(handle_finances)],
 
             states["transactions"]: [CallbackQueryHandler(handle_transactions)],
             states["transaction_add_fast_type"]: [CallbackQueryHandler(handle_transaction_add_fast_type)],
@@ -229,10 +246,11 @@ def generate_id(type: str, name: str):
                 loop = loop + 1
 
 
-def display_text_method(method: dict, button = False):
+def display_text_method(method: dict, button=False):
     data = gsh.get_cached_data(["users"])
 
-    owner_emoji = method.get("owner", False) and (data["users"]["dict"][method["owner"]]["emoji"]) or ""
+    owner_emoji = method.get("owner", False) and (
+        data["users"]["dict"][method["owner"]]["emoji"]) or ""
     method_name = method.get("name", "New method")
     method_emoji = method.get("emoji", False) and (" " + method["emoji"]) or ""
     method_is_account = method.get("account", False) and " Account" or ""
@@ -405,6 +423,28 @@ def keyboard_main():
     reply_keyboard = [
         [
             telegram.InlineKeyboardButton(
+                text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
+        ],
+        [
+            telegram.InlineKeyboardButton(
+                text="💰 Finances", callback_data="finances"),
+            telegram.InlineKeyboardButton(
+                text="✍️ Tasks", callback_data="tasks"),
+            telegram.InlineKeyboardButton(
+                text="🌱 Plants", callback_data="plants"),
+        ],
+        [
+            telegram.InlineKeyboardButton(
+                text="👫 Users", callback_data="users"),
+        ]
+    ]
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_finances():
+    reply_keyboard = [
+        [
+            telegram.InlineKeyboardButton(
                 text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
                 text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
@@ -412,8 +452,6 @@ def keyboard_main():
         [
             telegram.InlineKeyboardButton(
                 text="🏪 Merchants", callback_data="merchants"),
-        ],
-        [
             telegram.InlineKeyboardButton(
                 text="💳 Methods", callback_data="methods"),
         ],
@@ -422,10 +460,9 @@ def keyboard_main():
                 text="🏷 Categories", callback_data="categories"),
             telegram.InlineKeyboardButton(
                 text="💱 Currencies", callback_data="currencies"),
-            telegram.InlineKeyboardButton(
-                text="👫 Users", callback_data="users"),
         ]
     ]
+    reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -640,6 +677,11 @@ def state_main_reply(message: Message):
     return states["main"]
 
 
+def state_finances(message: Message):
+    message.edit_text("Financial operations", reply_markup=keyboard_finances())
+    return states["finances"]
+
+
 def state_transactions(message: Message):
     message.edit_text(
         "List of transactions", reply_markup=keyboard_transactions())
@@ -815,6 +857,17 @@ def state_wip(message: Message):
 
 
 def handle_main(update: Update, context: CallbackContext):
+    if update.callback_query.data == "transaction_add_fast_type":
+        return state_transaction_add_fast_type(update.callback_query.message)
+    elif update.callback_query.data == "finances":
+        return state_finances(update.callback_query.message)
+    elif update.callback_query.data == "users":
+        return state_users(update.callback_query.message)
+    else:
+        return state_wip(update.callback_query.message)
+
+
+def handle_finances(update: Update, context: CallbackContext):
     if update.callback_query.data == "transactions":
         return state_transactions(update.callback_query.message)
     elif update.callback_query.data == "transaction_add_fast_type":
@@ -827,10 +880,8 @@ def handle_main(update: Update, context: CallbackContext):
         return state_categories(update.callback_query.message)
     elif update.callback_query.data == "currencies":
         return state_currencies(update.callback_query.message)
-    elif update.callback_query.data == "users":
-        return state_users(update.callback_query.message)
     else:
-        return state_wip(update.callback_query.message)
+        return state_main(update.callback_query.message)
 
 
 def handle_transactions(update: Update, context: CallbackContext):
@@ -839,7 +890,7 @@ def handle_transactions(update: Update, context: CallbackContext):
     elif update.callback_query.data != handler_data_back:
         pass
 
-    return state_main(update.callback_query.message)
+    return state_finances(update.callback_query.message)
 
 
 def handle_transaction_add_fast_type(update: Update, context: CallbackContext):
@@ -1027,7 +1078,7 @@ def handle_merchants(update: Update, context: CallbackContext):
         send_info_message(update.callback_query.from_user.first_name + " has selected " +
                           data["merchants"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
 
-    return state_main(update.callback_query.message)
+    return state_finances(update.callback_query.message)
 
 
 def handle_merchant(update: Update, context: CallbackContext):
@@ -1075,7 +1126,7 @@ def handle_methods(update: Update, context: CallbackContext):
         send_info_message(update.callback_query.from_user.first_name + " has selected " +
                           data["methods"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
 
-    return state_main(update.callback_query.message)
+    return state_finances(update.callback_query.message)
 
 
 def handle_method(update: Update, context: CallbackContext):
@@ -1151,11 +1202,11 @@ def handle_categories(update: Update, context: CallbackContext):
         send_info_message(update.callback_query.from_user.first_name + " has selected " + data["categories"]["dict"][update.callback_query.data]["emoji"] + " "
                           + data["categories"]["dict"][update.callback_query.data]["name"] + " and everyone should be aware of it")
 
-    return state_main(update.callback_query.message)
+    return state_finances(update.callback_query.message)
 
 
 def handle_currencies(update: Update, context: CallbackContext):
-    return state_main(update.callback_query.message)
+    return state_finances(update.callback_query.message)
 
 
 def handle_users(update: Update, context: CallbackContext):

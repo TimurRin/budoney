@@ -10,7 +10,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 print_label = "[google_sheets_handler]"
 
-sheet_types = ["users", "categories", "methods", "merchants", "currencies"]
+sheet_types = ["users", "categories", "methods", "merchants", "currencies", "tasks_current", "tasks_scheduled"]
 
 print(print_label, "Loading configs")
 general_config = yaml_manager.load("config/local/general")
@@ -151,6 +151,44 @@ def fetch_data(name: str, sheet: Worksheet):
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
+    elif name == "tasks_current":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for value in sheet.get_values()[1:]:
+            entry = {
+                "id": value[0],
+                "name": value[1],
+                "priority": value[2],
+                "scheduled_id": value[3],
+                "created": value[4],
+                "due_to": value[5],
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+        return data
+    elif name == "tasks_scheduled":
+        data = {
+            "dict": {},
+            "list": []
+        }
+        for value in sheet.get_values()[1:]:
+            entry = {
+                "id": value[0],
+                "name": value[1],
+                "priority": value[2],
+                "recurring_type": value[3],
+                "recurring_value": value[4],
+                "recurring_stage": value[5],
+                "strict_recurring": value[6],
+                "times_done": value[7],
+                "times_missed": value[8],
+                "paused": value[9],
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+        return data
     else:
         return sheet.get_values()
 
@@ -158,9 +196,9 @@ def fetch_data(name: str, sheet: Worksheet):
 def fetch_all_sheets():
     transactions = {}
 
-    date = datetime.strptime(
+    transactions_date = datetime.strptime(
         google_sheets_config["transactions_start"], '%Y-%m-%d')
-    for transaction_code in date_utils.transaction_codes_range(date, date.today()):
+    for transaction_code in date_utils.monthly_codes_range(transactions_date, transactions_date.today()):
         transactions[transaction_code] = fetch_transaction_sheet(
             transaction_code)
 
@@ -170,7 +208,9 @@ def fetch_all_sheets():
         "methods": fetch_sheet("methods"),
         "merchants": fetch_sheet("merchants"),
         "currencies": fetch_sheet("currencies"),
-        "transactions": transactions
+        "transactions": transactions,
+        "tasks_current": fetch_sheet("tasks_current"),
+        "tasks_scheduled": fetch_sheet("tasks_scheduled"),
     }
 
 

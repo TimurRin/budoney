@@ -13,7 +13,7 @@ def get_today_text():
     return datetime.today().strftime('%Y-%m-%d')
 
 
-def transaction_codes_range(start_date: datetime, end_date: datetime):
+def monthly_codes_range(start_date: datetime, end_date: datetime):
     so = []
     for n in range(int((end_date - start_date).days)):
         d = start_date + timedelta(n)

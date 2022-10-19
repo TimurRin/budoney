@@ -66,6 +66,10 @@ states_list = [
     "currencies",
 
     "tasks",
+    "tasks_current",
+    "task_current",
+    "tasks_scheduled",
+    "task_scheduled",
 
     "plants",
 
@@ -77,8 +81,6 @@ states = {}
 for state in states_list:
     states[state] = states_count
     states_count += 1
-
-print(states)
 
 main_entry_text = "Shall we begin?"
 error_text = "This action has been skipped (due to old session or other error), type /start to restart a conversation..."
@@ -137,6 +139,14 @@ def init():
             states["categories"]: [CallbackQueryHandler(handle_categories)],
 
             states["currencies"]: [CallbackQueryHandler(handle_currencies)],
+
+            states["tasks"]: [CallbackQueryHandler(handle_tasks)],
+            states["tasks_current"]: [CallbackQueryHandler(handle_tasks_current)],
+            states["task_current"]: [CallbackQueryHandler(handle_task_current)],
+            states["tasks_scheduled"]: [CallbackQueryHandler(handle_tasks_scheduled)],
+            states["task_scheduled"]: [CallbackQueryHandler(handle_task_scheduled)],
+
+            states["plants"]: [CallbackQueryHandler(handle_plants)],
 
             states["users"]: [CallbackQueryHandler(handle_users)],
         },
@@ -302,6 +312,26 @@ def display_text_add_transaction(add_transaction: dict):
     return str(text)
 
 
+def display_text_task_current(task_current: dict, short_info=False):
+    task_current_name = (task_current.get("scheduled_id", False)
+                         and "🔁 " or "") + task_current.get("name", "New task")
+    task_current_priority = " (p" + task_current.get("priority", "0") + ")"
+    if short_info:
+        return task_current_name + task_current_priority
+    else:
+        return str(task_current)
+
+
+def display_text_task_scheduled(task_scheduled: dict, short_info=False):
+    task_scheduled_name = task_scheduled.get("name", "New task")
+    task_scheduled_recurring_type = " (" + \
+        task_scheduled.get("recurring_type", "NO_TYPE") + ")"
+    if short_info:
+        return task_scheduled_name + task_scheduled_recurring_type
+    else:
+        return str(task_scheduled)
+
+
 def get_transaction_target_type(transaction):
     return ("type" in transaction and transaction["type"] ==
             "TRANSFER") and "target_method" or "merchant"
@@ -424,12 +454,14 @@ def keyboard_main():
         [
             telegram.InlineKeyboardButton(
                 text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
+            telegram.InlineKeyboardButton(
+                text="✍️🗒 New task", callback_data="task_current"),
         ],
         [
             telegram.InlineKeyboardButton(
                 text="💰 Finances", callback_data="finances"),
             telegram.InlineKeyboardButton(
-                text="✍️ Tasks", callback_data="tasks"),
+                text="🗒⏰ Tasks", callback_data="tasks"),
             telegram.InlineKeyboardButton(
                 text="🌱 Plants", callback_data="plants"),
         ],
@@ -604,6 +636,96 @@ def keyboard_currencies():
 
     reply_keyboard.append(keyboard_row_back())
 
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_tasks():
+    reply_keyboard = [
+        [
+            telegram.InlineKeyboardButton(
+                text="✍️🗒 New task", callback_data="task_current"),
+            # telegram.InlineKeyboardButton(
+            #     text="✍️⏰ New scheduled task", callback_data="task_scheduled"),
+        ],
+        [
+            telegram.InlineKeyboardButton(
+                text="🗒 Current tasks", callback_data="tasks_current"),
+            telegram.InlineKeyboardButton(
+                text="⏰ Scheduled tasks", callback_data="tasks_scheduled"),
+        ]
+    ]
+    reply_keyboard.append(keyboard_row_back())
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_tasks_current():
+    data = gsh.get_cached_data(["tasks_current"])
+
+    reply_keyboard = [[]]
+
+    current_row = 0
+
+    for id in data["tasks_current"]["list"]:
+        reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
+            text=display_text_task_current(data["tasks_current"]["dict"][id], True), callback_data=id))
+        if len(reply_keyboard[current_row]) >= 3:
+            reply_keyboard.append([])
+            current_row = current_row + 1
+
+    reply_keyboard.append([
+        telegram.InlineKeyboardButton(
+            text="✍️🗒 New task", callback_data="task_current"),
+    ])
+    reply_keyboard.append(keyboard_row_back())
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_task_current():
+    reply_keyboard = []
+    reply_keyboard.append(keyboard_row_back())
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_tasks_scheduled():
+    data = gsh.get_cached_data(["tasks_scheduled"])
+
+    reply_keyboard = [[]]
+
+    current_row = 0
+
+    for id in data["tasks_scheduled"]["list"]:
+        reply_keyboard[current_row].append(telegram.InlineKeyboardButton(
+            text=display_text_task_scheduled(data["tasks_scheduled"]["dict"][id], True), callback_data=id))
+        if len(reply_keyboard[current_row]) >= 1:
+            reply_keyboard.append([])
+            current_row = current_row + 1
+
+    reply_keyboard.append([
+        telegram.InlineKeyboardButton(
+            text="✍️🗒 New scheduled task", callback_data="task_scheduled"),
+    ])
+    reply_keyboard.append(keyboard_row_back())
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_task_scheduled():
+    reply_keyboard = []
+    reply_keyboard.append(keyboard_row_back())
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
+def keyboard_plants():
+    reply_keyboard = [
+        [
+            telegram.InlineKeyboardButton(
+                text="Plants", callback_data="plants_plants"),
+            telegram.InlineKeyboardButton(
+                text="Lots", callback_data="plants_lots"),
+            telegram.InlineKeyboardButton(
+                text="Plant types", callback_data="plant_types"),
+        ]
+    ]
+    reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -841,6 +963,42 @@ def state_currencies(message: Message):
     return states["currencies"]
 
 
+def state_tasks(message: Message):
+    message.edit_text("Task manager",
+                      reply_markup=keyboard_tasks())
+    return states["tasks"]
+
+
+def state_tasks_current(message: Message):
+    message.edit_text("List of current tasks",
+                      reply_markup=keyboard_tasks_current())
+    return states["tasks_current"]
+
+
+def state_task_current(message: Message):
+    message.edit_text("Current task",
+                      reply_markup=keyboard_task_current())
+    return states["task_current"]
+
+
+def state_tasks_scheduled(message: Message):
+    message.edit_text("List of scheduled task",
+                      reply_markup=keyboard_tasks_scheduled())
+    return states["tasks_scheduled"]
+
+
+def state_task_scheduled(message: Message):
+    message.edit_text("Scheduled task",
+                      reply_markup=keyboard_task_scheduled())
+    return states["task_scheduled"]
+
+
+def state_plants(message: Message):
+    message.edit_text("List of plants",
+                      reply_markup=keyboard_plants())
+    return states["plants"]
+
+
 def state_users(message: Message):
     message.edit_text("List of users",
                       reply_markup=keyboard_users())
@@ -861,6 +1019,10 @@ def handle_main(update: Update, context: CallbackContext):
         return state_transaction_add_fast_type(update.callback_query.message)
     elif update.callback_query.data == "finances":
         return state_finances(update.callback_query.message)
+    elif update.callback_query.data == "tasks":
+        return state_tasks(update.callback_query.message)
+    elif update.callback_query.data == "plants":
+        return state_plants(update.callback_query.message)
     elif update.callback_query.data == "users":
         return state_users(update.callback_query.message)
     else:
@@ -1207,6 +1369,39 @@ def handle_categories(update: Update, context: CallbackContext):
 
 def handle_currencies(update: Update, context: CallbackContext):
     return state_finances(update.callback_query.message)
+
+
+def handle_tasks(update: Update, context: CallbackContext):
+    if update.callback_query.data != handler_data_back:
+        if update.callback_query.data == "tasks_current":
+            return state_tasks_current(update.callback_query.message)
+        elif update.callback_query.data == "task_current":
+            return state_task_current(update.callback_query.message)
+        elif update.callback_query.data == "tasks_scheduled":
+            return state_tasks_scheduled(update.callback_query.message)
+        elif update.callback_query.data == "task_scheduled":
+            return state_task_scheduled(update.callback_query.message)
+    return state_main(update.callback_query.message)
+
+
+def handle_tasks_current(update: Update, context: CallbackContext):
+    return state_tasks(update.callback_query.message)
+
+
+def handle_task_current(update: Update, context: CallbackContext):
+    return state_tasks(update.callback_query.message)
+
+
+def handle_tasks_scheduled(update: Update, context: CallbackContext):
+    return state_tasks(update.callback_query.message)
+
+
+def handle_task_scheduled(update: Update, context: CallbackContext):
+    return state_tasks(update.callback_query.message)
+
+
+def handle_plants(update: Update, context: CallbackContext):
+    return state_main(update.callback_query.message)
 
 
 def handle_users(update: Update, context: CallbackContext):

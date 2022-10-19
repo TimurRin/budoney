@@ -66,8 +66,12 @@ states_list = [
     "currencies",
 
     "tasks",
+
     "tasks_current",
     "task_current",
+    "task_current_name",
+    "task_current_due_to",
+
     "tasks_scheduled",
     "task_scheduled",
 
@@ -141,8 +145,11 @@ def init():
             states["currencies"]: [CallbackQueryHandler(handle_currencies)],
 
             states["tasks"]: [CallbackQueryHandler(handle_tasks)],
+
             states["tasks_current"]: [CallbackQueryHandler(handle_tasks_current)],
             states["task_current"]: [CallbackQueryHandler(handle_task_current)],
+            states["task_current_name"]: [MessageHandler(text_filters(), handle_task_current_name)],
+
             states["tasks_scheduled"]: [CallbackQueryHandler(handle_tasks_scheduled)],
             states["task_scheduled"]: [CallbackQueryHandler(handle_task_scheduled)],
 
@@ -177,6 +184,8 @@ def init():
                 "transaction": {},
                 "merchant": {},
                 "method": {},
+                "task_current": {},
+                "task_scheduled": {},
             }
 
     send_message_to_authorized(
@@ -419,6 +428,31 @@ def method_submit(message: Message):
         return authorized_data[message.chat.id]["last_state"](message)
     else:
         return state_methods(message)
+
+
+def task_current_submit(message: Message):
+    data = authorized_data[message.chat.id]["task_current"]
+
+    if "id" in data:
+        send_info_message("New current task: " + data["id"])
+
+        gsh.insert_into_sheet_name("tasks_current", [
+            data["id"],
+            "name" in data and data["name"] or data["id"],
+            0,
+            "",
+            (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+            ""
+        ])
+
+        authorized_data[message.chat.id]["task_current"] = {}
+
+        gsh.cached_data.pop("tasks_current", None)
+        gsh.get_cached_data(["tasks_current"])
+
+        return authorized_data[message.chat.id]["last_state"](message)
+    else:
+        return state_tasks_current(message)
 
 
 # keyboard rows
@@ -672,17 +706,16 @@ def keyboard_tasks_current():
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    reply_keyboard.append([
-        telegram.InlineKeyboardButton(
-            text="✍️🗒 New task", callback_data="task_current"),
-    ])
     reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
 def keyboard_task_current():
     reply_keyboard = []
-    reply_keyboard.append(keyboard_row_back())
+    reply_keyboard.append(
+        [telegram.InlineKeyboardButton("Edit name", callback_data="name")])
+
+    reply_keyboard.append(keyboard_row_back_and_submit())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -700,10 +733,6 @@ def keyboard_tasks_scheduled():
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    reply_keyboard.append([
-        telegram.InlineKeyboardButton(
-            text="✍️🗒 New scheduled task", callback_data="task_scheduled"),
-    ])
     reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
 
@@ -976,9 +1005,19 @@ def state_tasks_current(message: Message):
 
 
 def state_task_current(message: Message):
-    message.edit_text("Current task",
+    message.edit_text("Task: " + display_text_task_current(authorized_data[message.chat.id]["task_current"], True),
                       reply_markup=keyboard_task_current())
     return states["task_current"]
+
+def state_task_current_reply(message: Message):
+    message.reply_text("Task: " + display_text_task_current(authorized_data[message.chat.id]["task_current"], True),
+                      reply_markup=keyboard_task_current())
+    return states["task_current"]
+
+def state_task_current_name(message: Message):
+    message.edit_text(
+        "Enter current task name")
+    return states["task_current_name"]
 
 
 def state_tasks_scheduled(message: Message):
@@ -1017,6 +1056,10 @@ def state_wip(message: Message):
 def handle_main(update: Update, context: CallbackContext):
     if update.callback_query.data == "transaction_add_fast_type":
         return state_transaction_add_fast_type(update.callback_query.message)
+    elif update.callback_query.data == "task_current":
+        authorized_data[update.callback_query.message.chat.id]["task_current"]["_NEW"] = True
+        authorized_data[update.callback_query.message.chat.id]["last_state"] = state_main
+        return state_task_current(update.callback_query.message)
     elif update.callback_query.data == "finances":
         return state_finances(update.callback_query.message)
     elif update.callback_query.data == "tasks":
@@ -1376,6 +1419,8 @@ def handle_tasks(update: Update, context: CallbackContext):
         if update.callback_query.data == "tasks_current":
             return state_tasks_current(update.callback_query.message)
         elif update.callback_query.data == "task_current":
+            authorized_data[update.callback_query.message.chat.id]["task_current"]["_NEW"] = True
+            authorized_data[update.callback_query.message.chat.id]["last_state"] = state_tasks
             return state_task_current(update.callback_query.message)
         elif update.callback_query.data == "tasks_scheduled":
             return state_tasks_scheduled(update.callback_query.message)
@@ -1389,7 +1434,21 @@ def handle_tasks_current(update: Update, context: CallbackContext):
 
 
 def handle_task_current(update: Update, context: CallbackContext):
+    if update.callback_query.data != handler_data_back:
+        if update.callback_query.data == handler_data_submit:
+            return task_current_submit(update.callback_query.message)
+        elif update.callback_query.data == "name":
+            return state_task_current_name(update.callback_query.message)
     return state_tasks(update.callback_query.message)
+
+
+def handle_task_current_name(update: Update, context: CallbackContext):
+    authorized_data[update.message.chat.id]["task_current"]["name"] = update.message.text
+    if "_NEW" in authorized_data[update.message.chat.id]["task_current"] or "id" not in authorized_data[update.message.chat.id]["task_current"]:
+        authorized_data[update.message.chat.id]["task_current"]["id"] = generate_id(
+            "tasks_current", update.message.text)
+
+    return state_task_current_reply(update.message)
 
 
 def handle_tasks_scheduled(update: Update, context: CallbackContext):

@@ -436,12 +436,16 @@ def task_current_submit(message: Message):
     if "id" in data:
         send_info_message("New current task: " + data["id"])
 
+        due_to = "due_to" in data and data["due_to"] or ""
+
         gsh.insert_into_sheet_name("tasks_current", [
             data["id"],
             "name" in data and data["name"] or data["id"],
-            0,
-            "",
+            "priority" in data and data["priority"] or 0,
+            "scheduled_id" in data and data["scheduled_id"] or "",
             (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+            due_to,
+            "days_before" in data and data["days_before"] or -1,
             ""
         ])
 
@@ -487,7 +491,7 @@ def keyboard_main():
     reply_keyboard = [
         [
             telegram.InlineKeyboardButton(
-                text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
+                text="💸 Add transaction", callback_data="transaction_add_fast_type"),
             telegram.InlineKeyboardButton(
                 text="✍️🗒 New task", callback_data="task_current"),
         ],
@@ -513,7 +517,7 @@ def keyboard_finances():
             telegram.InlineKeyboardButton(
                 text="👛 Transactions", callback_data="transactions"),
             telegram.InlineKeyboardButton(
-                text="💸 Add fast transaction", callback_data="transaction_add_fast_type"),
+                text="💸 Add transaction", callback_data="transaction_add_fast_type"),
         ],
         [
             telegram.InlineKeyboardButton(
@@ -1009,10 +1013,12 @@ def state_task_current(message: Message):
                       reply_markup=keyboard_task_current())
     return states["task_current"]
 
+
 def state_task_current_reply(message: Message):
     message.reply_text("Task: " + display_text_task_current(authorized_data[message.chat.id]["task_current"], True),
-                      reply_markup=keyboard_task_current())
+                       reply_markup=keyboard_task_current())
     return states["task_current"]
+
 
 def state_task_current_name(message: Message):
     message.edit_text(

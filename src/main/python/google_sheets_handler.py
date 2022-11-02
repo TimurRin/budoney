@@ -10,7 +10,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 print_label = "[google_sheets_handler]"
 
-sheet_types = ["users", "categories", "methods", "merchants", "currencies", "tasks_current", "tasks_scheduled"]
+sheet_types = ["users", "categories", "methods", "merchants",
+               "currencies", "tasks_current", "tasks_scheduled"]
 
 print(print_label, "Loading configs")
 general_config = yaml_manager.load("config/local/general")
@@ -164,6 +165,8 @@ def fetch_data(name: str, sheet: Worksheet):
                 "scheduled_id": value[3],
                 "created": value[4],
                 "due_to": value[5],
+                "days_before": value[6],
+                "done": value[7],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
@@ -181,7 +184,7 @@ def fetch_data(name: str, sheet: Worksheet):
                 "recurring_type": value[3],
                 "recurring_value": value[4],
                 "recurring_stage": value[5],
-                "strict_recurring": value[6],
+                "recurring_timestamp": value[6],
                 "times_done": value[7],
                 "times_missed": value[8],
                 "paused": value[9],

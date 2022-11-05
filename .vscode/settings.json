@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true
+    },
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+}

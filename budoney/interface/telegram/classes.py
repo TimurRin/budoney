@@ -45,6 +45,7 @@ class TelegramConversationView:
 
     def _simple_handling(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
+        context.bot.answer_callback_query(callback_query_id = update.callback_query.id) # , show_alert = True, text="okay"
         if data in conversation_views:
             return conversation_views[data].state(update.callback_query.message, f"selected data: {data}", True)
         else:

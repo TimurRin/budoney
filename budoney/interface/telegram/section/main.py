@@ -1,4 +1,4 @@
-from interface.telegram.classes import TelegramConversationFork, SimpleTelegramConversationFork, TelegramConversationView
+from interface.telegram.classes import SimpleTelegramConversationFork, TelegramConversationView
 
 
 def init():

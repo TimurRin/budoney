@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from interface.telegram.classes import conversation_views, TelegramConversationView
 import interface.telegram.section.main as main_section
+import interface.telegram.section.finances as finances_section
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import (
     CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler)
@@ -15,6 +16,7 @@ def command_start(update: Update, context: CallbackContext):
 
 
 main_section.init()
+finances_section.init()
 
 for name in conversation_views:
     state_handlers[name] = conversation_views[name].handlers

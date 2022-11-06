@@ -20,7 +20,5 @@ def init():
             ("currencies", "💱 Currencies",
              SimpleTelegramConversationFork("currencies")),
         ],
-
         keyboard_row_back()
-
     ])

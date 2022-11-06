@@ -1,11 +1,23 @@
 from abc import abstractmethod
-from typing import Type
+from collections import deque
+from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler, Handler
 
 print_label: str = "[budoney :: Telegram Interface :: Classes]"
 
-conversation_views: "dict[str, TelegramConversationView]" = {}
+
+class TelegramUser:
+    states_whore = deque()
+    transaction = {}
+    merchant = {}
+    method = {}
+    task_current = {}
+    task_scheduled = {}
+
+
+def kiki(telegram_user: TelegramUser, text: str):
+    return f"{str(telegram_user.states_whore)}\n\n{text}"
 
 
 class TelegramConversationView:
@@ -24,7 +36,6 @@ class TelegramConversationView:
             for key_data in keyboard_line_data:
                 keyboard_line.append(InlineKeyboardButton(
                     callback_data=key_data[0], text=key_data[1]))
-                print(type(key_data[2]))
                 handler = CallbackQueryHandler(self._simple_handling)
                 handlers.append(handler)
                 simple_handlers[key_data[0]] = handler
@@ -45,15 +56,30 @@ class TelegramConversationView:
 
     def _simple_handling(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
-        context.bot.answer_callback_query(callback_query_id = update.callback_query.id) # , show_alert = True, text="okay"
-        if data in conversation_views:
-            return conversation_views[data].state(update.callback_query.message, f"selected data: {data}", True)
+        # , show_alert = True, text="okay"
+        context.bot.answer_callback_query(
+            callback_query_id=update.callback_query.id, show_alert=False, text=("state: " + data))
+
+        telegram_user = telegram_users[update.callback_query.message.chat.id]
+
+        if data == "_BACK":
+            if len(telegram_user.states_whore) > 0:
+                state = telegram_user.states_whore.pop()
+            else:
+                state = "main"
+            return conversation_views[state].state(update.callback_query.message, kiki(telegram_user, f"guess whos back to {state}"), True)
         else:
-            return conversation_views["wip"].state(update.callback_query.message, f"ERROR! This data doesn't exist: {data}", True)
+            telegram_user.states_whore.append(self.state_name)
+            if data in conversation_views:
+                return conversation_views[data].state(update.callback_query.message, kiki(telegram_user, f"selected data: {data}"), True)
+            else:
+                return conversation_views["_WIP"].state(update.callback_query.message, kiki(
+                    telegram_user, f"ERROR! This data doesn't exist: {data}. You will be returned to {telegram_user.states_whore[-1]}"
+                ), True)
 
 
 class TelegramConversationFork:
-    handler_type = "none"
+    handler_type: str = "none"
 
 
 class SimpleTelegramConversationFork(TelegramConversationFork):
@@ -61,3 +87,7 @@ class SimpleTelegramConversationFork(TelegramConversationFork):
 
     def __init__(self, state: str):
         self.state = state
+
+
+telegram_users: "dict[Any, TelegramUser]" = {}
+conversation_views: "dict[str, TelegramConversationView]" = {}

@@ -1,5 +1,7 @@
 from abc import abstractmethod
-from interface.telegram.classes import conversation_views, TelegramConversationView
+import configs
+from interface.telegram.classes import conversation_views, telegram_users, TelegramConversationView, TelegramUser
+from interface.telegram.utils import keyboard_row_back
 import interface.telegram.section.main as main_section
 import interface.telegram.section.finances as finances_section
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
@@ -14,6 +16,16 @@ state_handlers = {}
 def command_start(update: Update, context: CallbackContext):
     return conversation_views["main"].state(update.message, "Fresh start!", False)
 
+
+for telegram_user_id in configs.telegram["authorized"]:
+    if telegram_user_id not in telegram_users:
+        telegram_users[telegram_user_id] = TelegramUser()
+
+
+# Technical coversation views
+TelegramConversationView("_WIP", [
+    keyboard_row_back()
+])
 
 main_section.init()
 finances_section.init()

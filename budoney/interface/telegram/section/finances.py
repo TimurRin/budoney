@@ -1,4 +1,5 @@
 from interface.telegram.classes import SimpleTelegramConversationFork, TelegramConversationView
+from interface.telegram.utils import keyboard_row_back
 
 
 def init():
@@ -20,8 +21,6 @@ def init():
              SimpleTelegramConversationFork("currencies")),
         ],
 
-        [
-            ("main", "gosbacc", SimpleTelegramConversationFork("main"))
-        ],
+        keyboard_row_back()
 
     ])

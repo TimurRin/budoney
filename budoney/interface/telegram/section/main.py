@@ -1,32 +1,31 @@
-from interface.telegram.classes import SimpleTelegramConversationFork, TelegramConversationView
+from interface.telegram.classes import SIMPLE_FORK, TelegramConversationView
 from interface.telegram.utils import keyboard_row_back
 
 
 def init():
     TelegramConversationView("main", [
         [
-            ("transaction_add_fast_type", "✍️💸 Transaction", SimpleTelegramConversationFork("transaction")),
-            ("task_current", "✍️🗒 Task",
-             SimpleTelegramConversationFork("task_current"))
+            ("transaction", "➕💸 Transaction", SIMPLE_FORK),
+            ("task_current", "➕🗒 Task", SIMPLE_FORK)
         ],
         [
-            ("finances", "💰 Finances", SimpleTelegramConversationFork("finances")),
+            ("finances", "💸 Finances", SIMPLE_FORK),
         ],
         [
-            ("tasks", "🗒 Tasks", SimpleTelegramConversationFork("tasks")),
-            ("reminders", "⏰ Reminders", SimpleTelegramConversationFork("reminders")),
+            ("tasks", "🗒 Tasks", SIMPLE_FORK),
+            ("reminders", "⏰ Reminders", SIMPLE_FORK),
 
         ],
         [
-            ("utilities", "🚰 Utilities", SimpleTelegramConversationFork("utilities")),
-            ("storage", "📦 Storage", SimpleTelegramConversationFork("storage")),
+            ("utilities", "🚰 Utilities", SIMPLE_FORK),
+            ("storage", "📦 Storage", SIMPLE_FORK),
         ],
         [
-            ("food", "🥘 Food", SimpleTelegramConversationFork("food")),
-            ("pills", "💊 Pills", SimpleTelegramConversationFork("pills")),
-            ("plants", "🌱 Plants", SimpleTelegramConversationFork("plants")),
+            ("food", "🥘 Food", SIMPLE_FORK),
+            ("pills", "💊 Pills", SIMPLE_FORK),
+            ("plants", "🌱 Plants", SIMPLE_FORK),
         ],
-        [("users", "👫 Users", SimpleTelegramConversationFork("users"))]
+        [("users", "👫 Users", SIMPLE_FORK)]
     ])
     TelegramConversationView("users", [
         keyboard_row_back()

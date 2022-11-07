@@ -35,7 +35,7 @@ class TelegramConversationView:
             keyboard.append(keyboard_line)
             for key_data in keyboard_line_data:
                 keyboard_line.append(InlineKeyboardButton(
-                    callback_data=key_data[0], text=key_data[1]))
+                    callback_data=key_data[0], text=(key_data[1] or key_data[0])))
                 handler = CallbackQueryHandler(self._simple_handling)
                 handlers.append(handler)
                 simple_handlers[key_data[0]] = handler
@@ -88,6 +88,7 @@ class SimpleTelegramConversationFork(TelegramConversationFork):
     def __init__(self, state: str):
         self.state = state
 
+SIMPLE_FORK = TelegramConversationFork()
 
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, TelegramConversationView]" = {}

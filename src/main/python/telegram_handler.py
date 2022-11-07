@@ -611,9 +611,15 @@ def keyboard_with_back():
 # commands
 
 def command_start(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "🍏 A fresh start! " + main_entry_text, reply_markup=keyboard_main())
-    return states["main"]
+    if update.message.from_user.id in telegram_config["authorized"]:
+        update.message.reply_text(
+            "🍏 A fresh start! " + main_entry_text, reply_markup=keyboard_main())
+        return states["main"]
+    else:
+        update.message.reply_text("👋 Hello there! This is a private instance of Budoney Household Management. If you want a personal Budoney instance, follow the link below", reply_markup=InlineKeyboardMarkup([
+            [telegram.InlineKeyboardButton(
+                text="Budoney GitHub repository", url="https://github.com/TimurRin/budoney")],
+        ]))
 
 
 def command_update(update: Update, context: CallbackContext):

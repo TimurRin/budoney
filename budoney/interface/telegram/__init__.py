@@ -1,21 +1,24 @@
-from abc import abstractmethod
 import configs
-from interface.telegram.classes import conversation_views, telegram_users, TelegramConversationView, TelegramUser
-from interface.telegram.utils import keyboard_row_back
+from interface.telegram.classes import (conversation_views, telegram_users,
+                                        TelegramConversationView, TelegramUser)
+from interface.telegram.utils import keyboard_back_button
 import interface.telegram.section.main as main_section
 import interface.telegram.section.finances as finances_section
 import interface.telegram.section.tasks as tasks_section
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler)
-from telegram.ext.handler import Handler
+    CallbackContext, CommandHandler, ConversationHandler)
 
 print_label: str = "[budoney :: Telegram Interface]"
 state_handlers = {}
 
 
 def command_start(update: Update, context: CallbackContext):
-    return conversation_views["main"].state(update.message, "Fresh start!", False)
+    if update.message.from_user.id in configs.telegram["authorized"]:
+        return conversation_views["main"].state(update.message, f"🤠 Hiya, {update.message.from_user.first_name}! Welcome to Budoney 🤗", False)
+    else:
+        update.message.reply_text("👋 Hello there! This is a private instance of Budoney Household Management. If you want a personal Budoney instance, follow the link below",
+                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="Budoney GitHub repository", url="https://github.com/TimurRin/budoney")]]))
 
 
 for telegram_user_id in configs.telegram["authorized"]:
@@ -25,7 +28,7 @@ for telegram_user_id in configs.telegram["authorized"]:
 
 # Technical coversation views
 TelegramConversationView("_WIP", [
-    keyboard_row_back()
+    [keyboard_back_button()]
 ])
 
 main_section.init()

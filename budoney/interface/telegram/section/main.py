@@ -1,5 +1,4 @@
 from interface.telegram.classes import SIMPLE_FORK, TelegramConversationView
-from interface.telegram.utils import keyboard_row_back
 
 
 def init():
@@ -26,7 +25,4 @@ def init():
             ("plants", "🌱 Plants", SIMPLE_FORK),
         ],
         [("users", "👫 Users", SIMPLE_FORK)]
-    ])
-    TelegramConversationView("users", [
-        keyboard_row_back()
     ])

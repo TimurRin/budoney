@@ -1,7 +1,7 @@
 from typing import Union
-from telegram.ext import ConversationHandler
-from telegram.ext.updater import Updater
+from telegram.ext import ConversationHandler, Updater
 import configs
+
 
 print_label: str = "[budoney :: TelegramConnector]"
 

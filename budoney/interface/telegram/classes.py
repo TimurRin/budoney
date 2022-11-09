@@ -1,13 +1,14 @@
-from abc import abstractmethod
 from collections import deque
 from typing import Any
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
-from telegram.ext import CallbackContext, CallbackQueryHandler, Handler
+from telegram import (
+    InlineKeyboardButton, InlineKeyboardMarkup, Message, Update)
+from telegram.ext import CallbackContext, CallbackQueryHandler
 
 print_label: str = "[budoney :: Telegram Interface :: Classes]"
 
 
 class TelegramUser:
+    name: str = "User"
     states_sequence = deque()
     transaction = {}
     merchant = {}
@@ -46,9 +47,11 @@ class TelegramConversationView:
 
     def state(self, message: Message, text: str, edit: bool):
         if edit:
-            message.edit_text(text, reply_markup=self.keyboard(), parse_mode='html')
+            message.edit_text(
+                text, reply_markup=self.keyboard(), parse_mode='html')
         else:
-            message.reply_text(text, reply_markup=self.keyboard(), parse_mode='html')
+            message.reply_text(
+                text, reply_markup=self.keyboard(), parse_mode='html')
         return self.state_name
 
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -62,31 +65,41 @@ class TelegramConversationView:
 
         telegram_user = telegram_users[update.callback_query.message.chat.id]
 
+        print(print_label, self.state_name, update.callback_query.from_user.first_name,
+              update.callback_query.from_user.id)
+
         if data == "_BACK":
             if len(telegram_user.states_sequence) > 0:
                 state = telegram_user.states_sequence.pop()
             else:
                 state = "main"
-            return conversation_views[state].state(update.callback_query.message, state_text_with_extras(telegram_user, f"Nice to have you back at '<b>{state}</b>' state"), True)
+            return conversation_views[state].state(
+                update.callback_query.message,
+                state_text_with_extras(telegram_user, f"Nice to have you back at '<b>{state}</b>' state"), True)
         else:
             telegram_user.states_sequence.append(self.state_name)
             if data in conversation_views:
-                return conversation_views[data].state(update.callback_query.message, state_text_with_extras(telegram_user, f"Current state is '<b>{data}</b>'"), True)
+                return conversation_views[data].state(
+                    update.callback_query.message,
+                    state_text_with_extras(telegram_user, f"Current state is '<b>{data}</b>'"), True)
             else:
-                return conversation_views["_WIP"].state(update.callback_query.message, state_text_with_extras(
-                    telegram_user, f"⚠️ State '<b>{data}</b>' doesn't exist. Go back to '<b>{telegram_user.states_sequence[-1]}</b>' state"
-                ), True)
+                return conversation_views["_WIP"].state(
+                    update.callback_query.message, state_text_with_extras(
+                        telegram_user,
+                        f"⚠️ State '<b>{data}</b>' doesn't exist. Go back to '<b>{telegram_user.states_sequence[-1]}</b>' state"
+                    ), True)
 
 
 class TelegramConversationFork:
     handler_type: str = "none"
 
 
-class SimpleTelegramConversationFork(TelegramConversationFork):
+class EnumTelegramConversationFork(TelegramConversationFork):
     handler_type = "simple"
 
-    def __init__(self, state: str):
-        self.state = state
+    def __init__(self, options: "tuple[str, str]"):
+        self.options = options
+
 
 SIMPLE_FORK = TelegramConversationFork()
 

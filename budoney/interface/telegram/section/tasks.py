@@ -3,10 +3,13 @@ from interface.telegram.utils import keyboard_back_button
 
 
 def init():
-    TelegramConversationView("tasks", [
+    TelegramConversationView(
+        "tasks",
         [
-            ("tasks_current", "🗒 Current tasks", SIMPLE_FORK),
-            ("tasks_scheduled", "⏰ Scheduled tasks", SIMPLE_FORK),
+            [
+                ("tasks_current", "🗒 Current tasks", SIMPLE_FORK),
+                ("tasks_scheduled", "⏰ Scheduled tasks", SIMPLE_FORK),
+            ],
+            [keyboard_back_button()],
         ],
-        [keyboard_back_button()]
-    ])
+    )

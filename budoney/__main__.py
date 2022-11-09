@@ -12,6 +12,7 @@ if TELEGRAM:
     if TELEGRAM_INTERFACE:
         print(print_label, "TELEGRAM_INTERFACE is enabled")
         import interface.telegram as telegram_interface
+
         conversation = telegram_interface.conversation
 
     telegram_connector.start(conversation)

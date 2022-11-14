@@ -2,6 +2,7 @@ from collections import deque
 from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler
+from loc import localization
 
 print_label: str = "[budoney :: Telegram Interface :: Classes]"
 
@@ -24,7 +25,7 @@ class TelegramConversationView:
     def __init__(
         self,
         state_name: str,
-        keyboard_data: "list[list[tuple[str, str, TelegramConversationFork]]]",
+        forks: "list[list[TelegramConversationFork]]",
     ) -> None:
         conversation_views[state_name] = self
         self.state_name = state_name
@@ -34,18 +35,19 @@ class TelegramConversationView:
         handlers = []
         simple_handlers = {}
 
-        for keyboard_line_data in keyboard_data:
+        for forks_line in forks:
             keyboard_line = []
             keyboard.append(keyboard_line)
-            for key_data in keyboard_line_data:
+            for fork in forks_line:
                 keyboard_line.append(
                     InlineKeyboardButton(
-                        callback_data=key_data[0], text=(key_data[1] or key_data[0])
+                        callback_data=fork.name,
+                        text=localization["states"].get(fork.name, fork.name),
                     )
                 )
                 handler = CallbackQueryHandler(self._simple_handling)
                 handlers.append(handler)
-                simple_handlers[key_data[0]] = handler
+                simple_handlers[fork.name] = handler
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self.handlers = handlers
@@ -113,17 +115,21 @@ class TelegramConversationView:
 
 
 class TelegramConversationFork:
+    name: str = "none"
     handler_type: str = "none"
+
+    def __init__(self, name: str):
+        self.name = name
 
 
 class EnumTelegramConversationFork(TelegramConversationFork):
     handler_type = "simple"
 
-    def __init__(self, options: "tuple[str, str]"):
+    def __init__(self, name: str, options: "list[str]"):
+        self.name = name
         self.options = options
+        # self.coversation = TelegramConversationView()
 
-
-SIMPLE_FORK = TelegramConversationFork()
 
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, TelegramConversationView]" = {}

@@ -1,5 +1,14 @@
-from interface.telegram.classes import SIMPLE_FORK, TelegramConversationView
+from interface.telegram.classes import (
+    TelegramConversationView,
+    TelegramConversationFork,
+    EnumTelegramConversationFork,
+)
 from interface.telegram.utils import keyboard_back_button
+
+transaction_types: "list[str]" = ["INCOME", "EXPENSE"]
+transaction_types_fork: EnumTelegramConversationFork = EnumTelegramConversationFork(
+    "transaction_type", transaction_types
+)
 
 
 def init():
@@ -7,18 +16,18 @@ def init():
         "finances",
         [
             [
-                ("transaction", "➕💸 Transaction", SIMPLE_FORK),
+                TelegramConversationFork("transaction"),
             ],
             [
-                ("transactions", "👛 Transactions", SIMPLE_FORK),
+                TelegramConversationFork("transactions"),
             ],
             [
-                ("merchants", "🏪 Merchants", SIMPLE_FORK),
-                ("methods", "💳 Methods", SIMPLE_FORK),
+                TelegramConversationFork("merchants"),
+                TelegramConversationFork("methods"),
             ],
             [
-                ("categories", "🏷 Categories", SIMPLE_FORK),
-                ("currencies", "💱 Currencies", SIMPLE_FORK),
+                TelegramConversationFork("categories"),
+                TelegramConversationFork("currencies"),
             ],
             [keyboard_back_button()],
         ],
@@ -26,19 +35,7 @@ def init():
     TelegramConversationView(
         "transaction",
         [
-            [
-                ("transaction_type", "", SIMPLE_FORK),
-            ],
-            [keyboard_back_button()],
-        ],
-    )
-    TelegramConversationView(
-        "transaction_type",
-        [
-            [
-                ("expense", "", SIMPLE_FORK),
-                ("income", "", SIMPLE_FORK),
-            ],
+            [transaction_types_fork],
             [keyboard_back_button()],
         ],
     )

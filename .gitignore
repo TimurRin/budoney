@@ -1,6 +1,7 @@
 /.idea
 /config/local
 /budoney/old
+/budoney/database/dev
 
 __pycache__/
 *.py[cod]

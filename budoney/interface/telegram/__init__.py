@@ -9,6 +9,7 @@ from interface.telegram.utils import keyboard_back_button
 import interface.telegram.section.main as main_section
 import interface.telegram.section.finances as finances_section
 import interface.telegram.section.tasks as tasks_section
+import interface.telegram.section.health as health_section
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, CommandHandler, ConversationHandler
 
@@ -50,6 +51,7 @@ TelegramConversationView("_WIP", [[keyboard_back_button()]])
 main_section.init()
 finances_section.init()
 tasks_section.init()
+health_section.init()
 
 for name in conversation_views:
     state_handlers[name] = conversation_views[name].handlers

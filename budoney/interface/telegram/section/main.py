@@ -1,4 +1,7 @@
-from interface.telegram.classes import SIMPLE_FORK, TelegramConversationView
+from interface.telegram.classes import (
+    TelegramConversationView,
+    TelegramConversationFork,
+)
 
 
 def init():
@@ -6,26 +9,26 @@ def init():
         "main",
         [
             [
-                ("transaction", "➕💸 Transaction", SIMPLE_FORK),
-                ("task_current", "➕🗒 Task", SIMPLE_FORK),
+                TelegramConversationFork("transaction"),
+                TelegramConversationFork("task_current"),
             ],
             [
-                ("finances", "💸 Finances", SIMPLE_FORK),
+                TelegramConversationFork("finances"),
             ],
             [
-                ("tasks", "🗒 Tasks", SIMPLE_FORK),
-                ("reminders", "⏰ Reminders", SIMPLE_FORK),
+                TelegramConversationFork("tasks"),
+                TelegramConversationFork("reminders"),
             ],
             [
-                ("utilities", "🚰 Utilities", SIMPLE_FORK),
-                ("clothes", "👚 Clothes", SIMPLE_FORK),
-                ("storage", "📦 Storage", SIMPLE_FORK),
+                TelegramConversationFork("utilities"),
+                TelegramConversationFork("clothes"),
+                TelegramConversationFork("storage"),
             ],
             [
-                ("food", "🥘 Food", SIMPLE_FORK),
-                ("pills", "💊 Pills", SIMPLE_FORK),
-                ("plants", "🌱 Plants", SIMPLE_FORK),
+                TelegramConversationFork("health"),
+                TelegramConversationFork("food"),
+                TelegramConversationFork("plants"),
             ],
-            [("users", "👫 Users", SIMPLE_FORK)],
+            [TelegramConversationFork("users")],
         ],
     )

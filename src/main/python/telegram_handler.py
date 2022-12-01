@@ -150,6 +150,7 @@ def init():
                 "transaction": {},
                 "merchant": {},
                 "method": {},
+                "date_offset": 0
             }
 
     send_message_to_authorized(
@@ -377,22 +378,22 @@ def method_submit(message: Message):
 
 
 def keyboard_row_back():
-    return [telegram.InlineKeyboardButton(text="🔙 Back", callback_data=handler_data_back)]
+    return [telegram.InlineKeyboardButton(text="◀️ Back", callback_data=handler_data_back)]
 
 
 def keyboard_row_back_and_add():
     return [
         telegram.InlineKeyboardButton(
-            text="🔙 Back", callback_data=handler_data_back),
+            text="◀️ Back", callback_data=handler_data_back),
         telegram.InlineKeyboardButton(
-            text="➕ Add new", callback_data=handler_data_add)
+            text="🆕 Add new", callback_data=handler_data_add)
     ]
 
 
 def keyboard_row_back_and_submit():
     return [
         telegram.InlineKeyboardButton(
-            text="🔙 Back", callback_data=handler_data_back),
+            text="◀️ Back", callback_data=handler_data_back),
         telegram.InlineKeyboardButton(
             text="✅ Submit", callback_data=handler_data_submit)
     ]
@@ -589,15 +590,38 @@ def keyboard_users():
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_dates():
+def keyboard_dates(date_offset: int):
     reply_keyboard = []
 
-    dates = date_utils.date_range(datetime.datetime(
-        2022, 8, 19), datetime.datetime.today())
+    today = datetime.datetime.today()
+
+    dates = date_utils.date_range(
+        today - datetime.timedelta(days=(date_offset * 7 + 6)),
+        today - datetime.timedelta(days=(date_offset * 7)),
+    )
 
     for date in dates:
-        reply_keyboard.append([telegram.InlineKeyboardButton(
-            date.strftime("%Y-%m-%d"), callback_data=date.strftime("%Y-%m-%d"))])
+        reply_keyboard.append(
+            [
+                telegram.InlineKeyboardButton(
+                    date.strftime("%Y-%m-%d (%a)"), callback_data=date.strftime("%Y_%m_%d")
+                )
+            ]
+        )
+    
+    control_buttons = [
+        telegram.InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
+        telegram.InlineKeyboardButton("⬅️", callback_data="_DATE_BACKWARD"),
+    ]
+
+    if (date_offset > 0):
+        control_buttons.append(telegram.InlineKeyboardButton("Today", callback_data="_DATE_TODAY"))
+        if (date_offset > 1):
+            control_buttons.append(telegram.InlineKeyboardButton("➡️", callback_data="_DATE_FORWARD"))
+            if (date_offset > 2):
+                control_buttons.append(telegram.InlineKeyboardButton("⏩", callback_data="_DATE_REWIND_FORWARD"))
+
+    reply_keyboard.append(control_buttons)
 
     reply_keyboard.append(keyboard_row_back())
 
@@ -660,7 +684,7 @@ def state_transaction_add_fast_type(message: Message):
 
 def state_transaction_add_fast_sum(message: Message):
     message.edit_text(
-        "Enter transaction data in this sequence \(data in _italic_ may be ommited\): *sum* _currency_, _method_, _description_",
+        "Enter transaction data in this sequence \(data in _italic_ may be ommited\): *sum* _currency_, _target_, _description_",
         parse_mode='MarkdownV2')
     return states["transaction_add_fast_sum"]
 
@@ -694,42 +718,42 @@ def state_transaction_reply(message: Message):
 
 
 def state_transaction_type(message: Message):
-    message.edit_text("state_transaction_type",
+    message.edit_text("Transaction type",
                       reply_markup=keyboard_transaction_type())
     return states["transaction_type"]
 
 
 def state_transaction_date(message: Message):
-    message.edit_text("state_transaction_date",
-                      reply_markup=keyboard_dates())
+    message.edit_text("Transaction date",
+                      reply_markup=keyboard_dates(authorized_data[message.chat.id]["date_offset"]))
     return states["transaction_date"]
 
 
 def state_transaction_sum(message: Message):
-    message.edit_text("state_transaction_sum")
+    message.edit_text("Transaction sum")
     return states["transaction_sum"]
 
 
 def state_transaction_currency(message: Message):
-    message.edit_text("state_transaction_currency",
+    message.edit_text("Transaction currency",
                       reply_markup=keyboard_with_back())
     return states["transaction_currency"]
 
 
 def state_transaction_method(message: Message):
-    message.edit_text("state_transaction_method",
+    message.edit_text("Transaction method",
                       reply_markup=keyboard_methods())
     return states["transaction_method"]
 
 
 def state_transaction_target(message: Message):
-    message.edit_text("state_transaction_target",
+    message.edit_text("Transaction target",
                       reply_markup=get_transaction_target_type(authorized_data[message.chat.id]["transaction"]) == "target_method" and keyboard_methods() or keyboard_merchants())
     return states["transaction_target"]
 
 
 def state_transaction_description(message: Message):
-    message.edit_text("state_transaction_description")
+    message.edit_text("Transaction description")
     return states["transaction_description"]
 
 
@@ -821,6 +845,7 @@ def state_wip(message: Message):
 
 
 def handle_main(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == "transactions":
         return state_transactions(update.callback_query.message)
     elif update.callback_query.data == "transaction_add_fast_type":
@@ -840,6 +865,7 @@ def handle_main(update: Update, context: CallbackContext):
 
 
 def handle_transactions(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         return state_transaction(update.callback_query.message)
     elif update.callback_query.data != handler_data_back:
@@ -849,6 +875,7 @@ def handle_transactions(update: Update, context: CallbackContext):
 
 
 def handle_transaction_add_fast_type(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         authorized_data[update.callback_query.message.chat.id]["transaction"]["type"] = update.callback_query.data
         return state_transaction_add_fast_sum(update.callback_query.message)
@@ -857,6 +884,7 @@ def handle_transaction_add_fast_type(update: Update, context: CallbackContext):
 
 
 def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     data = gsh.get_cached_data(["merchants", "currencies"])
 
     splitted = update.message.text.split(", ")
@@ -897,6 +925,7 @@ def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
 
 
 def handle_transaction_add_fast_method(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         authorized_data[update.callback_query.message.chat.id]["method"]["_NEW"] = True
         authorized_data[update.callback_query.message.chat.id]["last_state"] = state_transaction
@@ -916,6 +945,7 @@ def handle_transaction_add_fast_method(update: Update, context: CallbackContext)
 
 
 def handle_transaction_add_fast_merchant(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         authorized_data[update.callback_query.message.chat.id]["merchant"]["_NEW"] = True
         authorized_data[update.callback_query.message.chat.id]["last_state"] = state_transaction
@@ -927,6 +957,7 @@ def handle_transaction_add_fast_merchant(update: Update, context: CallbackContex
 
 
 def handle_transaction(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         if update.callback_query.data == handler_data_submit:
             return transaction_submit(update.callback_query.message)
@@ -952,17 +983,41 @@ def handle_transaction(update: Update, context: CallbackContext):
 
 
 def handle_transaction_type(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         authorized_data[update.callback_query.message.chat.id]["transaction"]["type"] = update.callback_query.data
     return state_transaction(update.callback_query.message)
 
 
 def handle_transaction_date(update: Update, context: CallbackContext):
-    try:
-        authorized_data[update.callback_query.message.chat.id]["transaction"]["date"] = datetime.datetime.strptime(
-            update.callback_query.data, "%Y-%m-%d")
-    finally:
-        return state_transaction(update.callback_query.message)
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
+    if update.callback_query.data == "_DATE_TODAY":
+        authorized_data[update.callback_query.message.chat.id]["date_offset"] = 0
+        return state_transaction_date(update.callback_query.message)
+    elif update.callback_query.data == "_DATE_REWIND_BACKWARD":
+        authorized_data[update.callback_query.message.chat.id]["date_offset"] += 4
+        return state_transaction_date(update.callback_query.message)
+    elif update.callback_query.data == "_DATE_BACKWARD":
+        authorized_data[update.callback_query.message.chat.id]["date_offset"] += 1
+        return state_transaction_date(update.callback_query.message)
+    elif update.callback_query.data == "_DATE_FORWARD":
+        authorized_data[update.callback_query.message.chat.id]["date_offset"] -= 1
+        if authorized_data[update.callback_query.message.chat.id]["date_offset"] < 0:
+            authorized_data[update.callback_query.message.chat.id]["date_offset"] = 0
+        return state_transaction_date(update.callback_query.message)
+    elif update.callback_query.data == "_DATE_REWIND_FORWARD":
+        authorized_data[update.callback_query.message.chat.id]["date_offset"] -= 4
+        if authorized_data[update.callback_query.message.chat.id]["date_offset"] < 0:
+            authorized_data[update.callback_query.message.chat.id]["date_offset"] = 0
+        return state_transaction_date(update.callback_query.message)
+    
+    else:
+        try:
+            authorized_data[update.callback_query.message.chat.id]["transaction"][
+                "date"
+            ] = datetime.datetime.strptime(update.callback_query.data, "%Y_%m_%d")
+        finally:
+            return state_transaction(update.callback_query.message)
 
 
 def handle_transaction_date_text(update: Update, context: CallbackContext):
@@ -985,12 +1040,14 @@ def handle_transaction_sum(update: Update, context: CallbackContext):
 
 
 def handle_transaction_currency(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         authorized_data[update.callback_query.message.chat.id]["transaction"]["currency"] = update.callback_query.data
     return state_transaction(update.callback_query.message)
 
 
 def handle_transaction_method(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         authorized_data[update.callback_query.message.chat.id]["method"]["_NEW"] = True
         authorized_data[update.callback_query.message.chat.id]["last_state"] = state_transaction
@@ -1001,6 +1058,7 @@ def handle_transaction_method(update: Update, context: CallbackContext):
 
 
 def handle_transaction_target(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     target = get_transaction_target_type(
         authorized_data[update.callback_query.message.chat.id]["transaction"])
 
@@ -1024,6 +1082,7 @@ def handle_transaction_description(update: Update, context: CallbackContext):
 
 
 def handle_merchants(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         authorized_data[update.callback_query.message.chat.id]["merchant"]["_NEW"] = True
         authorized_data[update.callback_query.message.chat.id]["last_state"] = state_transaction
@@ -1037,6 +1096,7 @@ def handle_merchants(update: Update, context: CallbackContext):
 
 
 def handle_merchant(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         if update.callback_query.data == handler_data_submit:
             return merchant_submit(update.callback_query.message)
@@ -1062,6 +1122,7 @@ def handle_merchant_keywords(update: Update, context: CallbackContext):
 
 
 def handle_merchant_category(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         authorized_data[update.callback_query.message.chat.id]["merchant"]["category"] = update.callback_query.data
 
@@ -1073,6 +1134,7 @@ def handle_merchant_emoji(update: Update, context: CallbackContext):
 
 
 def handle_methods(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         authorized_data[update.callback_query.message.chat.id]["method"]["_NEW"] = True
         return state_method(update.callback_query.message)
@@ -1085,6 +1147,7 @@ def handle_methods(update: Update, context: CallbackContext):
 
 
 def handle_method(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         method = authorized_data[update.callback_query.message.chat.id]["method"]
 
@@ -1127,22 +1190,27 @@ def handle_method_name(update: Update, context: CallbackContext):
 
 
 def handle_method_is_account(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_method(update.callback_query.message)
 
 
 def handle_method_is_mir(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_method(update.callback_query.message)
 
 
 def handle_method_is_credit(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_method(update.callback_query.message)
 
 
 def handle_method_is_cashback(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_method(update.callback_query.message)
 
 
 def handle_method_owner(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data != handler_data_back:
         authorized_data[update.callback_query.message.chat.id]["method"]["owner"] = update.callback_query.data
 
@@ -1150,6 +1218,7 @@ def handle_method_owner(update: Update, context: CallbackContext):
 
 
 def handle_categories(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     if update.callback_query.data == handler_data_add:
         pass
     elif update.callback_query.data != handler_data_back:
@@ -1161,14 +1230,17 @@ def handle_categories(update: Update, context: CallbackContext):
 
 
 def handle_currencies(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_main(update.callback_query.message)
 
 
 def handle_users(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_main(update.callback_query.message)
 
 
 def handle_wip(update: Update, context: CallbackContext):
+    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     return state_main(update.callback_query.message)
 
 

@@ -189,6 +189,7 @@ def init():
                 "merchant": {},
                 "method": {},
                 "date_offset": 0,
+                "merchant_category": "",
             }
 
     send_message_to_authorized("Hello, I've just started, so I need you to type /start")
@@ -404,6 +405,7 @@ def transaction_submit(message: Message):
         )
 
         authorized_data[message.chat.id]["transaction"] = {}
+        authorized_data[message.chat.id]["merchant_category"] = ""
 
         authorized_data[message.chat.id]["last_state"] = state_main
 
@@ -431,6 +433,7 @@ def merchant_submit(message: Message):
 
         authorized_data[message.chat.id]["merchant"] = {}
         authorized_data[message.chat.id]["transaction"]["merchant"] = data["id"]
+        authorized_data[message.chat.id]["merchant_category"] = ""
 
         gsh.cached_data.pop("merchants", None)
         gsh.get_cached_data(["merchants"])
@@ -464,6 +467,7 @@ def method_submit(message: Message):
 
         authorized_data[message.chat.id]["method"] = {}
         authorized_data[message.chat.id]["transaction"]["method"] = data["id"]
+        authorized_data[message.chat.id]["merchant_category"] = ""
 
         gsh.cached_data.pop("methods", None)
         gsh.get_cached_data(["methods"])
@@ -617,6 +621,35 @@ def keyboard_categories():
     return InlineKeyboardMarkup(reply_keyboard)
 
 
+def keyboard_categories_merchant_info():
+    data = gsh.get_cached_data(["categories", "merchants"])
+
+    reply_keyboard = [[]]
+
+    current_row = 0
+
+    for id in data["categories"]["list"]:
+        if id in data["merchants"]["by_category"]:
+            reply_keyboard[current_row].append(
+                telegram.InlineKeyboardButton(
+                    text=data["categories"]["dict"][id]["emoji"]
+                    + " "
+                    + data["categories"]["dict"][id]["name"]
+                    + " ("
+                    + str(len(data["merchants"]["by_category"][id]))
+                    + ")",
+                    callback_data=id,
+                )
+            )
+            if len(reply_keyboard[current_row]) >= 3:
+                reply_keyboard.append([])
+                current_row = current_row + 1
+
+    reply_keyboard.append(keyboard_row_back())
+
+    return InlineKeyboardMarkup(reply_keyboard)
+
+
 def keyboard_methods():
     data = gsh.get_cached_data(["methods"])
 
@@ -664,7 +697,7 @@ def keyboard_method():
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_merchants():
+def keyboard_merchants(merchant_category: str):
     data = gsh.get_cached_data(["merchants", "categories"])
 
     reply_keyboard = [[]]
@@ -672,22 +705,26 @@ def keyboard_merchants():
     current_row = 0
 
     for id in data["merchants"]["list"]:
-        reply_keyboard[current_row].append(
-            telegram.InlineKeyboardButton(
-                text=(
-                    data["merchants"]["dict"][id]["emoji"]
-                    or data["categories"]["dict"][
-                        data["merchants"]["dict"][id]["category"]
-                    ]["emoji"]
+        if (
+            not merchant_category
+            or merchant_category == data["merchants"]["dict"][id]["category"]
+        ):
+            reply_keyboard[current_row].append(
+                telegram.InlineKeyboardButton(
+                    text=(
+                        data["merchants"]["dict"][id]["emoji"]
+                        or data["categories"]["dict"][
+                            data["merchants"]["dict"][id]["category"]
+                        ]["emoji"]
+                    )
+                    + " "
+                    + data["merchants"]["dict"][id]["name"],
+                    callback_data=id,
                 )
-                + " "
-                + data["merchants"]["dict"][id]["name"],
-                callback_data=id,
             )
-        )
-        if len(reply_keyboard[current_row]) >= 3:
-            reply_keyboard.append([])
-            current_row = current_row + 1
+            if len(reply_keyboard[current_row]) >= 3:
+                reply_keyboard.append([])
+                current_row = current_row + 1
 
     reply_keyboard.append(keyboard_row_back_and_add())
 
@@ -882,7 +919,7 @@ def state_transaction_add_fast_method(message: Message):
 
 
 def state_transaction_add_fast_target(message: Message):
-    if authorized_data[message.chat.id]["transaction"]["type"] == "TRANSFER":
+    if authorized_data[message.chat.id]["transaction"].get("type") == "TRANSFER":
         message.edit_text(
             display_text_add_transaction(
                 authorized_data[message.chat.id]["transaction"]
@@ -896,7 +933,13 @@ def state_transaction_add_fast_target(message: Message):
                 authorized_data[message.chat.id]["transaction"]
             )
             + ". Where?",
-            reply_markup=keyboard_merchants(),
+            reply_markup=(
+                authorized_data[message.chat.id]["merchant_category"]
+                and keyboard_merchants(
+                    authorized_data[message.chat.id]["merchant_category"]
+                )
+                or keyboard_categories_merchant_info()
+            ),
         )
     return states["transaction_add_fast_target"]
 
@@ -953,7 +996,13 @@ def state_transaction_target(message: Message):
         )
         == "target_method"
         and keyboard_methods()
-        or keyboard_merchants(),
+        or (
+            authorized_data[message.chat.id]["merchant_category"]
+            and keyboard_merchants(
+                authorized_data[message.chat.id]["merchant_category"]
+            )
+            or keyboard_categories_merchant_info()
+        ),
     )
     return states["transaction_target"]
 
@@ -964,7 +1013,12 @@ def state_transaction_description(message: Message):
 
 
 def state_merchants(message: Message):
-    message.edit_text("List of merchants", reply_markup=keyboard_merchants())
+    message.edit_text(
+        "List of merchants",
+        reply_markup=keyboard_merchants(
+            authorized_data[message.chat.id]["merchant_category"]
+        ),
+    )
     return states["merchants"]
 
 
@@ -1100,7 +1154,6 @@ def handle_transaction_add_fast_type(update: Update, context: CallbackContext):
 
 
 def handle_transaction_add_fast_sum(update: Update, context: CallbackContext):
-    context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
     data = gsh.get_cached_data(["merchants", "currencies"])
 
     splitted = update.message.text.split(", ")
@@ -1193,17 +1246,46 @@ def handle_transaction_add_fast_merchant(update: Update, context: CallbackContex
         authorized_data[update.callback_query.message.chat.id]["merchant"][
             "_NEW"
         ] = True
+        authorized_data[update.callback_query.message.chat.id]["merchant"][
+            "category"
+        ] = authorized_data[update.callback_query.message.chat.id]["merchant_category"]
         authorized_data[update.callback_query.message.chat.id][
             "last_state"
         ] = state_transaction
         return state_merchant(update.callback_query.message)
     else:
-        authorized_data[update.callback_query.message.chat.id]["transaction"][
-            get_transaction_target_type(
-                authorized_data[update.callback_query.message.chat.id]["transaction"]
-            )
-        ] = update.callback_query.data
-        return state_transaction(update.callback_query.message)
+        target_type = get_transaction_target_type(
+            authorized_data[update.callback_query.message.chat.id]["transaction"]
+        )
+        if (
+            target_type == "merchant"
+            and not authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ]
+        ):
+            authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ] = update.callback_query.data
+            return state_transaction_add_fast_target(update.callback_query.message)
+        elif (
+            update.callback_query.data == handler_data_back
+            and target_type == "merchant"
+            and authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ]
+        ):
+            authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ] = ""
+            return state_transaction_add_fast_target(update.callback_query.message)
+        else:
+            authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ] = ""
+            authorized_data[update.callback_query.message.chat.id]["transaction"][
+                target_type
+            ] = update.callback_query.data
+            return state_transaction(update.callback_query.message)
 
 
 def handle_transaction(update: Update, context: CallbackContext):
@@ -1324,15 +1406,20 @@ def handle_transaction_method(update: Update, context: CallbackContext):
 
 def handle_transaction_target(update: Update, context: CallbackContext):
     context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
-    target = get_transaction_target_type(
+    target_type = get_transaction_target_type(
         authorized_data[update.callback_query.message.chat.id]["transaction"]
     )
 
     if update.callback_query.data == handler_data_add:
-        if target == "target_method":
+        if target_type == "target_method":
             authorized_data[update.callback_query.message.chat.id]["method"][
                 "_NEW"
             ] = True
+            authorized_data[update.callback_query.message.chat.id]["merchant"][
+                "category"
+            ] = authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ]
             authorized_data[update.callback_query.message.chat.id][
                 "last_state"
             ] = state_transaction
@@ -1346,9 +1433,26 @@ def handle_transaction_target(update: Update, context: CallbackContext):
             ] = state_transaction
             return state_merchant(update.callback_query.message)
     elif update.callback_query.data != handler_data_back:
+        if (
+            target_type == "merchant"
+            and not authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ]
+        ):
+            authorized_data[update.callback_query.message.chat.id][
+                "merchant_category"
+            ] = update.callback_query.data
+            return state_transaction_target(update.callback_query.message)
         authorized_data[update.callback_query.message.chat.id]["transaction"][
-            target
+            target_type
         ] = update.callback_query.data
+    elif (
+        update.callback_query.data == handler_data_back
+        and target_type == "merchant"
+        and authorized_data[update.callback_query.message.chat.id]["merchant_category"]
+    ):
+        authorized_data[update.callback_query.message.chat.id]["merchant_category"] = ""
+        return state_transaction_target(update.callback_query.message)
     return state_transaction(update.callback_query.message)
 
 

@@ -98,16 +98,25 @@ def fetch_data(name: str, sheet: Worksheet):
                 "dict": {},
                 "list": [],
             },
+            "by_category": {
+
+            },
         }
         for value in sheet.get_values()[1:]:
+            category: str = value[3]
+
             entry = {
                 "id": value[0],
                 "name": value[1],
-                "category": value[3],
+                "category": category,
                 "emoji": value[4],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
+
+            if not category in data["by_category"]:
+                data["by_category"][category] = []
+            data["by_category"][category].append(value[0])
 
             keywords_to_add = [
                 value[0].casefold(),

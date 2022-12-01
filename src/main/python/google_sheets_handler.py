@@ -133,10 +133,10 @@ def fetch_data(name: str, sheet: Worksheet):
                 "id": value[0],
                 "name": value[1],
                 "emoji": value[2],
-                "account": value[3] == "TRUE" and True or False,
-                "mir": value[4] == "TRUE" and True or False,
-                "credit": value[5] == "TRUE" and True or False,
-                "cashback": value[6] == "TRUE" and True or False,
+                "is_account": value[3] == "TRUE" and True or False,
+                "is_mir": value[4] == "TRUE" and True or False,
+                "is_credit": value[5] == "TRUE" and True or False,
+                "is_cashback": value[6] == "TRUE" and True or False,
                 "owner": value[7],
             }
             data["dict"][value[0]] = entry

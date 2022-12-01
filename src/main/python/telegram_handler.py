@@ -60,6 +60,7 @@ states = {
     "methods": 300,
     "method": 301,
     "method_name": 302,
+    "method_emoji": 308,
     "method_is_account": 307,
     "method_is_mir": 303,
     "method_is_credit": 304,
@@ -139,6 +140,9 @@ def init():
             states["methods"]: [CallbackQueryHandler(handle_methods)],
             states["method"]: [CallbackQueryHandler(handle_method)],
             states["method_name"]: [MessageHandler(text_filters(), handle_method_name)],
+            states["method_emoji"]: [
+                MessageHandler(text_filters(), handle_method_emoji)
+            ],
             states["method_is_account"]: [
                 CallbackQueryHandler(handle_method_is_account)
             ],
@@ -277,10 +281,10 @@ def display_text_method(method: dict, button=False):
     )
     method_name = method.get("name", "New method")
     method_emoji = method.get("emoji", False) and (" " + method["emoji"]) or ""
-    method_is_account = method.get("account", False) and " Account" or ""
-    method_is_mir = method.get("mir", False) and " MIR" or ""
-    method_is_credit = method.get("credit", False) and " Credit" or ""
-    method_is_cashback = method.get("cashback", False) and " Cashback" or ""
+    method_is_account = method.get("is_account", False) and " Account" or ""
+    method_is_mir = method.get("is_mir", False) and " MIR" or ""
+    method_is_credit = method.get("is_credit", False) and " Credit" or ""
+    method_is_cashback = method.get("is_cashback", False) and " Cashback" or ""
 
     return (
         owner_emoji
@@ -449,11 +453,11 @@ def method_submit(message: Message):
             [
                 data["id"],
                 "name" in data and data["name"] or data["id"],
-                "emoji" in data and data["emoji"] or "🆕",
-                "is_account" in data and data["is_account"] and "TRUE" or "FALSE",
-                "is_mir" in data and data["is_mir"] and "TRUE" or "FALSE",
-                "is_credit" in data and data["is_credit"] and "TRUE" or "FALSE",
-                "is_cashback" in data and data["is_cashback"] and "TRUE" or "FALSE",
+                "emoji" in data and data["emoji"] or "",
+                "is_account" in data and data["is_account"] and True or False,
+                "is_mir" in data and data["is_mir"] and True or False,
+                "is_credit" in data and data["is_credit"] and True or False,
+                "is_cashback" in data and data["is_cashback"] and True or False,
                 "owner" in data and data["owner"] or "SHARED",
             ],
         )
@@ -641,6 +645,7 @@ def keyboard_method():
     reply_keyboard.append(
         [
             telegram.InlineKeyboardButton("Edit name", callback_data="name"),
+            telegram.InlineKeyboardButton("Edit emoji", callback_data="emoji"),
             telegram.InlineKeyboardButton("Edit owner", callback_data="owner"),
         ]
     )
@@ -695,6 +700,7 @@ def keyboard_merchant():
     reply_keyboard.append(
         [
             telegram.InlineKeyboardButton("Edit name", callback_data="name"),
+            telegram.InlineKeyboardButton("Edit emoji", callback_data="emoji"),
             telegram.InlineKeyboardButton("Edit category", callback_data="category"),
         ]
     )
@@ -983,6 +989,11 @@ def state_merchant_name(message: Message):
     return states["merchant_name"]
 
 
+def state_merchant_emoji(message: Message):
+    message.edit_text("Enter merchant emoji")
+    return states["merchant_emoji"]
+
+
 def state_merchant_category(message: Message):
     message.edit_text("Select merchant category", reply_markup=keyboard_categories())
     return states["merchant_category"]
@@ -1012,6 +1023,11 @@ def state_method_reply(message: Message):
 def state_method_name(message: Message):
     message.edit_text("Enter method name")
     return states["method_name"]
+
+
+def state_method_emoji(message: Message):
+    message.edit_text("Enter method emoji")
+    return states["method_emoji"]
 
 
 def state_method_owner(message: Message):
@@ -1372,6 +1388,8 @@ def handle_merchant(update: Update, context: CallbackContext):
             return merchant_submit(update.callback_query.message)
         elif update.callback_query.data == "name":
             return state_merchant_name(update.callback_query.message)
+        elif update.callback_query.data == "emoji":
+            return state_merchant_emoji(update.callback_query.message)
         elif update.callback_query.data == "category":
             return state_merchant_category(update.callback_query.message)
 
@@ -1406,6 +1424,7 @@ def handle_merchant_category(update: Update, context: CallbackContext):
 
 
 def handle_merchant_emoji(update: Update, context: CallbackContext):
+    authorized_data[update.message.chat.id]["merchant"]["emoji"] = update.message.text
     return state_merchant_reply(update.message)
 
 
@@ -1435,27 +1454,39 @@ def handle_method(update: Update, context: CallbackContext):
             return method_submit(update.callback_query.message)
         elif update.callback_query.data == "name":
             return state_method_name(update.callback_query.message)
+        elif update.callback_query.data == "emoji":
+            return state_method_emoji(update.callback_query.message)
         elif update.callback_query.data == "owner":
             return state_method_owner(update.callback_query.message)
         elif update.callback_query.data == "is_account":
             if "is_account" not in method:
                 method["is_account"] = False
             method["is_account"] = not method["is_account"]
+            if method["is_account"]:
+                method["is_mir"] = False
+                method["is_credit"] = False
+                method["is_cashback"] = False
             return state_method(update.callback_query.message)
         elif update.callback_query.data == "is_mir":
             if "is_mir" not in method:
                 method["is_mir"] = False
             method["is_mir"] = not method["is_mir"]
+            if method["is_mir"]:
+                method["is_account"] = False
             return state_method(update.callback_query.message)
         elif update.callback_query.data == "is_credit":
             if "is_credit" not in method:
                 method["is_credit"] = False
             method["is_credit"] = not method["is_credit"]
+            if method["is_credit"]:
+                method["is_account"] = False
             return state_method(update.callback_query.message)
         elif update.callback_query.data == "is_cashback":
             if "is_cashback" not in method:
                 method["is_cashback"] = False
             method["is_cashback"] = not method["is_cashback"]
+            if method["is_cashback"]:
+                method["is_account"] = False
             return state_method(update.callback_query.message)
 
     return state_methods(update.callback_query.message)
@@ -1470,6 +1501,11 @@ def handle_method_name(update: Update, context: CallbackContext):
         authorized_data[update.message.chat.id]["method"]["id"] = generate_id(
             "methods", update.message.text
         )
+    return state_method_reply(update.message)
+
+
+def handle_method_emoji(update: Update, context: CallbackContext):
+    authorized_data[update.message.chat.id]["method"]["emoji"] = update.message.text
     return state_method_reply(update.message)
 
 

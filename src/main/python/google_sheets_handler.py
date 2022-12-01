@@ -18,13 +18,14 @@ google_sheets_config = yaml_manager.load("config/local/google-sheets")
 
 print(print_label, "Setting scope to use when authenticating")
 scope = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
 ]
 
 print(print_label, "Authenticating using credentials, saved in JSON")
 google_sheets_credentials = ServiceAccountCredentials.from_json_keyfile_name(
-    '../../../config/local/google-api.json', scope)
+    "../../../config/local/google-api.json", scope
+)
 
 gspread_client = None
 book_cache = {}
@@ -50,7 +51,8 @@ def fetch_sheet(name: string):
     sheet_credentials = google_sheets_config["sheets"][name]
     if sheet_credentials["bookKey"] not in book_cache:
         book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
-            sheet_credentials["bookKey"])
+            sheet_credentials["bookKey"]
+        )
     books_by_sheet[name] = book_cache[sheet_credentials["bookKey"]]
     return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
 
@@ -63,26 +65,28 @@ def fetch_transaction_sheet(transaction_code: str):
     sheet_name = sheet_credentials["sheetPrefix"] + transaction_code
     if sheet_credentials["bookKey"] not in book_cache:
         book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
-            sheet_credentials["bookKey"])
+            sheet_credentials["bookKey"]
+        )
     books_by_sheet[transaction_code] = book_cache[sheet_credentials["bookKey"]]
     return books_by_sheet[transaction_code].worksheet(sheet_name)
 
 
 def fetch_data(name: str, sheet: Worksheet):
-    print(print_label, "Getting data from the sheet '" +
-          name + "' (" + str(sheet.title) + ", " + str(sheet.id) + ")")
+    print(
+        print_label,
+        "Getting data from the sheet '"
+        + name
+        + "' ("
+        + str(sheet.title)
+        + ", "
+        + str(sheet.id)
+        + ")",
+    )
 
     if name == "categories":
-        data = {
-            "dict": {},
-            "list": []
-        }
+        data = {"dict": {}, "list": []}
         for value in sheet.get_values()[1:]:
-            entry = {
-                "id": value[0],
-                "name": value[1],
-                "emoji": value[2]
-            }
+            entry = {"id": value[0], "name": value[1], "emoji": value[2]}
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
@@ -93,25 +97,29 @@ def fetch_data(name: str, sheet: Worksheet):
             "keywords": {
                 "dict": {},
                 "list": [],
-            }
+            },
         }
         for value in sheet.get_values()[1:]:
             entry = {
                 "id": value[0],
                 "name": value[1],
                 "category": value[3],
-                "emoji": value[4]
+                "emoji": value[4],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
 
-            keywords_to_add = [value[0].casefold(), value[1].casefold(
-            ), transliterate.russian_to_latin(value[1].casefold())]
+            keywords_to_add = [
+                value[0].casefold(),
+                value[1].casefold(),
+                transliterate.russian_to_latin(value[1].casefold()),
+            ]
 
             for keyword in value[2].split(","):
                 keywords_to_add.append(keyword.casefold())
                 keywords_to_add.append(
-                    transliterate.russian_to_latin(keyword.casefold()))
+                    transliterate.russian_to_latin(keyword.casefold())
+                )
 
             for keyword in keywords_to_add:
                 if keyword and keyword not in data["keywords"]["dict"]:
@@ -119,10 +127,7 @@ def fetch_data(name: str, sheet: Worksheet):
                     data["keywords"]["dict"][keyword] = value[0]
         return data
     elif name == "methods":
-        data = {
-            "dict": {},
-            "list": []
-        }
+        data = {"dict": {}, "list": []}
         for value in sheet.get_values()[1:]:
             entry = {
                 "id": value[0],
@@ -132,16 +137,13 @@ def fetch_data(name: str, sheet: Worksheet):
                 "mir": value[4] == "TRUE" and True or False,
                 "credit": value[5] == "TRUE" and True or False,
                 "cashback": value[6] == "TRUE" and True or False,
-                "owner": value[7]
+                "owner": value[7],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
     elif name == "currencies" or name == "users":
-        data = {
-            "dict": {},
-            "list": []
-        }
+        data = {"dict": {}, "list": []}
         for value in sheet.get_values()[1:]:
             entry = {
                 "id": value[0],
@@ -158,11 +160,9 @@ def fetch_data(name: str, sheet: Worksheet):
 def fetch_all_sheets():
     transactions = {}
 
-    date = datetime.strptime(
-        google_sheets_config["transactions_start"], '%Y-%m-%d')
+    date = datetime.strptime(google_sheets_config["transactions_start"], "%Y-%m-%d")
     for transaction_code in date_utils.transaction_codes_range(date, date.today()):
-        transactions[transaction_code] = fetch_transaction_sheet(
-            transaction_code)
+        transactions[transaction_code] = fetch_transaction_sheet(transaction_code)
 
     return {
         "users": fetch_sheet("users"),
@@ -170,7 +170,7 @@ def fetch_all_sheets():
         "methods": fetch_sheet("methods"),
         "merchants": fetch_sheet("merchants"),
         "currencies": fetch_sheet("currencies"),
-        "transactions": transactions
+        "transactions": transactions,
     }
 
 

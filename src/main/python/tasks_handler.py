@@ -22,12 +22,13 @@ def schedule_tasks():
             changed = True
             gsh.sheets["tasks_scheduled"].update_cell(line, 9, recurring_timestamp)
             recurring_stage = scheduled_task_data["recurring_stage"] + 1
+            if recurring_stage > scheduled_task_data["recurring_value"]:
+                recurring_stage = 1
             gsh.sheets["tasks_scheduled"].update_cell(line, 8, recurring_stage)
-            if scheduled_task_data["recurring_stage"] == 0 or recurring_stage > scheduled_task_data["recurring_value"]:
-                if recurring_stage > scheduled_task_data["recurring_value"]:
-                    recurring_stage = 1
-                gsh.sheets["tasks_scheduled"].update_cell(line, 10, scheduled_task_data["times_scheduled"] + 1)
-                
+            if recurring_stage == 1:
+                gsh.sheets["tasks_scheduled"].update_cell(
+                    line, 10, scheduled_task_data["times_scheduled"] + 1
+                )
                 gsh.insert_into_sheet(
                     "tasks_current",
                     [

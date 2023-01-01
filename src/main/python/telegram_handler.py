@@ -429,7 +429,7 @@ def transaction_submit(message: Message):
         date = "date" in data and data["date"] or datetime.datetime.today()
 
         gsh.insert_into_sheet(
-            "transactions_" + date_utils.get_date_code(date),
+            ("transactions", date_utils.get_date_code(date)),
             [
                 data["type"],
                 (date - datetime.datetime(1899, 12, 30)).days,

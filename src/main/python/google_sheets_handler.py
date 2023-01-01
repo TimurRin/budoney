@@ -1,4 +1,3 @@
-import string
 from datetime import datetime
 
 import gspread
@@ -35,11 +34,11 @@ google_sheets_credentials = ServiceAccountCredentials.from_json_keyfile_name(
     "../../../config/local/google-api.json", scope
 )
 
-gspread_client = None
-book_cache = {}
-books_by_sheet = {}
-sheets = {}
-data = {}
+gspread_client: Client = None
+book_cache: dict[str, Spreadsheet] = {}
+books_by_sheet: dict[str, Spreadsheet] = {}
+sheets: dict[str, Worksheet] = {}
+data: dict = {}
 
 
 def check_authorization(gspread_client: Client):
@@ -50,17 +49,20 @@ def check_authorization(gspread_client: Client):
         return gspread.authorize(google_sheets_credentials)
 
 
-def fetch_sheet(name: string):
+def fetch_sheet(name: str, code: str = None):
     global gspread_client
     gspread_client = check_authorization(gspread_client)
-    print(print_label, "Opening the sheet '" + name + "'")
+    print(print_label, "Opening the sheet '" + name + (code and ("_" + code) or "") + "'")
     sheet_credentials = google_sheets_config["sheets"][name]
     if sheet_credentials["bookKey"] not in book_cache:
         book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
             sheet_credentials["bookKey"]
         )
     books_by_sheet[name] = book_cache[sheet_credentials["bookKey"]]
-    return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
+    if code:
+        return books_by_sheet[name].worksheet(sheet_credentials["sheetPrefix"] + code)
+    else:
+        return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
 
 
 def fetch_data(name: str, sheet: Worksheet):
@@ -190,22 +192,43 @@ def fetch_data(name: str, sheet: Worksheet):
         return sheet.get_values()
 
 
-def get_cached_data(requests, extra=None, update=False):
-    for sheet_name in requests:
+def get_sheet_name(request):
+    is_tuple = type(request) is tuple
+    if is_tuple:
+        sheet_name: str = request[0] + "_" + request[1]
+    else:
+        sheet_name: str = request
+    return sheet_name, is_tuple
+
+
+def get_cached_data(requests, update=False):
+    for request in requests:
+        sheet_name, is_tuple = get_sheet_name(request)
+
         if update:
             print(print_label, "Data update request for '" + sheet_name + "'")
-        if extra:
-            prefix_name = sheet_name + "_" + extra
+
         if (update) or (sheet_name not in sheets):
-            sheets[sheet_name] = fetch_sheet(sheet_name)
+            sheets[sheet_name] = (
+                is_tuple
+                and fetch_sheet(request[0], code=request[1])
+                or fetch_sheet(sheet_name)
+            )
+
         if (update) or (sheet_name not in data):
             data[sheet_name] = fetch_data(sheet_name, sheets[sheet_name])
+
     return data
 
 
-def insert_into_sheet(sheet_name: str, row: list):
+def insert_into_sheet(request: tuple[str, str] | str, row: list):
+    sheet_name, is_tuple = get_sheet_name(request)
     if sheet_name not in sheets:
-        sheets[sheet_name] = fetch_sheet(sheet_name)
+        sheets[sheet_name] = (
+            is_tuple
+            and fetch_sheet(request[0], code=request[1])
+            or fetch_sheet(sheet_name)
+        )
     sheets[sheet_name].append_row(row)
 
 

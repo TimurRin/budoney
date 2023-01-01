@@ -52,7 +52,9 @@ def check_authorization(gspread_client: Client):
 def fetch_sheet(name: str, code: str = None):
     global gspread_client
     gspread_client = check_authorization(gspread_client)
-    print(print_label, "Opening the sheet '" + name + (code and ("_" + code) or "") + "'")
+    print(
+        print_label, "Opening the sheet '" + name + (code and ("_" + code) or "") + "'"
+    )
     sheet_credentials = google_sheets_config["sheets"][name]
     if sheet_credentials["bookKey"] not in book_cache:
         book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
@@ -233,6 +235,8 @@ def insert_into_sheet(request: tuple[str, str] | str, row: list):
 
 
 def invalidate_all():
+    sheets: dict[str, Worksheet] = {}
+    data: dict = {}
     get_cached_data(sheet_types, update=True)
 
 

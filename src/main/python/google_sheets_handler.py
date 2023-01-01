@@ -181,11 +181,11 @@ def fetch_data(name: str, sheet: Worksheet):
                 "urgency": value[3] == "TRUE",
                 "time": value[4],
                 "recurring_type": value[5],
-                "recurring_value": value[6],
-                "recurring_stage": value[7],
+                "recurring_value": value[6] and int(value[6]) or 0,
+                "recurring_stage": value[7] and int(value[7]) or 0,
                 "recurring_timestamp": value[8],
-                "times_done": value[9],
-                "times_missed": value[10],
+                "times_scheduled": value[9] and int(value[9]) or 0,
+                "times_done": value[10] and int(value[10]) or 0,
                 "paused": value[11] == "TRUE",
             }
             data["dict"][value[0]] = entry

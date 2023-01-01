@@ -6,6 +6,7 @@ import tasks_handler
 import telegram
 import utils.date_utils as date_utils
 import utils.id_utils as id_utils
+import utils.thread_utils as thread_utils
 import utils.yaml_manager as yaml_manager
 from telegram import InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackQueryHandler, ConversationHandler, Filters, Updater
@@ -208,10 +209,22 @@ def init():
 
     send_message_to_authorized("Hello, I've just started, so I need you to type /start")
 
-    # tasks_handler.schedule_tasks()
-
     print(print_label, "Started")
-    updater.idle()
+
+    if general_config["production_mode"]:
+        tasks_handler.check_tasks()
+    else:
+        tasks_handler.schedule_tasks()
+        updater.idle()
+
+    # thread_utils.run_io_tasks_in_parallel(
+    #     [
+    #         updater.idle,
+    #         tasks_handler.check_tasks,
+    #     ]
+    # )
+
+    print(print_label, "Started completely")
 
 
 # local utils
@@ -358,19 +371,20 @@ def display_text_add_transaction(add_transaction: dict):
 
 
 def display_text_task_current(task_current: dict, short_info=False):
-    task_current_name = (
-        task_current.get("scheduled_id", False) and "🔁 " or ""
-    ) + task_current.get("name", "New task")
+    task_current_schedlued: str = task_current["scheduled_id"] and "🔁" or ""
+    task_current_importance: str = task_current["importance"] and "❗" or ""
+    task_current_urgency: str = task_current["due_to"] and "⏰" or ""
 
-    priority = int(task_current.get("priority", "0"))
-
-    if not priority == 0:
-        task_current_priority = " (p" + (priority > 0 and "+" or "") + str(priority) + ")"
-    else:
-        task_current_priority = ""
+    task_current_name: str = task_current.get("name", "New task")
 
     if short_info:
-        return task_current_name + task_current_priority
+        return (
+            task_current_schedlued
+            + task_current_importance
+            + task_current_urgency
+            + " "
+            + task_current_name
+        )
     else:
         return str(task_current)
 
@@ -869,7 +883,9 @@ def keyboard_tasks_current():
         if not data["tasks_current"]["dict"][id]["done"]:
             reply_keyboard[current_row].append(
                 telegram.InlineKeyboardButton(
-                    text=display_text_task_current(data["tasks_current"]["dict"][id], True),
+                    text=display_text_task_current(
+                        data["tasks_current"]["dict"][id], True
+                    ),
                     callback_data=id,
                 )
             )
@@ -2000,5 +2016,6 @@ def fallback_callback_query_handler(update: Update, context: CallbackContext):
 print(print_label, "Loading configs...")
 general_config = yaml_manager.load("config/local/general")
 telegram_config = yaml_manager.load("config/local/telegram")
+
 
 init()

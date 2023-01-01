@@ -1,12 +1,11 @@
 import datetime
 import difflib
-import math
-import re
 
 import google_sheets_handler as gsh
+import tasks_handler
 import telegram
 import utils.date_utils as date_utils
-import utils.transliterate as transliterate
+import utils.id_utils as id_utils
 import utils.yaml_manager as yaml_manager
 from telegram import InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackQueryHandler, ConversationHandler, Filters, Updater
@@ -209,6 +208,8 @@ def init():
 
     send_message_to_authorized("Hello, I've just started, so I need you to type /start")
 
+    # tasks_handler.schedule_tasks()
+
     print(print_label, "Started")
     updater.idle()
 
@@ -259,32 +260,6 @@ def parse_sum_text(text: str):
         }
     except:
         return {"sum": 0, "currency": telegram_config["main_currency"]}
-
-
-def generate_id(type: str, name: str):
-    data = gsh.get_cached_data([type])
-    # int(math.log10(n))+1
-
-    transliterated = transliterate.russian_to_latin(name).upper()
-    code = re.sub(r"[^A-Z0-9]+", "", transliterated)
-    id = code[:7]
-    id_len = len(id)
-
-    if id not in data[type]["dict"]:
-        return id
-    else:
-        loop = 0
-        while loop <= 999999:
-            digits = loop > 0 and (int(math.log10(loop)) + 1) or 1
-            temp_id = None
-            if id_len + digits > 7:
-                temp_id = id[:-digits] + str(loop)
-            else:
-                temp_id = id + str(loop)
-            if temp_id not in data[type]["dict"]:
-                return temp_id
-            else:
-                loop = loop + 1
 
 
 def display_text_method(method: dict, button=False):
@@ -386,7 +361,14 @@ def display_text_task_current(task_current: dict, short_info=False):
     task_current_name = (
         task_current.get("scheduled_id", False) and "🔁 " or ""
     ) + task_current.get("name", "New task")
-    task_current_priority = " (p" + task_current.get("priority", "0") + ")"
+
+    priority = int(task_current.get("priority", "0"))
+
+    if not priority == 0:
+        task_current_priority = " (p" + (priority > 0 and "+" or "") + str(priority) + ")"
+    else:
+        task_current_priority = ""
+
     if short_info:
         return task_current_name + task_current_priority
     else:
@@ -525,11 +507,10 @@ def task_current_submit(message: Message):
             [
                 data["id"],
                 "name" in data and data["name"] or data["id"],
-                "priority" in data and data["priority"] or 0,
+                "importance" in data and data["importance"] and True or False,
                 "scheduled_id" in data and data["scheduled_id"] or "",
                 (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
                 due_to,
-                "days_before" in data and data["days_before"] or -1,
                 "",
             ],
         )
@@ -885,15 +866,16 @@ def keyboard_tasks_current():
     current_row = 0
 
     for id in data["tasks_current"]["list"]:
-        reply_keyboard[current_row].append(
-            telegram.InlineKeyboardButton(
-                text=display_text_task_current(data["tasks_current"]["dict"][id], True),
-                callback_data=id,
+        if not data["tasks_current"]["dict"][id]["done"]:
+            reply_keyboard[current_row].append(
+                telegram.InlineKeyboardButton(
+                    text=display_text_task_current(data["tasks_current"]["dict"][id], True),
+                    callback_data=id,
+                )
             )
-        )
-        if len(reply_keyboard[current_row]) >= 3:
-            reply_keyboard.append([])
-            current_row = current_row + 1
+            if len(reply_keyboard[current_row]) >= 1:
+                reply_keyboard.append([])
+                current_row = current_row + 1
 
     reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
@@ -1767,8 +1749,10 @@ def handle_merchant_name(update: Update, context: CallbackContext):
         "_NEW" in authorized_data[update.message.chat.id]["merchant"]
         or "id" not in authorized_data[update.message.chat.id]["merchant"]
     ):
-        authorized_data[update.message.chat.id]["merchant"]["id"] = generate_id(
-            "merchants", update.message.text
+        authorized_data[update.message.chat.id]["merchant"][
+            "id"
+        ] = id_utils.generate_id(
+            gsh.get_cached_data(["merchants"])["merchants"]["dict"], update.message.text
         )
 
     return state_merchant_reply(update.message)
@@ -1863,8 +1847,8 @@ def handle_method_name(update: Update, context: CallbackContext):
         "_NEW" in authorized_data[update.message.chat.id]["method"]
         or "id" not in authorized_data[update.message.chat.id]["method"]
     ):
-        authorized_data[update.message.chat.id]["method"]["id"] = generate_id(
-            "methods", update.message.text
+        authorized_data[update.message.chat.id]["method"]["id"] = id_utils.generate_id(
+            gsh.get_cached_data(["methods"])["methods"]["dict"], update.message.text
         )
     return state_method_reply(update.message)
 
@@ -1966,8 +1950,11 @@ def handle_task_current_name(update: Update, context: CallbackContext):
         "_NEW" in authorized_data[update.message.chat.id]["task_current"]
         or "id" not in authorized_data[update.message.chat.id]["task_current"]
     ):
-        authorized_data[update.message.chat.id]["task_current"]["id"] = generate_id(
-            "tasks_current", update.message.text
+        authorized_data[update.message.chat.id]["task_current"][
+            "id"
+        ] = id_utils.generate_id(
+            gsh.get_cached_data(["tasks_current"])["tasks_current"]["dict"],
+            update.message.text,
         )
 
     return state_task_current_reply(update.message)

@@ -162,12 +162,11 @@ def fetch_data(name: str, sheet: Worksheet):
             entry = {
                 "id": value[0],
                 "name": value[1],
-                "priority": value[2],
+                "importance": value[2] == "TRUE",
                 "scheduled_id": value[3],
                 "created": value[4],
                 "due_to": value[5],
-                "days_before": value[6],
-                "done": value[7],
+                "done": value[6],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
@@ -178,14 +177,16 @@ def fetch_data(name: str, sheet: Worksheet):
             entry = {
                 "id": value[0],
                 "name": value[1],
-                "priority": value[2],
-                "recurring_type": value[3],
-                "recurring_value": value[4],
-                "recurring_stage": value[5],
-                "recurring_timestamp": value[6],
-                "times_done": value[7],
-                "times_missed": value[8],
-                "paused": value[9],
+                "importance": value[2] == "TRUE",
+                "urgency": value[3] == "TRUE",
+                "time": value[4],
+                "recurring_type": value[5],
+                "recurring_value": value[6],
+                "recurring_stage": value[7],
+                "recurring_timestamp": value[8],
+                "times_done": value[9],
+                "times_missed": value[10],
+                "paused": value[11] == "TRUE",
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
@@ -231,6 +232,7 @@ def insert_into_sheet(request: tuple[str, str] | str, row: list):
             and fetch_sheet(request[0], code=request[1])
             or fetch_sheet(sheet_name)
         )
+    print(print_label, "Inserting into '" + sheet_name + "':", str(row))
     sheets[sheet_name].append_row(row)
 
 

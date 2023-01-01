@@ -38,10 +38,8 @@ google_sheets_credentials = ServiceAccountCredentials.from_json_keyfile_name(
 gspread_client = None
 book_cache = {}
 books_by_sheet = {}
-sheets = {"transactions": {}}
-data = {"transactions": {}}
-
-cached_data = {}
+sheets = {}
+data = {}
 
 
 def check_authorization(gspread_client: Client):
@@ -63,20 +61,6 @@ def fetch_sheet(name: string):
         )
     books_by_sheet[name] = book_cache[sheet_credentials["bookKey"]]
     return books_by_sheet[name].get_worksheet_by_id(sheet_credentials["sheetId"])
-
-
-def fetch_transaction_sheet(transaction_code: str):
-    global gspread_client
-    gspread_client = check_authorization(gspread_client)
-    print(print_label, "Opening the transaction sheet '" + transaction_code + "'")
-    sheet_credentials = google_sheets_config["sheets"]["transactions"]
-    sheet_name = sheet_credentials["sheetPrefix"] + transaction_code
-    if sheet_credentials["bookKey"] not in book_cache:
-        book_cache[sheet_credentials["bookKey"]] = gspread_client.open_by_key(
-            sheet_credentials["bookKey"]
-        )
-    books_by_sheet[transaction_code] = book_cache[sheet_credentials["bookKey"]]
-    return books_by_sheet[transaction_code].worksheet(sheet_name)
 
 
 def fetch_data(name: str, sheet: Worksheet):
@@ -202,108 +186,32 @@ def fetch_data(name: str, sheet: Worksheet):
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
         return data
-    elif name == "tasks_current":
-        data = {"dict": {}, "list": []}
-        for value in sheet.get_values()[1:]:
-            entry = {
-                "id": value[0],
-                "name": value[1],
-                "priority": value[2],
-                "scheduled_id": value[3],
-                "created": value[4],
-                "due_to": value[5],
-                "days_before": value[6],
-                "done": value[7],
-            }
-            data["dict"][value[0]] = entry
-            data["list"].append(value[0])
-        return data
-    elif name == "tasks_scheduled":
-        data = {"dict": {}, "list": []}
-        for value in sheet.get_values()[1:]:
-            entry = {
-                "id": value[0],
-                "name": value[1],
-                "priority": value[2],
-                "recurring_type": value[3],
-                "recurring_value": value[4],
-                "recurring_stage": value[5],
-                "recurring_timestamp": value[6],
-                "times_done": value[7],
-                "times_missed": value[8],
-                "paused": value[9],
-            }
-            data["dict"][value[0]] = entry
-            data["list"].append(value[0])
-        return data
     else:
         return sheet.get_values()
 
 
-def fetch_all_sheets():
-    transactions = {}
-
-    transactions_date = datetime.strptime(
-        google_sheets_config["transactions_start"], "%Y-%m-%d"
-    )
-    for transaction_code in date_utils.monthly_codes_range(
-        transactions_date, transactions_date.today()
-    ):
-        transactions[transaction_code] = fetch_transaction_sheet(transaction_code)
-
-    return {
-        "users": fetch_sheet("users"),
-        "categories": fetch_sheet("categories"),
-        "methods": fetch_sheet("methods"),
-        "merchants": fetch_sheet("merchants"),
-        "currencies": fetch_sheet("currencies"),
-        "transactions": transactions,
-        "tasks_current": fetch_sheet("tasks_current"),
-        "tasks_scheduled": fetch_sheet("tasks_scheduled"),
-    }
-
-
-def fetch_all_data(requests):
-    for sheet in requests:
-        if sheet == "transactions":
-            pass
-            # for transaction_sheet in sheets["transactions"]:
-            #     data["transactions"][transaction_sheet] = fetch_data(
-            #         transaction_sheet, sheets["transactions"][transaction_sheet])
-        else:
-            if (sheet not in sheets) or (sheet not in cached_data):
-                sheets[sheet] = fetch_sheet(sheet)
-            if (sheet not in data) or (sheet not in cached_data):
-                data[sheet] = fetch_data(sheet, sheets[sheet])
-            cached_data[sheet] = True
+def get_cached_data(requests, extra=None, update=False):
+    for sheet_name in requests:
+        if update:
+            print(print_label, "Data update request for '" + sheet_name + "'")
+        if extra:
+            prefix_name = sheet_name + "_" + extra
+        if (update) or (sheet_name not in sheets):
+            sheets[sheet_name] = fetch_sheet(sheet_name)
+        if (update) or (sheet_name not in data):
+            data[sheet_name] = fetch_data(sheet_name, sheets[sheet_name])
     return data
 
 
-def get_cached_data(requests):
-    global data
-    data = fetch_all_data(requests)
-    return data
-
-
-def insert_into_transaction_sheet(id: str, row: list):
-    if id not in sheets["transactions"]:
-        sheets["transactions"][id] = fetch_transaction_sheet(id)
-    insert_into_sheet(sheets["transactions"][id], row)
-
-
-def insert_into_sheet_name(name: str, row: list):
-    insert_into_sheet(sheets[name], row)
-
-
-def insert_into_sheet(sheet: Worksheet, row: list):
-    sheet.append_row(row)
+def insert_into_sheet(sheet_name: str, row: list):
+    if sheet_name not in sheets:
+        sheets[sheet_name] = fetch_sheet(sheet_name)
+    sheets[sheet_name].append_row(row)
 
 
 def invalidate_all():
-    global cached_data
-    cached_data = {}
-    get_cached_data(sheet_types)
+    get_cached_data(sheet_types, update=True)
 
 
 # cache data from the start
-get_cached_data(not general_config["quiet_mode"] and sheet_types or [])
+get_cached_data(general_config["production_mode"] and sheet_types or [])

@@ -428,8 +428,8 @@ def transaction_submit(message: Message):
 
         date = "date" in data and data["date"] or datetime.datetime.today()
 
-        gsh.insert_into_transaction_sheet(
-            date_utils.get_date_transaction_code(date),
+        gsh.insert_into_sheet(
+            "transactions_" + date_utils.get_date_code(date),
             [
                 data["type"],
                 (date - datetime.datetime(1899, 12, 30)).days,
@@ -457,7 +457,7 @@ def merchant_submit(message: Message):
     if "id" in data:
         send_info_message("New merchant: " + data["id"])
 
-        gsh.insert_into_sheet_name(
+        gsh.insert_into_sheet(
             "merchants",
             [
                 data["id"],
@@ -472,8 +472,7 @@ def merchant_submit(message: Message):
         authorized_data[message.chat.id]["transaction"]["merchant"] = data["id"]
         authorized_data[message.chat.id]["merchant_category"] = ""
 
-        gsh.cached_data.pop("merchants", None)
-        gsh.get_cached_data(["merchants"])
+        gsh.get_cached_data(["merchants"], update=True)
 
         return authorized_data[message.chat.id]["last_state"](message)
     else:
@@ -488,7 +487,7 @@ def method_submit(message: Message):
             "New method: " + data["id"] + " — " + display_text_method(data)
         )
 
-        gsh.insert_into_sheet_name(
+        gsh.insert_into_sheet(
             "methods",
             [
                 data["id"],
@@ -506,8 +505,7 @@ def method_submit(message: Message):
         authorized_data[message.chat.id]["transaction"]["method"] = data["id"]
         authorized_data[message.chat.id]["merchant_category"] = ""
 
-        gsh.cached_data.pop("methods", None)
-        gsh.get_cached_data(["methods"])
+        gsh.get_cached_data(["methods"], update=True)
 
         return authorized_data[message.chat.id]["last_state"](message)
     else:
@@ -522,7 +520,7 @@ def task_current_submit(message: Message):
 
         due_to = "due_to" in data and data["due_to"] or ""
 
-        gsh.insert_into_sheet_name(
+        gsh.insert_into_sheet(
             "tasks_current",
             [
                 data["id"],
@@ -538,8 +536,7 @@ def task_current_submit(message: Message):
 
         authorized_data[message.chat.id]["task_current"] = {}
 
-        gsh.cached_data.pop("tasks_current", None)
-        gsh.get_cached_data(["tasks_current"])
+        gsh.get_cached_data(["tasks_current"], update=True)
 
         return authorized_data[message.chat.id]["last_state"](message)
     else:

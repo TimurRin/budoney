@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
 
-def get_date_transaction_code(date: datetime):
+def get_date_code(date: datetime):
     return date.strftime("%Y_%m")
 
 
-def get_today_transaction_code():
+def get_today_code():
     return datetime.today().strftime("%Y_%m")
 
 

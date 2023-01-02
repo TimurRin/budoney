@@ -374,21 +374,23 @@ def display_text_task_current(task_current: dict, short_info=False):
     task_current_overdue: str = (
         (
             (
-                task_current["due_to"]
+                "due_to" in task_current
+                and task_current["due_to"]
                 and (task_current["due_to"].date() < datetime.datetime.today().date())
             )
             or (
-                task_current["scheduled_id"]
+                "scheduled_id" in task_current
+                and task_current["scheduled_id"]
                 and (task_current["created"].date() < datetime.datetime.today().date())
             )
         )
         and "⚠️"
         or ""
     )
-    task_current_importance: str = task_current["importance"] and "🚩" or ""
-    task_current_urgency: str = task_current["urgency"] and "⚡️" or ""
-    task_current_due_to: str = task_current["due_to"] and "🗓" or ""
-    task_current_schedlued: str = task_current["scheduled_id"] and "🔁" or ""
+    task_current_importance: str = "importance" in task_current and task_current["importance"] and "🚩" or ""
+    task_current_urgency: str = "urgency" in task_current and task_current["urgency"] and "⚡️" or ""
+    task_current_due_to: str = "due_to" in task_current and task_current["due_to"] and "🗓" or ""
+    task_current_schedlued: str = "scheduled_id" in task_current and task_current["scheduled_id"] and "🔁" or ""
 
     task_current_name: str = task_current.get("name", "New task")
 
@@ -2011,7 +2013,10 @@ def handle_task_current(update: Update, context: CallbackContext):
                 or "IGNORED",
             )
 
-            if update.callback_query.data == "_TASK_DONE" and task_current["scheduled_id"]:
+            if (
+                update.callback_query.data == "_TASK_DONE"
+                and task_current["scheduled_id"]
+            ):
                 cell_scheduled: gsh.gspread.Cell = gsh.sheets["tasks_scheduled"].find(
                     task_current["scheduled_id"],
                     in_column=1,
@@ -2020,12 +2025,17 @@ def handle_task_current(update: Update, context: CallbackContext):
                 gsh.sheets["tasks_scheduled"].update_cell(
                     row_scheduled,
                     11,
-                    data["tasks_scheduled"]["dict"][task_current["scheduled_id"]]["times_done"] + 1,
+                    data["tasks_scheduled"]["dict"][task_current["scheduled_id"]][
+                        "times_done"
+                    ]
+                    + 1,
                 )
 
             send_info_message(
                 update.callback_query.from_user.first_name
-                + " has " + (update.callback_query.data == "_TASK_DONE" and "done" or "ignored") + " task "
+                + " has "
+                + (update.callback_query.data == "_TASK_DONE" and "done" or "ignored")
+                + " task "
                 + display_text_task_current(task_current, True)
             )
 

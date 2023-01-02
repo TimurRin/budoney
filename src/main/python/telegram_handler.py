@@ -2023,6 +2023,12 @@ def handle_task_current(update: Update, context: CallbackContext):
                     data["tasks_scheduled"]["dict"][task_current["scheduled_id"]]["times_done"] + 1,
                 )
 
+            send_info_message(
+                update.callback_query.from_user.first_name
+                + " has " + (update.callback_query.data == "_TASK_DONE" and "done" or "ignored") + " task "
+                + display_text_task_current(task_current, True)
+            )
+
             gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
         elif update.callback_query.data == "name":
             return state_task_current_name(update.callback_query.message)

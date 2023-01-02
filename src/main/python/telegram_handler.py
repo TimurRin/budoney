@@ -2011,7 +2011,7 @@ def handle_task_current(update: Update, context: CallbackContext):
                 or "IGNORED",
             )
 
-            if task_current["scheduled_id"]:
+            if update.callback_query.data == "_TASK_DONE" and task_current["scheduled_id"]:
                 cell_scheduled: gsh.gspread.Cell = gsh.sheets["tasks_scheduled"].find(
                     task_current["scheduled_id"],
                     in_column=1,

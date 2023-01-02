@@ -35,11 +35,10 @@ def schedule_tasks():
                         task_id,
                         scheduled_task_data["name"],
                         scheduled_task_data["importance"] and True or False,
+                        scheduled_task_data["urgency"] and True or False,
                         scheduled_task_data["id"],
                         (task_date - datetime.datetime(1899, 12, 30)).days,
-                        scheduled_task_data["urgency"]
-                        and (task_date - datetime.datetime(1899, 12, 30)).days
-                        or "",
+                        "",
                         "",
                     ],
                 )

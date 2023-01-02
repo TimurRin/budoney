@@ -13,6 +13,10 @@ def get_today_text():
     return datetime.today().strftime("%Y-%m-%d")
 
 
+def get_today_day_stamp():
+    return datetime.today().strftime("%Y_%m_%d")
+
+
 def monthly_codes_range(start_date: datetime, end_date: datetime):
     so = []
     for n in range(int((end_date - start_date).days)):

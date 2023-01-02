@@ -163,10 +163,11 @@ def fetch_data(name: str, sheet: Worksheet):
                 "id": value[0],
                 "name": value[1],
                 "importance": value[2] == "TRUE",
-                "scheduled_id": value[3],
-                "created": value[4],
-                "due_to": value[5],
-                "done": value[6],
+                "urgency": value[3] == "TRUE",
+                "scheduled_id": value[4],
+                "created": value[5] and datetime.strptime(value[5], '%Y-%m-%d') or datetime.now(),
+                "due_to": value[6] and datetime.strptime(value[6], '%Y-%m-%d'),
+                "done": value[7] and value[7] != "IGNORED" and datetime.strptime(value[7], '%Y-%m-%d') or value[7],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

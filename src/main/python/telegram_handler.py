@@ -371,17 +371,34 @@ def display_text_add_transaction(add_transaction: dict):
 
 
 def display_text_task_current(task_current: dict, short_info=False):
+    task_current_overdue: str = (
+        (
+            (
+                task_current["due_to"]
+                and (task_current["due_to"].date() < datetime.datetime.today().date())
+            )
+            or (
+                task_current["scheduled_id"]
+                and (task_current["created"].date() < datetime.datetime.today().date())
+            )
+        )
+        and "⚠️"
+        or ""
+    )
+    task_current_importance: str = task_current["importance"] and "🚩" or ""
+    task_current_urgency: str = task_current["urgency"] and "⚡️" or ""
+    task_current_due_to: str = task_current["due_to"] and "🗓" or ""
     task_current_schedlued: str = task_current["scheduled_id"] and "🔁" or ""
-    task_current_importance: str = task_current["importance"] and "❗" or ""
-    task_current_urgency: str = task_current["due_to"] and "⏰" or ""
 
     task_current_name: str = task_current.get("name", "New task")
 
     if short_info:
         return (
-            task_current_schedlued
+            task_current_overdue
             + task_current_importance
             + task_current_urgency
+            + task_current_due_to
+            + task_current_schedlued
             + " "
             + task_current_name
         )
@@ -522,6 +539,7 @@ def task_current_submit(message: Message):
                 data["id"],
                 "name" in data and data["name"] or data["id"],
                 "importance" in data and data["importance"] and True or False,
+                "urgency" in data and data["urgency"] and True or False,
                 "scheduled_id" in data and data["scheduled_id"] or "",
                 (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
                 due_to,
@@ -897,11 +915,20 @@ def keyboard_tasks_current():
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_task_current():
+def keyboard_task_current(data):
     reply_keyboard = []
     reply_keyboard.append(
         [telegram.InlineKeyboardButton("Edit name", callback_data="name")]
     )
+    if "_NEW" not in data:
+        reply_keyboard.append(
+            [
+                telegram.InlineKeyboardButton(
+                    "🙅‍♀️ Ignore", callback_data="_TASK_IGNORE"
+                ),
+                telegram.InlineKeyboardButton("🏆 Done", callback_data="_TASK_DONE"),
+            ]
+        )
 
     reply_keyboard.append(keyboard_row_back_and_submit())
     return InlineKeyboardMarkup(reply_keyboard)
@@ -1302,7 +1329,9 @@ def state_task_current(message: Message):
         + display_text_task_current(
             authorized_data[message.chat.id]["task_current"], True
         ),
-        reply_markup=keyboard_task_current(),
+        reply_markup=keyboard_task_current(
+            data=authorized_data[message.chat.id]["task_current"]
+        ),
     )
     return states["task_current"]
 
@@ -1313,7 +1342,9 @@ def state_task_current_reply(message: Message):
         + display_text_task_current(
             authorized_data[message.chat.id]["task_current"], True
         ),
-        reply_markup=keyboard_task_current(),
+        reply_markup=keyboard_task_current(
+            data=authorized_data[message.chat.id]["task_current"]
+        ),
     )
     return states["task_current"]
 
@@ -1946,6 +1977,12 @@ def handle_tasks(update: Update, context: CallbackContext):
 
 
 def handle_tasks_current(update: Update, context: CallbackContext):
+    if update.callback_query.data != handler_data_back:
+        data = gsh.get_cached_data(["tasks_current"])
+        authorized_data[update.callback_query.message.chat.id]["task_current"] = dict(
+            data["tasks_current"]["dict"][update.callback_query.data]
+        )
+        return state_task_current(update.callback_query.message)
     return state_tasks(update.callback_query.message)
 
 
@@ -1953,9 +1990,43 @@ def handle_task_current(update: Update, context: CallbackContext):
     if update.callback_query.data != handler_data_back:
         if update.callback_query.data == handler_data_submit:
             return task_current_submit(update.callback_query.message)
+        elif (
+            update.callback_query.data == "_TASK_DONE"
+            or update.callback_query.data == "_TASK_IGNORE"
+        ):
+            data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"])
+            task_current = authorized_data[update.callback_query.message.chat.id][
+                "task_current"
+            ]
+            cell: gsh.gspread.Cell = gsh.sheets["tasks_current"].find(
+                task_current["id"],
+                in_column=1,
+            )
+            row = cell.row
+            gsh.sheets["tasks_current"].update_cell(
+                row,
+                8,
+                update.callback_query.data == "_TASK_DONE"
+                and date_utils.get_today_text()
+                or "IGNORED",
+            )
+
+            if task_current["scheduled_id"]:
+                cell_scheduled: gsh.gspread.Cell = gsh.sheets["tasks_scheduled"].find(
+                    task_current["scheduled_id"],
+                    in_column=1,
+                )
+                row_scheduled = cell_scheduled.row
+                gsh.sheets["tasks_scheduled"].update_cell(
+                    row_scheduled,
+                    11,
+                    data["tasks_scheduled"]["dict"][task_current["scheduled_id"]]["times_done"] + 1,
+                )
+
+            gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
         elif update.callback_query.data == "name":
             return state_task_current_name(update.callback_query.message)
-    return state_tasks(update.callback_query.message)
+    return state_tasks_current(update.callback_query.message)
 
 
 def handle_task_current_name(update: Update, context: CallbackContext):
@@ -1981,7 +2052,7 @@ def handle_tasks_scheduled(update: Update, context: CallbackContext):
 
 
 def handle_task_scheduled(update: Update, context: CallbackContext):
-    return state_tasks(update.callback_query.message)
+    return state_tasks_scheduled(update.callback_query.message)
 
 
 def handle_plants(update: Update, context: CallbackContext):

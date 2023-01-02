@@ -187,7 +187,8 @@ def fetch_data(name: str, sheet: Worksheet):
                 "recurring_timestamp": value[8],
                 "times_scheduled": value[9] and int(value[9]) or 0,
                 "times_done": value[10] and int(value[10]) or 0,
-                "paused": value[11] == "TRUE",
+                "scheduled": value[11] == "TRUE",
+                "paused": value[12] == "TRUE",
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
@@ -225,7 +226,7 @@ def get_cached_data(requests, update=False):
     return data
 
 
-def insert_into_sheet(request: tuple[str, str] | str, row: list):
+def insert_into_sheet(request: tuple[str, str] | str, rows: list[list]):
     sheet_name, is_tuple = get_sheet_name(request)
     if sheet_name not in sheets:
         sheets[sheet_name] = (
@@ -233,8 +234,8 @@ def insert_into_sheet(request: tuple[str, str] | str, row: list):
             and fetch_sheet(request[0], code=request[1])
             or fetch_sheet(sheet_name)
         )
-    print(print_label, "Inserting into '" + sheet_name + "':", str(row))
-    sheets[sheet_name].append_row(row)
+    print(print_label, "Inserting into '" + sheet_name + "':", str(rows))
+    sheets[sheet_name].append_rows(rows)
 
 
 def invalidate_all():

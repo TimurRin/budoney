@@ -191,7 +191,7 @@ def fetch_data(name: str, sheet: Worksheet):
         data["pagination"]["pages"] = math.ceil(len(data["list"]) / data["pagination"]["per_page"])
         return data
     elif name == "tasks_scheduled":
-        data = {"dict": {}, "list": []}
+        data = {"dict": {}, "list": [], "pagination": {}}
         for value in sheet.get_values()[1:]:
             entry = {
                 "id": value[0],
@@ -224,6 +224,9 @@ def fetch_data(name: str, sheet: Worksheet):
                 data["dict"][d]["name"].lower(),
             ),
         )
+        data["pagination"]["items"] = len(data["list"])
+        data["pagination"]["per_page"] = 5
+        data["pagination"]["pages"] = math.ceil(len(data["list"]) / data["pagination"]["per_page"])
         return data
     else:
         return sheet.get_values()

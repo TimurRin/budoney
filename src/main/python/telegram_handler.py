@@ -995,6 +995,7 @@ def keyboard_tasks_current(page_user_data):
             if len(reply_keyboard[current_row]) >= 1:
                 reply_keyboard.append([])
                 current_row = current_row + 1
+
     if page_user_data["data"]["pages"] > 1:
         reply_keyboard.append(keyboard_row_pagination(page_user_data))
     reply_keyboard.append(keyboard_row_back_and_add())
@@ -1003,10 +1004,12 @@ def keyboard_tasks_current(page_user_data):
 
 def keyboard_task_current(data):
     reply_keyboard = []
-    reply_keyboard.append(
-        [telegram.InlineKeyboardButton("Edit name", callback_data="name")]
-    )
-    if "_NEW" not in data:
+    if "_NEW" in data:
+        reply_keyboard.append(
+            [telegram.InlineKeyboardButton("Edit name", callback_data="name")]
+        )
+        reply_keyboard.append(keyboard_row_back_and_submit())
+    else:
         reply_keyboard.append(
             [
                 # telegram.InlineKeyboardButton(
@@ -1015,24 +1018,42 @@ def keyboard_task_current(data):
                 telegram.InlineKeyboardButton("🏆 Done", callback_data="_TASK_DONE"),
             ]
         )
+        reply_keyboard.append(keyboard_row_back())
 
-    reply_keyboard.append(keyboard_row_back_and_submit())
+    
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_tasks_scheduled():
+def keyboard_tasks_scheduled(page_user_data):
     data = gsh.get_cached_data(["tasks_scheduled"])
 
     reply_keyboard = [[]]
 
     current_row = 0
 
-    for id in data["tasks_scheduled"]["list"]:
+    page_user_data["data"] = data["tasks_scheduled"]["pagination"]
+
+    if page_user_data["page"] > page_user_data["data"]["pages"]:
+        page_user_data["page"] = page_user_data["data"]["pages"]
+
+    items = get_page_items(
+        page_user_data["page"],
+        page_user_data["data"]["per_page"],
+        limit=page_user_data["data"]["pages"] == page_user_data["page"]
+        and page_user_data["data"]["items"]
+        or None,
+    )
+
+    for number, id in enumerate(
+        data["tasks_scheduled"]["list"][(items[0] - 1) : items[1]], start=items[0]
+    ):
         reply_keyboard[current_row].append(
             telegram.InlineKeyboardButton(
-                text=display_text_task_scheduled(
+                text=(str(number)
+                        + ". "
+                        + display_text_task_scheduled(
                     data["tasks_scheduled"]["dict"][id], True
-                ),
+                )),
                 callback_data=id,
             )
         )
@@ -1040,7 +1061,9 @@ def keyboard_tasks_scheduled():
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    reply_keyboard.append(keyboard_row_back_and_add())
+    if page_user_data["data"]["pages"] > 1:
+        reply_keyboard.append(keyboard_row_pagination(page_user_data))
+    reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -1447,7 +1470,7 @@ def state_task_current_name(message: Message):
 
 
 def state_tasks_scheduled(message: Message):
-    message.edit_text("List of scheduled task", reply_markup=keyboard_tasks_scheduled())
+    message.edit_text("List of scheduled task", reply_markup=keyboard_tasks_scheduled(authorized_data[message.chat.id]["page_tasks_scheduled"]))
     return states["tasks_scheduled"]
 
 
@@ -2216,11 +2239,51 @@ def handle_task_current_name(update: Update, context: CallbackContext):
 
 def handle_tasks_scheduled(update: Update, context: CallbackContext):
     if update.callback_query.data != handler_data_back:
-        data = gsh.get_cached_data(["tasks_scheduled"])
-        authorized_data[update.callback_query.message.chat.id]["task_scheduled"] = dict(
-            data["tasks_scheduled"]["dict"][update.callback_query.data]
-        )
-        return state_task_scheduled(update.callback_query.message)
+        user_data = authorized_data[update.callback_query.message.chat.id]
+        page_tasks_scheduled = user_data["page_tasks_scheduled"]
+        if update.callback_query.data == handler_data_add:
+            if "_NEW" not in user_data["task_scheduled"]:
+                user_data["task_scheduled"] = {}
+            user_data["task_scheduled"]["_NEW"] = True
+            user_data["last_state"] = state_tasks_scheduled
+            return state_task_scheduled(update.callback_query.message)
+        if update.callback_query.data == "_PAGE_START":
+            if page_tasks_scheduled["page"] != 1:
+                page_tasks_scheduled["page"] = 1
+                return state_tasks_scheduled(update.callback_query.message)
+            else:
+                return states["tasks_scheduled"]
+        elif update.callback_query.data == "_PAGE_BACK":
+            old_page = page_tasks_scheduled["page"]
+            page_tasks_scheduled["page"] = max(
+                page_tasks_scheduled["page"] - 1,
+                1,
+            )
+            if old_page != page_tasks_scheduled["page"]:
+                return state_tasks_scheduled(update.callback_query.message)
+            else:
+                return states["tasks_scheduled"]
+        elif update.callback_query.data == "_PAGE_FORWARD":
+            old_page = page_tasks_scheduled["page"]
+            page_tasks_scheduled["page"] = min(
+                page_tasks_scheduled["page"] + 1, page_tasks_scheduled["data"]["pages"]
+            )
+            if old_page != page_tasks_scheduled["page"]:
+                return state_tasks_scheduled(update.callback_query.message)
+            else:
+                return states["tasks_scheduled"]
+        elif update.callback_query.data == "_PAGE_END":
+            if page_tasks_scheduled["page"] != page_tasks_scheduled["data"]["pages"]:
+                page_tasks_scheduled["page"] = page_tasks_scheduled["data"]["pages"]
+                return state_tasks_scheduled(update.callback_query.message)
+            else:
+                return states["tasks_scheduled"]
+        else:
+            data = gsh.get_cached_data(["tasks_scheduled"])
+            authorized_data[update.callback_query.message.chat.id]["task_scheduled"] = dict(
+                data["tasks_scheduled"]["dict"][update.callback_query.data]
+            )
+            return state_task_scheduled(update.callback_query.message)
     return state_tasks(update.callback_query.message)
 
 
@@ -2269,6 +2332,7 @@ def empty_user():
         "task_current": {},
         "task_scheduled": {},
         "page_tasks_current": {"page": 1},
+        "page_tasks_scheduled": {"page": 1},
         "date_offset": 0,
         "merchant_category": "",
     }

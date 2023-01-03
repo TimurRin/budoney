@@ -417,12 +417,32 @@ def display_text_task_current(task_current: dict, short_info=False):
 
 
 def display_text_task_scheduled(task_scheduled: dict, short_info=False):
-    task_scheduled_name = task_scheduled.get("name", "New task")
-    task_scheduled_recurring_type = (
-        " (" + task_scheduled.get("recurring_type", "NO_TYPE") + ")"
+    task_scheduled_importance: str = (
+        "importance" in task_scheduled and task_scheduled["importance"] and "🚩" or ""
     )
+    task_scheduled_urgency: str = (
+        "urgency" in task_scheduled and task_scheduled["urgency"] and "⚡️" or ""
+    )
+    task_scheduled_name = task_scheduled.get("name", "New task")
+    if task_scheduled["scheduled"]:
+        task_scheduled_span = "⚡️"
+    else:
+        task_scheduled_span = (
+            "⏲" + str(max(task_scheduled["recurring_value"] - (task_scheduled["recurring_stage"] - 1), 0)) + "d"
+        )
+    task_scheduled_done = "☑️" + str(task_scheduled["times_done"])
+
     if short_info:
-        return task_scheduled_name + task_scheduled_recurring_type
+        return (
+            task_scheduled_importance
+            + task_scheduled_urgency
+            + task_scheduled_name
+            + " ("
+            + task_scheduled_span
+            + ", "
+            + task_scheduled_done
+            + ")"
+        )
     else:
         return str(task_scheduled)
 
@@ -453,15 +473,17 @@ def transaction_submit(message: Message):
 
         gsh.insert_into_sheet(
             ("transactions", date_utils.get_date_code(date)),
-            [[
-                data["type"],
-                (date - datetime.datetime(1899, 12, 30)).days,
-                data["sum"],
-                data["currency"],
-                data["method"],
-                data["type"] != "CORRECTION" and data[target] or "",
-                "description" in data and data["description"] or "",
-            ]],
+            [
+                [
+                    data["type"],
+                    (date - datetime.datetime(1899, 12, 30)).days,
+                    data["sum"],
+                    data["currency"],
+                    data["method"],
+                    data["type"] != "CORRECTION" and data[target] or "",
+                    "description" in data and data["description"] or "",
+                ]
+            ],
         )
 
         authorized_data[message.chat.id]["transaction"] = {}
@@ -482,13 +504,15 @@ def merchant_submit(message: Message):
 
         gsh.insert_into_sheet(
             "merchants",
-            [[
-                data["id"],
-                "name" in data and data["name"] or data["id"],
-                "keywords" in data and data["keywords"] or "",
-                "category" in data and data["category"] or "OTHER",
-                "emoji" in data and data["emoji"] or "",
-            ]],
+            [
+                [
+                    data["id"],
+                    "name" in data and data["name"] or data["id"],
+                    "keywords" in data and data["keywords"] or "",
+                    "category" in data and data["category"] or "OTHER",
+                    "emoji" in data and data["emoji"] or "",
+                ]
+            ],
         )
 
         authorized_data[message.chat.id]["merchant"] = {}
@@ -512,16 +536,18 @@ def method_submit(message: Message):
 
         gsh.insert_into_sheet(
             "methods",
-            [[
-                data["id"],
-                "name" in data and data["name"] or data["id"],
-                "emoji" in data and data["emoji"] or "",
-                "is_account" in data and data["is_account"] and True or False,
-                "is_mir" in data and data["is_mir"] and True or False,
-                "is_credit" in data and data["is_credit"] and True or False,
-                "is_cashback" in data and data["is_cashback"] and True or False,
-                "owner" in data and data["owner"] or "SHARED",
-            ]],
+            [
+                [
+                    data["id"],
+                    "name" in data and data["name"] or data["id"],
+                    "emoji" in data and data["emoji"] or "",
+                    "is_account" in data and data["is_account"] and True or False,
+                    "is_mir" in data and data["is_mir"] and True or False,
+                    "is_credit" in data and data["is_credit"] and True or False,
+                    "is_cashback" in data and data["is_cashback"] and True or False,
+                    "owner" in data and data["owner"] or "SHARED",
+                ]
+            ],
         )
 
         authorized_data[message.chat.id]["method"] = {}
@@ -545,16 +571,18 @@ def task_current_submit(message: Message):
 
         gsh.insert_into_sheet(
             "tasks_current",
-            [[
-                data["id"],
-                "name" in data and data["name"] or data["id"],
-                "importance" in data and data["importance"] and True or False,
-                "urgency" in data and data["urgency"] and True or False,
-                "scheduled_id" in data and data["scheduled_id"] or "",
-                (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
-                due_to,
-                "",
-            ]],
+            [
+                [
+                    data["id"],
+                    "name" in data and data["name"] or data["id"],
+                    "importance" in data and data["importance"] and True or False,
+                    "urgency" in data and data["urgency"] and True or False,
+                    "scheduled_id" in data and data["scheduled_id"] or "",
+                    (datetime.datetime.today() - datetime.datetime(1899, 12, 30)).days,
+                    due_to,
+                    "",
+                ]
+            ],
         )
 
         authorized_data[message.chat.id]["task_current"] = {}
@@ -921,7 +949,7 @@ def keyboard_tasks_current():
                 reply_keyboard.append([])
                 current_row = current_row + 1
 
-    reply_keyboard.append(keyboard_row_back())
+    reply_keyboard.append(keyboard_row_back_and_add())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -964,7 +992,7 @@ def keyboard_tasks_scheduled():
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    reply_keyboard.append(keyboard_row_back())
+    reply_keyboard.append(keyboard_row_back_and_add())
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -1370,7 +1398,13 @@ def state_tasks_scheduled(message: Message):
 
 
 def state_task_scheduled(message: Message):
-    message.edit_text("Scheduled task", reply_markup=keyboard_task_scheduled())
+    message.edit_text(
+        "Scheduled task: "
+        + display_text_task_scheduled(
+            authorized_data[message.chat.id]["task_scheduled"]
+        ),
+        reply_markup=keyboard_task_scheduled(),
+    )
     return states["task_scheduled"]
 
 
@@ -1396,7 +1430,12 @@ def handle_main(update: Update, context: CallbackContext):
     if update.callback_query.data == "transaction_add_fast_type":
         return state_transaction_add_fast_type(update.callback_query.message)
     elif update.callback_query.data == "task_current":
-        if "_NEW" not in authorized_data[update.callback_query.message.chat.id]["task_current"]:
+        if (
+            "_NEW"
+            not in authorized_data[update.callback_query.message.chat.id][
+                "task_current"
+            ]
+        ):
             authorized_data[update.callback_query.message.chat.id]["task_current"] = {}
         authorized_data[update.callback_query.message.chat.id]["task_current"][
             "_NEW"
@@ -1974,8 +2013,15 @@ def handle_tasks(update: Update, context: CallbackContext):
         if update.callback_query.data == "tasks_current":
             return state_tasks_current(update.callback_query.message)
         elif update.callback_query.data == "task_current":
-            if "_NEW" not in authorized_data[update.callback_query.message.chat.id]["task_current"]:
-                authorized_data[update.callback_query.message.chat.id]["task_current"] = {}
+            if (
+                "_NEW"
+                not in authorized_data[update.callback_query.message.chat.id][
+                    "task_current"
+                ]
+            ):
+                authorized_data[update.callback_query.message.chat.id][
+                    "task_current"
+                ] = {}
             authorized_data[update.callback_query.message.chat.id]["task_current"][
                 "_NEW"
             ] = True
@@ -2075,6 +2121,12 @@ def handle_task_current_name(update: Update, context: CallbackContext):
 
 
 def handle_tasks_scheduled(update: Update, context: CallbackContext):
+    if update.callback_query.data != handler_data_back:
+        data = gsh.get_cached_data(["tasks_scheduled"])
+        authorized_data[update.callback_query.message.chat.id]["task_scheduled"] = dict(
+            data["tasks_scheduled"]["dict"][update.callback_query.data]
+        )
+        return state_task_scheduled(update.callback_query.message)
     return state_tasks(update.callback_query.message)
 
 

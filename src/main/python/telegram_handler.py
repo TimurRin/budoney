@@ -1,5 +1,6 @@
 import datetime
 import difflib
+from math import ceil
 
 import google_sheets_handler as gsh
 import tasks_handler
@@ -196,16 +197,7 @@ def init():
 
     for authorized in telegram_config["authorized"]:
         if authorized not in authorized_data:
-            authorized_data[authorized] = {
-                "last_state": state_main,
-                "transaction": {},
-                "merchant": {},
-                "method": {},
-                "task_current": {},
-                "task_scheduled": {},
-                "date_offset": 0,
-                "merchant_category": "",
-            }
+            authorized_data[authorized] = empty_user()
 
     send_message_to_authorized("Hello, I've just started, so I need you to type /start")
 
@@ -214,7 +206,7 @@ def init():
     if general_config["production_mode"]:
         tasks_handler.check_tasks()
     else:
-        tasks_handler.schedule_tasks()
+        # tasks_handler.schedule_tasks()
         updater.idle()
 
     # thread_utils.run_io_tasks_in_parallel(
@@ -428,7 +420,15 @@ def display_text_task_scheduled(task_scheduled: dict, short_info=False):
         task_scheduled_span = "⚡️"
     else:
         task_scheduled_span = (
-            "⏲" + str(max(task_scheduled["recurring_value"] - (task_scheduled["recurring_stage"] - 1), 1)) + "d "
+            "⏲"
+            + str(
+                max(
+                    task_scheduled["recurring_value"]
+                    - (task_scheduled["recurring_stage"] - 1),
+                    1,
+                )
+            )
+            + "d "
         )
     task_scheduled_done = "☑️" + str(task_scheduled["times_done"])
 
@@ -595,22 +595,52 @@ def task_current_submit(message: Message):
 # keyboard rows
 
 
+def get_page_items(page, per_page, limit=None):
+    return (((page * per_page) - per_page) + 1, limit or (page * per_page))
+
+
+def format_page_items(page, per_page, limit=None):
+    items = get_page_items(page, per_page, limit)
+    return "{}-{}".format(items[0], items[1])
+
+
+def keyboard_row_pagination(page_user_data):
+    return [
+        telegram.InlineKeyboardButton(
+            text=(format_page_items(1, page_user_data["data"]["per_page"])),
+            callback_data="_PAGE_START",
+        ),
+        telegram.InlineKeyboardButton(text="◀️", callback_data="_PAGE_BACK"),
+        telegram.InlineKeyboardButton(text="▶️", callback_data="_PAGE_FORWARD"),
+        telegram.InlineKeyboardButton(
+            text=(
+                format_page_items(
+                    page_user_data["data"]["pages"],
+                    page_user_data["data"]["per_page"],
+                    limit=page_user_data["data"]["items"],
+                )
+            ),
+            callback_data="_PAGE_END",
+        ),
+    ]
+
+
 def keyboard_row_back():
     return [
-        telegram.InlineKeyboardButton(text="◀️ Back", callback_data=handler_data_back)
+        telegram.InlineKeyboardButton(text="⬅️ Back", callback_data=handler_data_back)
     ]
 
 
 def keyboard_row_back_and_add():
     return [
-        telegram.InlineKeyboardButton(text="◀️ Back", callback_data=handler_data_back),
+        telegram.InlineKeyboardButton(text="⬅️ Back", callback_data=handler_data_back),
         telegram.InlineKeyboardButton(text="🆕 Add new", callback_data=handler_data_add),
     ]
 
 
 def keyboard_row_back_and_submit():
     return [
-        telegram.InlineKeyboardButton(text="◀️ Back", callback_data=handler_data_back),
+        telegram.InlineKeyboardButton(text="⬅️ Back", callback_data=handler_data_back),
         telegram.InlineKeyboardButton(
             text="✅ Submit", callback_data=handler_data_submit
         ),
@@ -926,27 +956,43 @@ def keyboard_tasks():
     return InlineKeyboardMarkup(reply_keyboard)
 
 
-def keyboard_tasks_current():
+def keyboard_tasks_current(page_user_data):
     data = gsh.get_cached_data(["tasks_current"])
 
     reply_keyboard = [[]]
 
     current_row = 0
 
-    for id in data["tasks_current"]["list"]:
+    page_user_data["data"] = data["tasks_current"]["pagination"]
+
+    if page_user_data["page"] > page_user_data["data"]["pages"]:
+        page_user_data["page"] = page_user_data["data"]["pages"]
+
+    items = get_page_items(
+        page_user_data["page"],
+        page_user_data["data"]["per_page"],
+        limit=page_user_data["data"]["pages"] == page_user_data["page"]
+        and page_user_data["data"]["items"]
+        or None,
+    )
+
+    for number, id in enumerate(
+        data["tasks_current"]["list"][(items[0] - 1) : items[1]], start=items[0]
+    ):
         if not data["tasks_current"]["dict"][id]["done"]:
             reply_keyboard[current_row].append(
                 telegram.InlineKeyboardButton(
-                    text=display_text_task_current(
+                    text=(str(number) + ". " + display_text_task_current(
                         data["tasks_current"]["dict"][id], True
-                    ),
+                    )),
                     callback_data=id,
                 )
             )
             if len(reply_keyboard[current_row]) >= 1:
                 reply_keyboard.append([])
                 current_row = current_row + 1
-
+    if page_user_data["data"]["pages"] > 1:
+        reply_keyboard.append(keyboard_row_pagination(page_user_data))
     reply_keyboard.append(keyboard_row_back_and_add())
     return InlineKeyboardMarkup(reply_keyboard)
 
@@ -1092,6 +1138,7 @@ def keyboard_with_back():
 
 def command_start(update: Update, context: CallbackContext):
     if update.message.from_user.id in telegram_config["authorized"]:
+        authorized_data[update.message.from_user.id] = empty_user()
         update.message.reply_text(
             "🍏 A fresh start! " + main_entry_text, reply_markup=keyboard_main()
         )
@@ -1355,7 +1402,12 @@ def state_tasks(message: Message):
 
 
 def state_tasks_current(message: Message):
-    message.edit_text("List of current tasks", reply_markup=keyboard_tasks_current())
+    message.edit_text(
+        "List of current tasks",
+        reply_markup=keyboard_tasks_current(
+            authorized_data[message.chat.id]["page_tasks_current"]
+        ),
+    )
     return states["tasks_current"]
 
 
@@ -2036,11 +2088,43 @@ def handle_tasks(update: Update, context: CallbackContext):
 
 def handle_tasks_current(update: Update, context: CallbackContext):
     if update.callback_query.data != handler_data_back:
-        data = gsh.get_cached_data(["tasks_current"])
-        authorized_data[update.callback_query.message.chat.id]["task_current"] = dict(
-            data["tasks_current"]["dict"][update.callback_query.data]
-        )
-        return state_task_current(update.callback_query.message)
+        user_data = authorized_data[update.callback_query.message.chat.id]
+        page_tasks_current = user_data["page_tasks_current"]
+        if update.callback_query.data == "_PAGE_START":
+            if page_tasks_current["page"] != 1:
+                page_tasks_current["page"] = 1
+                return state_tasks_current(update.callback_query.message)
+            else:
+                return states["tasks_current"]
+        elif update.callback_query.data == "_PAGE_BACK":
+            old_page = page_tasks_current["page"]
+            page_tasks_current["page"] = max(
+                page_tasks_current["page"] - 1,
+                1,
+            )
+            if old_page != page_tasks_current["page"]:
+                return state_tasks_current(update.callback_query.message)
+            else:
+                return states["tasks_current"]
+        elif update.callback_query.data == "_PAGE_FORWARD":
+            old_page = page_tasks_current["page"]
+            page_tasks_current["page"] = min(page_tasks_current["page"] + 1, page_tasks_current["data"]["pages"])
+            if old_page != page_tasks_current["page"]:
+                return state_tasks_current(update.callback_query.message)
+            else:
+                return states["tasks_current"]
+        elif update.callback_query.data == "_PAGE_END":
+            if page_tasks_current["page"] != page_tasks_current["data"]["pages"]:
+                page_tasks_current["page"] = page_tasks_current["data"]["pages"]
+                return state_tasks_current(update.callback_query.message)
+            else:
+                return states["tasks_current"]
+        else:
+            data = gsh.get_cached_data(["tasks_current"])
+            user_data["task_current"] = dict(
+                data["tasks_current"]["dict"][update.callback_query.data]
+            )
+            return state_task_current(update.callback_query.message)
     return state_tasks(update.callback_query.message)
 
 
@@ -2160,6 +2244,25 @@ def fallback_callback_query_handler(update: Update, context: CallbackContext):
     # print(print_label, "fallback_callback_query_handler", update)
     update.callback_query.message.reply_text(error_text)
 
+
+# other
+
+
+def empty_user():
+    return {
+        "last_state": state_main,
+        "transaction": {},
+        "merchant": {},
+        "method": {},
+        "task_current": {},
+        "task_scheduled": {},
+        "page_tasks_current": {"page": 1},
+        "date_offset": 0,
+        "merchant_category": "",
+    }
+
+
+# init
 
 print(print_label, "Loading configs...")
 general_config = yaml_manager.load("config/local/general")

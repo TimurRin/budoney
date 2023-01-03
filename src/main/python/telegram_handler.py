@@ -982,9 +982,13 @@ def keyboard_tasks_current(page_user_data):
         if not data["tasks_current"]["dict"][id]["done"]:
             reply_keyboard[current_row].append(
                 telegram.InlineKeyboardButton(
-                    text=(str(number) + ". " + display_text_task_current(
-                        data["tasks_current"]["dict"][id], True
-                    )),
+                    text=(
+                        str(number)
+                        + ". "
+                        + display_text_task_current(
+                            data["tasks_current"]["dict"][id], True
+                        )
+                    ),
                     callback_data=id,
                 )
             )
@@ -2090,6 +2094,12 @@ def handle_tasks_current(update: Update, context: CallbackContext):
     if update.callback_query.data != handler_data_back:
         user_data = authorized_data[update.callback_query.message.chat.id]
         page_tasks_current = user_data["page_tasks_current"]
+        if update.callback_query.data == handler_data_add:
+            if "_NEW" not in user_data["task_current"]:
+                user_data["task_current"] = {}
+            user_data["task_current"]["_NEW"] = True
+            user_data["last_state"] = state_tasks_current
+            return state_task_current(update.callback_query.message)
         if update.callback_query.data == "_PAGE_START":
             if page_tasks_current["page"] != 1:
                 page_tasks_current["page"] = 1
@@ -2108,7 +2118,9 @@ def handle_tasks_current(update: Update, context: CallbackContext):
                 return states["tasks_current"]
         elif update.callback_query.data == "_PAGE_FORWARD":
             old_page = page_tasks_current["page"]
-            page_tasks_current["page"] = min(page_tasks_current["page"] + 1, page_tasks_current["data"]["pages"])
+            page_tasks_current["page"] = min(
+                page_tasks_current["page"] + 1, page_tasks_current["data"]["pages"]
+            )
             if old_page != page_tasks_current["page"]:
                 return state_tasks_current(update.callback_query.message)
             else:

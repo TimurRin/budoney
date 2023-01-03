@@ -1396,6 +1396,8 @@ def handle_main(update: Update, context: CallbackContext):
     if update.callback_query.data == "transaction_add_fast_type":
         return state_transaction_add_fast_type(update.callback_query.message)
     elif update.callback_query.data == "task_current":
+        if "_NEW" not in authorized_data[update.callback_query.message.chat.id]["task_current"]:
+            authorized_data[update.callback_query.message.chat.id]["task_current"] = {}
         authorized_data[update.callback_query.message.chat.id]["task_current"][
             "_NEW"
         ] = True
@@ -1972,6 +1974,8 @@ def handle_tasks(update: Update, context: CallbackContext):
         if update.callback_query.data == "tasks_current":
             return state_tasks_current(update.callback_query.message)
         elif update.callback_query.data == "task_current":
+            if "_NEW" not in authorized_data[update.callback_query.message.chat.id]["task_current"]:
+                authorized_data[update.callback_query.message.chat.id]["task_current"] = {}
             authorized_data[update.callback_query.message.chat.id]["task_current"][
                 "_NEW"
             ] = True

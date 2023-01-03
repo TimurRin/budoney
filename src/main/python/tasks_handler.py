@@ -17,12 +17,13 @@ def schedule_tasks():
     cells_to_update = []
     rows_to_append = []
 
+    ids = dict(data["tasks_current"]["dict"])
+
     for row, scheduled_task_id in enumerate(data["tasks_scheduled"]["list"], 2):
         consequence = 5 * (row - 2)
         scheduled_task_data = data["tasks_scheduled"]["dict"][scheduled_task_id]
-        task_id = id_utils.generate_id(
-            data["tasks_current"]["dict"], scheduled_task_data["name"]
-        )
+        task_id = id_utils.generate_id(ids, scheduled_task_data["name"])
+        ids[task_id] = True
 
         if not scheduled_task_data["scheduled"] and (
             scheduled_task_data["recurring_timestamp"] != recurring_timestamp

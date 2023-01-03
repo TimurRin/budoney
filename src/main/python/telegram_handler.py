@@ -428,7 +428,7 @@ def display_text_task_scheduled(task_scheduled: dict, short_info=False):
         task_scheduled_span = "⚡️"
     else:
         task_scheduled_span = (
-            "⏲" + str(max(task_scheduled["recurring_value"] - (task_scheduled["recurring_stage"] - 1), 0)) + "d"
+            "⏲" + str(max(task_scheduled["recurring_value"] - (task_scheduled["recurring_stage"] - 1), 1)) + "d "
         )
     task_scheduled_done = "☑️" + str(task_scheduled["times_done"])
 
@@ -437,11 +437,9 @@ def display_text_task_scheduled(task_scheduled: dict, short_info=False):
             task_scheduled_importance
             + task_scheduled_urgency
             + task_scheduled_name
-            + " ("
+            + " "
             + task_scheduled_span
-            + ", "
             + task_scheduled_done
-            + ")"
         )
     else:
         return str(task_scheduled)

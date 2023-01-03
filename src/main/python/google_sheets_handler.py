@@ -165,12 +165,24 @@ def fetch_data(name: str, sheet: Worksheet):
                 "importance": value[2] == "TRUE",
                 "urgency": value[3] == "TRUE",
                 "scheduled_id": value[4],
-                "created": value[5] and datetime.strptime(value[5], '%Y-%m-%d') or datetime.now(),
-                "due_to": value[6] and datetime.strptime(value[6], '%Y-%m-%d'),
-                "done": value[7] and value[7] != "IGNORED" and datetime.strptime(value[7], '%Y-%m-%d') or value[7],
+                "created": value[5]
+                and datetime.strptime(value[5], "%Y-%m-%d")
+                or datetime.now(),
+                "due_to": value[6] and datetime.strptime(value[6], "%Y-%m-%d"),
+                "done": value[7]
+                and value[7] != "IGNORED"
+                and datetime.strptime(value[7], "%Y-%m-%d")
+                or value[7],
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
+        data["list"] = sorted(
+            list(data["list"]),
+            key=lambda d: (
+                -((data["dict"][d]["importance"] and 2 or 0) + (data["dict"][d]["urgency"] and 1 or 0)),
+                data["dict"][d]["name"].lower(),
+            ),
+        )
         return data
     elif name == "tasks_scheduled":
         data = {"dict": {}, "list": []}
@@ -192,6 +204,20 @@ def fetch_data(name: str, sheet: Worksheet):
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])
+
+        data["list"] = sorted(
+            list(data["list"]),
+            key=lambda d: (
+                not data["dict"][d]["scheduled"]
+                and max(
+                    data["dict"][d]["recurring_value"]
+                    - (data["dict"][d]["recurring_stage"] - 1),
+                    1,
+                ) or 0,
+                -((data["dict"][d]["importance"] and 2 or 0) + (data["dict"][d]["urgency"] and 1 or 0)),
+                data["dict"][d]["name"].lower(),
+            ),
+        )
         return data
     else:
         return sheet.get_values()

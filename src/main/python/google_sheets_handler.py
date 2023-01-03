@@ -180,6 +180,7 @@ def fetch_data(name: str, sheet: Worksheet):
             list(data["list"]),
             key=lambda d: (
                 -((data["dict"][d]["importance"] and 2 or 0) + (data["dict"][d]["urgency"] and 1 or 0)),
+                data["dict"][d]["scheduled_id"] and 1 or 0,
                 data["dict"][d]["name"].lower(),
             ),
         )

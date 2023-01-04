@@ -1,11 +1,10 @@
 import datetime
-from time import sleep
 import google_sheets_handler as gsh
 import utils.id_utils as id_utils
 
 
-def schedule_tasks():
-    data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"])
+def schedule_tasks() -> str:
+    data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
 
     task_date = datetime.datetime.today()
     recurring_timestamp = task_date.strftime("%Y_%m_%d")
@@ -18,6 +17,8 @@ def schedule_tasks():
     rows_to_append = []
 
     ids = dict(data["tasks_current"]["dict"])
+
+    tg_text: str = ""
 
     for scheduled_task_id in data["tasks_scheduled"]["list"]:
         scheduled_task_data = data["tasks_scheduled"]["dict"][scheduled_task_id]
@@ -43,6 +44,9 @@ def schedule_tasks():
                 cells_to_update.append(cells_to_read[2 + consequence])
                 cells_to_read[4 + consequence].value = True
                 cells_to_update.append(cells_to_read[4 + consequence])
+                if not tg_text:
+                    tg_text: str = "\nNew tasks to do:\n"
+                tg_text += "— " + scheduled_task_data["name"] + "\n"
                 rows_to_append.append(
                     [
                         task_id,
@@ -63,9 +67,4 @@ def schedule_tasks():
             gsh.insert_into_sheet("tasks_current", rows_to_append)
         gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
 
-
-def check_tasks():
-    schedule_tasks()
-    while True:
-        sleep(60 * 10)
-        schedule_tasks()
+    return tg_text

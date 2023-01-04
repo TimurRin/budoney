@@ -1,6 +1,6 @@
 import datetime
 import difflib
-from math import ceil
+from time import sleep
 
 import google_sheets_handler as gsh
 import tasks_handler
@@ -203,20 +203,19 @@ def init():
 
     print(print_label, "Started")
 
+    update_tasks()
     if general_config["production_mode"]:
-        tasks_handler.check_tasks()
+        while True:
+            sleep(60 * 20)
+            update_tasks()
     else:
-        tasks_handler.schedule_tasks()
         updater.idle()
 
-    # thread_utils.run_io_tasks_in_parallel(
-    #     [
-    #         updater.idle,
-    #         tasks_handler.check_tasks,
-    #     ]
-    # )
 
-    print(print_label, "Started completely")
+def update_tasks():
+    message = tasks_handler.schedule_tasks()
+    if message:
+        send_info_message("tasks", message)
 
 
 # local utils
@@ -1012,14 +1011,20 @@ def keyboard_task_current(data):
         )
         reply_keyboard.append(keyboard_row_back_and_submit())
     else:
-        reply_keyboard.append(
-            [
-                # telegram.InlineKeyboardButton(
-                #     "🙅‍♀️ Ignore", callback_data="_TASK_IGNORE"
-                # ),
-                telegram.InlineKeyboardButton("🏆 Done", callback_data="_TASK_DONE"),
-            ]
+        reply_action_buttons = []
+        # reply_action_buttons.append(
+        #     telegram.InlineKeyboardButton("🙅‍♀️ Ignore", callback_data="_TASK_IGNORE")
+        # )
+        if data["created"].date() < datetime.datetime.today().date():
+            reply_action_buttons.append(
+                telegram.InlineKeyboardButton(
+                    "🦥 Did yesterday", callback_data="_TASK_DID_YESTERDAY"
+                )
+            )
+        reply_action_buttons.append(
+            telegram.InlineKeyboardButton("🏆 Done", callback_data="_TASK_DONE_TODAY")
         )
+        reply_keyboard.append(reply_action_buttons)
         reply_keyboard.append(keyboard_row_back())
 
     return InlineKeyboardMarkup(reply_keyboard)
@@ -2179,8 +2184,8 @@ def handle_task_current(update: Update, context: CallbackContext):
         if update.callback_query.data == handler_data_submit:
             return task_current_submit(update.callback_query.message)
         elif (
-            update.callback_query.data == "_TASK_DONE"
-            or update.callback_query.data == "_TASK_IGNORE"
+            update.callback_query.data == "_TASK_DONE_TODAY"
+            or update.callback_query.data == "_TASK_DID_YESTERDAY"
         ):
             data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"])
             task_current = authorized_data[update.callback_query.message.chat.id][
@@ -2194,8 +2199,14 @@ def handle_task_current(update: Update, context: CallbackContext):
             gsh.sheets["tasks_current"].update_cell(
                 row,
                 8,
-                update.callback_query.data == "_TASK_DONE"
-                and date_utils.get_today_text()
+                (
+                    update.callback_query.data == "_TASK_DONE_TODAY"
+                    and date_utils.get_today_text()
+                )
+                or (
+                    update.callback_query.data == "_TASK_DID_YESTERDAY"
+                    and date_utils.get_yesterday_text()
+                )
                 or "IGNORED",
             )
 
@@ -2205,7 +2216,14 @@ def handle_task_current(update: Update, context: CallbackContext):
                     in_column=1,
                 )
                 row_scheduled = cell_scheduled.row
-                if update.callback_query.data == "_TASK_DONE":
+                if (
+                    update.callback_query.data == "_TASK_DONE_TODAY"
+                    or update.callback_query.data == "_TASK_DID_YESTERDAY"
+                ):
+                    if update.callback_query.data == "_TASK_DONE_TODAY":
+                        gsh.sheets["tasks_scheduled"].update_cell(
+                            row_scheduled, 9, date_utils.get_today_day_stamp()
+                        )
                     gsh.sheets["tasks_scheduled"].update_cell(
                         row_scheduled,
                         11,
@@ -2220,12 +2238,24 @@ def handle_task_current(update: Update, context: CallbackContext):
                 "tasks",
                 update.callback_query.from_user.first_name
                 + " has "
-                + (update.callback_query.data == "_TASK_DONE" and "done" or "ignored")
+                + (
+                    (
+                        update.callback_query.data == "_TASK_DONE_TODAY"
+                        or update.callback_query.data == "_TASK_DID_YESTERDAY"
+                    )
+                    and "done"
+                    or "ignored"
+                )
+                + (
+                    update.callback_query.data == "_TASK_DID_YESTERDAY"
+                    and " (yesterday)"
+                    or ""
+                )
                 + " task "
                 + display_text_task_current(task_current, True),
             )
 
-            gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
+            # update_tasks()
         elif update.callback_query.data == "name":
             return state_task_current_name(update.callback_query.message)
     return state_tasks_current(update.callback_query.message)

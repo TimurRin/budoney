@@ -13,6 +13,10 @@ def get_today_text():
     return datetime.today().strftime("%Y-%m-%d")
 
 
+def get_yesterday_text():
+    return (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
 def get_today_day_stamp():
     return datetime.today().strftime("%Y_%m_%d")
 

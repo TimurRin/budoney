@@ -417,8 +417,10 @@ def display_text_task_scheduled(task_scheduled: dict, short_info=False):
         "urgency" in task_scheduled and task_scheduled["urgency"] and "⚡️" or ""
     )
     task_scheduled_name = task_scheduled.get("name", "New task")
-    if task_scheduled["scheduled"]:
-        task_scheduled_span = "⚡️"
+    if task_scheduled["paused"]:
+        task_scheduled_span = "⏸"
+    elif task_scheduled["scheduled"]:
+        task_scheduled_span = "🗓"
     else:
         task_scheduled_span = (
             "⏲"
@@ -980,22 +982,21 @@ def keyboard_tasks_current(page_user_data):
     for number, id in enumerate(
         data["tasks_current"]["list"][(items[0] - 1) : items[1]], start=items[0]
     ):
-        if not data["tasks_current"]["dict"][id]["done"]:
-            reply_keyboard[current_row].append(
-                telegram.InlineKeyboardButton(
-                    text=(
-                        str(number)
-                        + ". "
-                        + display_text_task_current(
-                            data["tasks_current"]["dict"][id], True
-                        )
-                    ),
-                    callback_data=id,
-                )
+        reply_keyboard[current_row].append(
+            telegram.InlineKeyboardButton(
+                text=(
+                    str(number)
+                    + ". "
+                    + display_text_task_current(
+                        data["tasks_current"]["dict"][id], True
+                    )
+                ),
+                callback_data=id,
             )
-            if len(reply_keyboard[current_row]) >= 1:
-                reply_keyboard.append([])
-                current_row = current_row + 1
+        )
+        if len(reply_keyboard[current_row]) >= 1:
+            reply_keyboard.append([])
+            current_row = current_row + 1
 
     if page_user_data["data"]["pages"] > 1:
         reply_keyboard.append(keyboard_row_pagination(page_user_data))
@@ -2187,7 +2188,7 @@ def handle_task_current(update: Update, context: CallbackContext):
             update.callback_query.data == "_TASK_DONE_TODAY"
             or update.callback_query.data == "_TASK_DID_YESTERDAY"
         ):
-            data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"])
+            data = gsh.get_cached_data(["tasks_scheduled", "tasks_current"])
             task_current = authorized_data[update.callback_query.message.chat.id][
                 "task_current"
             ]
@@ -2256,6 +2257,7 @@ def handle_task_current(update: Update, context: CallbackContext):
             )
 
             # update_tasks()
+            gsh.get_cached_data(["tasks_scheduled", "tasks_current"], update=True)
         elif update.callback_query.data == "name":
             return state_task_current_name(update.callback_query.message)
     return state_tasks_current(update.callback_query.message)

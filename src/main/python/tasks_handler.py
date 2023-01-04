@@ -4,7 +4,7 @@ import utils.id_utils as id_utils
 
 
 def schedule_tasks() -> str:
-    data = gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
+    data = gsh.get_cached_data(["tasks_scheduled", "tasks_current"], update=True)
 
     task_date = datetime.datetime.today()
     recurring_timestamp = task_date.strftime("%Y_%m_%d")
@@ -28,7 +28,7 @@ def schedule_tasks() -> str:
 
         if not scheduled_task_data["scheduled"] and (
             scheduled_task_data["recurring_timestamp"] != recurring_timestamp
-        ):
+        ) and (task_date.hour >= scheduled_task_data["time"]) and not scheduled_task_data["paused"]:
             changed = True
             cells_to_read[1 + consequence].value = recurring_timestamp
             cells_to_update.append(cells_to_read[1 + consequence])
@@ -65,6 +65,6 @@ def schedule_tasks() -> str:
             gsh.sheets["tasks_scheduled"].update_cells(cells_to_update)
         if len(rows_to_append) > 0:
             gsh.insert_into_sheet("tasks_current", rows_to_append)
-        gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
+        gsh.get_cached_data(["tasks_scheduled", "tasks_current"], update=True)
 
     return tg_text

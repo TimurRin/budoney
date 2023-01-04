@@ -198,7 +198,7 @@ def fetch_data(name: str, sheet: Worksheet):
                 "name": value[1],
                 "importance": value[2] == "TRUE",
                 "urgency": value[3] == "TRUE",
-                "time": value[4],
+                "time": value[4] and int(value[4]) or 0,
                 "recurring_type": value[5],
                 "recurring_value": value[6] and int(value[6]) or 0,
                 "recurring_stage": value[7] and int(value[7]) or 0,

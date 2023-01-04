@@ -206,7 +206,7 @@ def init():
     if general_config["production_mode"]:
         tasks_handler.check_tasks()
     else:
-        # tasks_handler.schedule_tasks()
+        tasks_handler.schedule_tasks()
         updater.idle()
 
     # thread_utils.run_io_tasks_in_parallel(
@@ -233,11 +233,13 @@ def send_message_to_authorized(message):
             updater.bot.send_message(chat_id=authorized, text=message)
 
 
-def send_info_message(message):
+def send_info_message(tag, message):
     print(print_label, "send_info_message", message)
     if not general_config["quiet_mode"]:
         for info_chat in telegram_config["info_chats"]:
-            updater.bot.send_message(chat_id=info_chat, text=message)
+            updater.bot.send_message(
+                chat_id=info_chat, text=("#" + str(tag) + "\n" + message)
+            )
 
 
 def auth_filter():
@@ -465,7 +467,7 @@ def transaction_submit(message: Message):
         and ("method" in data)
         and (data["type"] == "CORRECTION" or target in data)
     ):
-        send_info_message(display_text_add_transaction(data))
+        send_info_message("finances", display_text_add_transaction(data))
 
         date = "date" in data and data["date"] or datetime.datetime.today()
 
@@ -498,7 +500,7 @@ def merchant_submit(message: Message):
     data = authorized_data[message.chat.id]["merchant"]
 
     if "id" in data:
-        send_info_message("New merchant: " + data["id"])
+        send_info_message("merchants", "New merchant: " + data["id"])
 
         gsh.insert_into_sheet(
             "merchants",
@@ -529,7 +531,7 @@ def method_submit(message: Message):
 
     if "id" in data:
         send_info_message(
-            "New method: " + data["id"] + " — " + display_text_method(data)
+            "methods", "New method: " + data["id"] + " — " + display_text_method(data)
         )
 
         gsh.insert_into_sheet(
@@ -563,7 +565,7 @@ def task_current_submit(message: Message):
     data = authorized_data[message.chat.id]["task_current"]
 
     if "id" in data:
-        send_info_message("New current task: " + data["id"])
+        send_info_message("tasks", "New current task: " + data["id"])
 
         due_to = "due_to" in data and data["due_to"] or ""
 
@@ -1020,7 +1022,6 @@ def keyboard_task_current(data):
         )
         reply_keyboard.append(keyboard_row_back())
 
-    
     return InlineKeyboardMarkup(reply_keyboard)
 
 
@@ -1049,11 +1050,13 @@ def keyboard_tasks_scheduled(page_user_data):
     ):
         reply_keyboard[current_row].append(
             telegram.InlineKeyboardButton(
-                text=(str(number)
-                        + ". "
-                        + display_text_task_scheduled(
-                    data["tasks_scheduled"]["dict"][id], True
-                )),
+                text=(
+                    str(number)
+                    + ". "
+                    + display_text_task_scheduled(
+                        data["tasks_scheduled"]["dict"][id], True
+                    )
+                ),
                 callback_data=id,
             )
         )
@@ -1470,7 +1473,12 @@ def state_task_current_name(message: Message):
 
 
 def state_tasks_scheduled(message: Message):
-    message.edit_text("List of scheduled task", reply_markup=keyboard_tasks_scheduled(authorized_data[message.chat.id]["page_tasks_scheduled"]))
+    message.edit_text(
+        "List of scheduled task",
+        reply_markup=keyboard_tasks_scheduled(
+            authorized_data[message.chat.id]["page_tasks_scheduled"]
+        ),
+    )
     return states["tasks_scheduled"]
 
 
@@ -1894,10 +1902,11 @@ def handle_merchants(update: Update, context: CallbackContext):
     elif update.callback_query.data != handler_data_back:
         data = gsh.get_cached_data(["merchants"])
         send_info_message(
+            "merchants",
             update.callback_query.from_user.first_name
             + " has selected "
             + data["merchants"]["dict"][update.callback_query.data]["name"]
-            + " and everyone should be aware of it"
+            + " and everyone should be aware of it",
         )
 
     return state_finances(update.callback_query.message)
@@ -1960,10 +1969,11 @@ def handle_methods(update: Update, context: CallbackContext):
     elif update.callback_query.data != handler_data_back:
         data = gsh.get_cached_data(["methods"])
         send_info_message(
+            "methods",
             update.callback_query.from_user.first_name
             + " has selected "
             + data["methods"]["dict"][update.callback_query.data]["name"]
-            + " and everyone should be aware of it"
+            + " and everyone should be aware of it",
         )
 
     return state_finances(update.callback_query.message)
@@ -2070,12 +2080,13 @@ def handle_categories(update: Update, context: CallbackContext):
     elif update.callback_query.data != handler_data_back:
         data = gsh.get_cached_data(["categories"])
         send_info_message(
+            "categories",
             update.callback_query.from_user.first_name
             + " has selected "
             + data["categories"]["dict"][update.callback_query.data]["emoji"]
             + " "
             + data["categories"]["dict"][update.callback_query.data]["name"]
-            + " and everyone should be aware of it"
+            + " and everyone should be aware of it",
         )
 
     return state_finances(update.callback_query.message)
@@ -2206,11 +2217,12 @@ def handle_task_current(update: Update, context: CallbackContext):
                 gsh.sheets["tasks_scheduled"].update_cell(row_scheduled, 12, False)
 
             send_info_message(
+                "tasks",
                 update.callback_query.from_user.first_name
                 + " has "
                 + (update.callback_query.data == "_TASK_DONE" and "done" or "ignored")
                 + " task "
-                + display_text_task_current(task_current, True)
+                + display_text_task_current(task_current, True),
             )
 
             gsh.get_cached_data(["tasks_current", "tasks_scheduled"], update=True)
@@ -2280,9 +2292,9 @@ def handle_tasks_scheduled(update: Update, context: CallbackContext):
                 return states["tasks_scheduled"]
         else:
             data = gsh.get_cached_data(["tasks_scheduled"])
-            authorized_data[update.callback_query.message.chat.id]["task_scheduled"] = dict(
-                data["tasks_scheduled"]["dict"][update.callback_query.data]
-            )
+            authorized_data[update.callback_query.message.chat.id][
+                "task_scheduled"
+            ] = dict(data["tasks_scheduled"]["dict"][update.callback_query.data])
             return state_task_scheduled(update.callback_query.message)
     return state_tasks(update.callback_query.message)
 

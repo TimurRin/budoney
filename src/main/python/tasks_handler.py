@@ -19,9 +19,9 @@ def schedule_tasks():
 
     ids = dict(data["tasks_current"]["dict"])
 
-    for row, scheduled_task_id in enumerate(data["tasks_scheduled"]["list"], 2):
-        consequence = 5 * (row - 2)
+    for scheduled_task_id in data["tasks_scheduled"]["list"]:
         scheduled_task_data = data["tasks_scheduled"]["dict"][scheduled_task_id]
+        consequence = 5 * scheduled_task_data["position"]
         task_id = id_utils.generate_id(ids, scheduled_task_data["name"])
         ids[task_id] = True
 
@@ -57,7 +57,7 @@ def schedule_tasks():
                 )
 
     if changed:
-        if len(cells_to_update):
+        if len(cells_to_update) > 0:
             gsh.sheets["tasks_scheduled"].update_cells(cells_to_update)
         if len(rows_to_append) > 0:
             gsh.insert_into_sheet("tasks_current", rows_to_append)

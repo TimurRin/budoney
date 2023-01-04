@@ -192,7 +192,7 @@ def fetch_data(name: str, sheet: Worksheet):
         return data
     elif name == "tasks_scheduled":
         data = {"dict": {}, "list": [], "pagination": {}}
-        for value in sheet.get_values()[1:]:
+        for position, value in enumerate(sheet.get_values()[1:], 0):
             entry = {
                 "id": value[0],
                 "name": value[1],
@@ -207,6 +207,7 @@ def fetch_data(name: str, sheet: Worksheet):
                 "times_done": value[10] and int(value[10]) or 0,
                 "scheduled": value[11] == "TRUE",
                 "paused": value[12] == "TRUE",
+                "position": position
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

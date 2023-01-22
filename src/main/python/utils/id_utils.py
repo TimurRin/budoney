@@ -18,7 +18,7 @@ def generate_id(data: dict, name: str):
         while loop <= 9999999:
             digits = loop > 0 and (int(math.log10(loop)) + 1) or 1
             temp_id = None
-            if id_len + digits > 7:
+            if id_len + digits > 14:
                 temp_id = id[:-digits] + str(loop)
             else:
                 temp_id = id + str(loop)

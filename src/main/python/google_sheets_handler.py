@@ -1,5 +1,4 @@
 from datetime import datetime
-import math
 
 import gspread
 import utils.date_utils as date_utils
@@ -158,26 +157,25 @@ def fetch_data(name: str, sheet: Worksheet):
             data["list"].append(value[0])
         return data
     elif name == "tasks_current":
-        data = {"dict": {}, "list": [], "pagination": {}}
+        data = {"dict": {}, "list": [], "list_active": []}
         for value in sheet.get_values()[1:]:
-            if not value[7]:
-                entry = {
-                    "id": value[0],
-                    "name": value[1],
-                    "importance": value[2] == "TRUE",
-                    "urgency": value[3] == "TRUE",
-                    "scheduled_id": value[4],
-                    "created": value[5]
-                    and datetime.strptime(value[5], "%Y-%m-%d")
-                    or datetime.now(),
-                    "due_to": value[6] and datetime.strptime(value[6], "%Y-%m-%d"),
-                    "done": value[7]
-                    and value[7] != "IGNORED"
-                    and datetime.strptime(value[7], "%Y-%m-%d")
-                    or value[7],
-                }
-                data["dict"][value[0]] = entry
-                data["list"].append(value[0])
+            done = value[7] and value[7] != "IGNORED" and datetime.strptime(value[7], "%Y-%m-%d") or value[7]
+            entry = {
+                "id": value[0],
+                "name": value[1],
+                "importance": value[2] == "TRUE",
+                "urgency": value[3] == "TRUE",
+                "scheduled_id": value[4],
+                "created": value[5]
+                and datetime.strptime(value[5], "%Y-%m-%d")
+                or datetime.now(),
+                "due_to": value[6] and datetime.strptime(value[6], "%Y-%m-%d"),
+                "done": done,
+            }
+            data["dict"][value[0]] = entry
+            data["list"].append(value[0])
+            if not done:
+                data["list_active"].append(value[0])
         data["list"] = sorted(
             list(data["list"]),
             key=lambda d: (
@@ -186,9 +184,6 @@ def fetch_data(name: str, sheet: Worksheet):
                 data["dict"][d]["name"].lower(),
             ),
         )
-        data["pagination"]["items"] = len(data["list"])
-        data["pagination"]["per_page"] = 5
-        data["pagination"]["pages"] = math.ceil(len(data["list"]) / data["pagination"]["per_page"])
         return data
     elif name == "tasks_scheduled":
         data = {"dict": {}, "list": [], "pagination": {}}
@@ -225,9 +220,6 @@ def fetch_data(name: str, sheet: Worksheet):
                 data["dict"][d]["name"].lower(),
             ),
         )
-        data["pagination"]["items"] = len(data["list"])
-        data["pagination"]["per_page"] = 5
-        data["pagination"]["pages"] = math.ceil(len(data["list"]) / data["pagination"]["per_page"])
         return data
     else:
         return sheet.get_values()

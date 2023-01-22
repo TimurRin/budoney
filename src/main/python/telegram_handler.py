@@ -1,5 +1,6 @@
 import datetime
 import difflib
+import math
 from time import sleep
 
 import google_sheets_handler as gsh
@@ -203,10 +204,10 @@ def init():
 
     print(print_label, "Started")
 
-    update_tasks()
+    # update_tasks()
     if general_config["production_mode"]:
         while True:
-            sleep(60 * 20)
+            sleep(60 * 1)
             update_tasks()
     else:
         updater.idle()
@@ -220,6 +221,10 @@ def update_tasks():
 
 # local utils
 
+def pagination(data, items_size, per_page):
+    data["items"] = items_size
+    data["per_page"] = per_page
+    data["pages"] = math.ceil(data["items"] / data["per_page"])
 
 def text_filters():
     return Filters.text & auth_filter() & conversation_filter()
@@ -610,7 +615,7 @@ def format_page_items(page, per_page, limit=None):
 def keyboard_row_pagination(page_user_data):
     return [
         telegram.InlineKeyboardButton(
-            text=(format_page_items(1, page_user_data["data"]["per_page"])),
+            text=(format_page_items(1, page_user_data["per_page"])),
             callback_data="_PAGE_START",
         ),
         telegram.InlineKeyboardButton(text="◀️", callback_data="_PAGE_BACK"),
@@ -618,9 +623,9 @@ def keyboard_row_pagination(page_user_data):
         telegram.InlineKeyboardButton(
             text=(
                 format_page_items(
-                    page_user_data["data"]["pages"],
-                    page_user_data["data"]["per_page"],
-                    limit=page_user_data["data"]["items"],
+                    page_user_data["pages"],
+                    page_user_data["per_page"],
+                    limit=page_user_data["items"],
                 )
             ),
             callback_data="_PAGE_END",
@@ -966,21 +971,21 @@ def keyboard_tasks_current(page_user_data):
 
     current_row = 0
 
-    page_user_data["data"] = data["tasks_current"]["pagination"]
+    pagination(page_user_data, len(data["tasks_current"]["list_active"]), 5)
 
-    if page_user_data["page"] > page_user_data["data"]["pages"]:
-        page_user_data["page"] = page_user_data["data"]["pages"]
+    if page_user_data["page"] > page_user_data["pages"]:
+        page_user_data["page"] = page_user_data["pages"]
 
     items = get_page_items(
         page_user_data["page"],
-        page_user_data["data"]["per_page"],
-        limit=page_user_data["data"]["pages"] == page_user_data["page"]
-        and page_user_data["data"]["items"]
+        page_user_data["per_page"],
+        limit=page_user_data["pages"] == page_user_data["page"]
+        and page_user_data["items"]
         or None,
     )
 
     for number, id in enumerate(
-        data["tasks_current"]["list"][(items[0] - 1) : items[1]], start=items[0]
+        data["tasks_current"]["list_active"][(items[0] - 1) : items[1]], start=items[0]
     ):
         reply_keyboard[current_row].append(
             telegram.InlineKeyboardButton(
@@ -998,7 +1003,7 @@ def keyboard_tasks_current(page_user_data):
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    if page_user_data["data"]["pages"] > 1:
+    if page_user_data["pages"] > 1:
         reply_keyboard.append(keyboard_row_pagination(page_user_data))
     reply_keyboard.append(keyboard_row_back_and_add())
     return InlineKeyboardMarkup(reply_keyboard)
@@ -1038,16 +1043,16 @@ def keyboard_tasks_scheduled(page_user_data):
 
     current_row = 0
 
-    page_user_data["data"] = data["tasks_scheduled"]["pagination"]
+    pagination(page_user_data, len(data["tasks_scheduled"]["list"]), 5)
 
-    if page_user_data["page"] > page_user_data["data"]["pages"]:
-        page_user_data["page"] = page_user_data["data"]["pages"]
+    if page_user_data["page"] > page_user_data["pages"]:
+        page_user_data["page"] = page_user_data["pages"]
 
     items = get_page_items(
         page_user_data["page"],
-        page_user_data["data"]["per_page"],
-        limit=page_user_data["data"]["pages"] == page_user_data["page"]
-        and page_user_data["data"]["items"]
+        page_user_data["per_page"],
+        limit=page_user_data["pages"] == page_user_data["page"]
+        and page_user_data["items"]
         or None,
     )
 
@@ -1070,7 +1075,7 @@ def keyboard_tasks_scheduled(page_user_data):
             reply_keyboard.append([])
             current_row = current_row + 1
 
-    if page_user_data["data"]["pages"] > 1:
+    if page_user_data["pages"] > 1:
         reply_keyboard.append(keyboard_row_pagination(page_user_data))
     reply_keyboard.append(keyboard_row_back())
     return InlineKeyboardMarkup(reply_keyboard)
@@ -2159,15 +2164,15 @@ def handle_tasks_current(update: Update, context: CallbackContext):
         elif update.callback_query.data == "_PAGE_FORWARD":
             old_page = page_tasks_current["page"]
             page_tasks_current["page"] = min(
-                page_tasks_current["page"] + 1, page_tasks_current["data"]["pages"]
+                page_tasks_current["page"] + 1, page_tasks_current["pages"]
             )
             if old_page != page_tasks_current["page"]:
                 return state_tasks_current(update.callback_query.message)
             else:
                 return states["tasks_current"]
         elif update.callback_query.data == "_PAGE_END":
-            if page_tasks_current["page"] != page_tasks_current["data"]["pages"]:
-                page_tasks_current["page"] = page_tasks_current["data"]["pages"]
+            if page_tasks_current["page"] != page_tasks_current["pages"]:
+                page_tasks_current["page"] = page_tasks_current["pages"]
                 return state_tasks_current(update.callback_query.message)
             else:
                 return states["tasks_current"]
@@ -2310,15 +2315,15 @@ def handle_tasks_scheduled(update: Update, context: CallbackContext):
         elif update.callback_query.data == "_PAGE_FORWARD":
             old_page = page_tasks_scheduled["page"]
             page_tasks_scheduled["page"] = min(
-                page_tasks_scheduled["page"] + 1, page_tasks_scheduled["data"]["pages"]
+                page_tasks_scheduled["page"] + 1, page_tasks_scheduled["pages"]
             )
             if old_page != page_tasks_scheduled["page"]:
                 return state_tasks_scheduled(update.callback_query.message)
             else:
                 return states["tasks_scheduled"]
         elif update.callback_query.data == "_PAGE_END":
-            if page_tasks_scheduled["page"] != page_tasks_scheduled["data"]["pages"]:
-                page_tasks_scheduled["page"] = page_tasks_scheduled["data"]["pages"]
+            if page_tasks_scheduled["page"] != page_tasks_scheduled["pages"]:
+                page_tasks_scheduled["page"] = page_tasks_scheduled["pages"]
                 return state_tasks_scheduled(update.callback_query.message)
             else:
                 return states["tasks_scheduled"]

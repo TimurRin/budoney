@@ -8,7 +8,7 @@ def generate_id(data: dict, name: str):
 
     transliterated = transliterate.russian_to_latin(name).upper()
     code = re.sub(r"[^A-Z0-9]+", "", transliterated)
-    id = code[:7]
+    id = code[:14]
     id_len = len(id)
 
     if id not in data:

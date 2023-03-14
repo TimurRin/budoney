@@ -831,14 +831,15 @@ def keyboard_methods():
     current_row = 0
 
     for id in data["methods"]["list"]:
-        reply_keyboard[current_row].append(
-            telegram.InlineKeyboardButton(
-                text=display_text_method(data["methods"]["dict"][id]), callback_data=id
+        if data["methods"]["dict"][id]["available"]:
+            reply_keyboard[current_row].append(
+                telegram.InlineKeyboardButton(
+                    text=display_text_method(data["methods"]["dict"][id]), callback_data=id
+                )
             )
-        )
-        if len(reply_keyboard[current_row]) >= 2:
-            reply_keyboard.append([])
-            current_row = current_row + 1
+            if len(reply_keyboard[current_row]) >= 2:
+                reply_keyboard.append([])
+                current_row = current_row + 1
 
     reply_keyboard.append(keyboard_row_back_and_add())
 

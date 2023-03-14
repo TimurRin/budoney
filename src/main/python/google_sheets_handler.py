@@ -141,6 +141,7 @@ def fetch_data(name: str, sheet: Worksheet):
                 "is_credit": value[5] == "TRUE" and True or False,
                 "is_cashback": value[6] == "TRUE" and True or False,
                 "owner": value[7],
+                "available": value[8] == "TRUE" and True or False,
             }
             data["dict"][value[0]] = entry
             data["list"].append(value[0])

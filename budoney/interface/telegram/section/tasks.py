@@ -1,18 +1,16 @@
 from interface.telegram.classes import (
-    TelegramConversationView,
+    DefaultTelegramConversationView,
     TelegramConversationFork,
 )
-from interface.telegram.utils import keyboard_back_button
 
 
 def init():
-    TelegramConversationView(
+    DefaultTelegramConversationView(
         "tasks",
         [
             [
                 TelegramConversationFork("tasks_current"),
                 TelegramConversationFork("tasks_scheduled"),
             ],
-            [keyboard_back_button()],
         ],
     )

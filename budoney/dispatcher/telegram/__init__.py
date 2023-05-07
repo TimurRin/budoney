@@ -3,7 +3,7 @@ from telegram.ext import ConversationHandler, Updater
 import configs
 
 
-print_label: str = "[budoney :: TelegramConnector]"
+print_label: str = "[budoney :: Telegram Dispatcher]"
 
 
 def start(conversation: Union[ConversationHandler, None]):

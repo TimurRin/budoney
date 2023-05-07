@@ -1,17 +1,13 @@
 from interface.telegram.classes import (
-    TelegramConversationView,
+    DefaultTelegramConversationView,
     TelegramConversationFork,
 )
 
 
 def init():
-    TelegramConversationView(
+    DefaultTelegramConversationView(
         "main",
         [
-            [
-                TelegramConversationFork("transaction"),
-                TelegramConversationFork("task_current"),
-            ],
             [
                 TelegramConversationFork("finances"),
             ],

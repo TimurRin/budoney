@@ -7,6 +7,8 @@ from interface.telegram.classes import (
 )
 
 import interface.telegram.section.main as main_section
+import interface.telegram.section.people as people_section
+import interface.telegram.section.organizations as organizations_section
 import interface.telegram.section.finances as finances_section
 import interface.telegram.section.tasks as tasks_section
 import interface.telegram.section.health as health_section
@@ -55,6 +57,8 @@ def command_start(update: Update, context: CallbackContext):
 DefaultTelegramConversationView("_WIP", [])
 
 main_section.init()
+people_section.init()
+organizations_section.init()
 finances_section.init()
 tasks_section.init()
 health_section.init()

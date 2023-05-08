@@ -5,8 +5,9 @@ from interface.telegram.classes import (
 
 def init():
     DatabaseTelegramConversationView(
-        "organizations",
+        "people",
         [
             {"column": "name", "type": "text"},
+            {"column": "emoji", "type": "text"},
         ],
     )

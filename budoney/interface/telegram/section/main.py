@@ -10,20 +10,20 @@ def init():
             [
                 "finances",
             ],
-            [
-                "tasks",
-                "reminders",
-            ],
-            [
-                "utilities",
-                "clothes",
-                "storage",
-            ],
-            [
-                "health",
-                "food",
-                "plants",
-            ],
+            # [
+            #     "tasks",
+            #     "reminders",
+            # ],
+            # [
+            #     "utilities",
+            #     "clothes",
+            #     "storage",
+            # ],
+            # [
+            #     "health",
+            #     "food",
+            #     "plants",
+            # ],
             ["organizations", "people"],
         ],
     )

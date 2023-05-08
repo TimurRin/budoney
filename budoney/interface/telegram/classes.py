@@ -57,6 +57,9 @@ class TelegramConversationView:
                 f"Nice to have you back at '<b>{state}</b>' state",
                 True,
             )
+        # elif data == "_ALL" or data == "_ADD":
+        #     telegram_user.states_sequence.append(self.state_name)
+        #     return self.handle(update, data)
         else:
             telegram_user.states_sequence.append(self.state_name)
             if data in conversation_views:
@@ -99,9 +102,10 @@ class DefaultTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
     def handle(self, update: Update, data):
+        print(print_label, "default", data)
         return conversation_views[data].state(
             update.callback_query.message,
-            "A special message which may be unrelated to the state",
+            "A special message which may be unrelated to the state (default)",
             True,
         )
 
@@ -110,37 +114,94 @@ class DatabaseTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, columns: list[list]) -> None:
         super().__init__(state_name)
 
+        keyboard = []
+
+        for column in columns:
+            if column["type"] == "data":
+                code = f"_DB__{state_name}__{column['column']}"
+                InfoTelegramConversationView(code, state_name)
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            callback_data=code,
+                            text=localization["states"].get(code, code),
+                        )
+                    ]
+                )
+
+        keyboard.append([back_button, all_button, add_button])
+
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+
     def keyboard(self) -> InlineKeyboardMarkup:
-        return database_keyboard
+        return self._keyboard
 
     def handle(self, update: Update, data):
-        return conversation_views["_WIP"].state(
+        print(print_label, "database", data)
+        return conversation_views[data].state(
             update.callback_query.message,
-            "A special message which may be unrelated to the state",
+            "Weeeeeeeee",
             True,
         )
 
+
+class InfoTelegramConversationView(TelegramConversationView):
+    def __init__(self, state_name: str, table_name) -> None:
+        super().__init__(state_name)
+
+        keyboard = []
+
+        keyboard.append([back_button])
+
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return self._keyboard
+
+    def handle(self, update: Update, data):
+        print(print_label, "list", data)
+        return conversation_views["_WIP"].state(
+            update.callback_query.message,
+            "A special message which may be unrelated to the state (info)",
+            True,
+        )
+
+
+class ListTelegramConversationView(TelegramConversationView):
+    def __init__(self, state_name: str, table_name) -> None:
+        super().__init__(state_name)
+
+        keyboard = []
+
+        keyboard.append([back_button])
+
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return self._keyboard
+
+    def handle(self, update: Update, data):
+        print(print_label, "list", data)
+        return conversation_views["_WIP"].state(
+            update.callback_query.message,
+            "A special message which may be unrelated to the state (list)",
+            True,
+        )
+
+
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, TelegramConversationView]" = {}
+
+# special handlers that don't have view
 back_button = InlineKeyboardButton(
     callback_data="_BACK",
     text=localization["states"].get("_BACK", "_BACK"),
 )
-
-database_keyboard = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton(
-                callback_data="_DB_LIST",
-                text=localization["states"].get("_LIST", "_LIST"),
-            )
-        ],
-        [
-            back_button,
-            InlineKeyboardButton(
-                callback_data="_DB_ADD",
-                text=localization["states"].get("_ADD", "_ADD"),
-            ),
-        ],
-    ]
+all_button = InlineKeyboardButton(
+    callback_data="_ALL",
+    text=localization["states"].get("_ALL", "_ALL"),
+)
+add_button = InlineKeyboardButton(
+    callback_data="_ADD",
+    text=localization["states"].get("_ADD", "_ADD"),
 )

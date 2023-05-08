@@ -28,7 +28,7 @@ class TelegramConversationView:
             f"{message.chat.first_name} ({message.chat.id}) has moved from '{telegram_users[message.chat.id].state}' to '{self.state_name}'",
         )
         telegram_users[message.chat.id].state = self.state_name
-        text = f"👩‍💻 Debug for {telegram_users[message.chat.id].name}:\n- states_sequence: <code>{str(telegram_users[message.chat.id].states_sequence)}</code>\n\n{text}"
+        text = f"👩‍💻 Debug for {telegram_users[message.chat.id].name}:\n- states_sequence: <code>{str(telegram_users[message.chat.id].states_sequence)}</code>\n\n{text}\n\n<b>{localization['states'].get(self.state_name, self.state_name)}</b>"
         if edit:
             message.edit_text(text, reply_markup=self.keyboard(), parse_mode="html")
         else:
@@ -73,7 +73,7 @@ class DefaultTelegramConversationView(TelegramConversationView):
     def __init__(
         self,
         state_name: str,
-        forks: "list[list[TelegramConversationFork]]",
+        forks: "list[list[str]]",
     ) -> None:
         super().__init__(state_name)
 
@@ -85,8 +85,8 @@ class DefaultTelegramConversationView(TelegramConversationView):
             for fork in forks_line:
                 keyboard_line.append(
                     InlineKeyboardButton(
-                        callback_data=fork.name,
-                        text=localization["states"].get(fork.name, fork.name),
+                        callback_data=fork,
+                        text=localization["states"].get(fork, fork),
                     )
                 )
 
@@ -101,41 +101,46 @@ class DefaultTelegramConversationView(TelegramConversationView):
     def handle(self, update: Update, data):
         return conversation_views[data].state(
             update.callback_query.message,
-            f"Current state is '<b>{data}</b>'",
+            "A special message which may be unrelated to the state",
             True,
         )
 
 
 class DatabaseTelegramConversationView(TelegramConversationView):
-    def __init__(
-        self,
-        state_name: str,
-    ) -> None:
+    def __init__(self, state_name: str, columns: list[list]) -> None:
         super().__init__(state_name)
 
     def keyboard(self) -> InlineKeyboardMarkup:
-        keyboard = []
-        keyboard.append([back_button])
-        return InlineKeyboardMarkup(keyboard)
+        return database_keyboard
 
     def handle(self, update: Update, data):
         return conversation_views["_WIP"].state(
             update.callback_query.message,
-            f"A placeholder for '<b>{data}</b>' database management",
+            "A special message which may be unrelated to the state",
             True,
         )
-
-
-class TelegramConversationFork:
-    name: str = "none"
-
-    def __init__(self, name: str):
-        self.name = name
-
 
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, TelegramConversationView]" = {}
 back_button = InlineKeyboardButton(
     callback_data="_BACK",
     text=localization["states"].get("_BACK", "_BACK"),
+)
+
+database_keyboard = InlineKeyboardMarkup(
+    [
+        [
+            InlineKeyboardButton(
+                callback_data="_DB_LIST",
+                text=localization["states"].get("_LIST", "_LIST"),
+            )
+        ],
+        [
+            back_button,
+            InlineKeyboardButton(
+                callback_data="_DB_ADD",
+                text=localization["states"].get("_ADD", "_ADD"),
+            ),
+        ],
+    ]
 )

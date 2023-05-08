@@ -1,6 +1,5 @@
 from interface.telegram.classes import (
     DefaultTelegramConversationView,
-    TelegramConversationFork,
 )
 
 
@@ -9,22 +8,22 @@ def init():
         "main",
         [
             [
-                TelegramConversationFork("finances"),
+                "finances",
             ],
             [
-                TelegramConversationFork("tasks"),
-                TelegramConversationFork("reminders"),
+                "tasks",
+                "reminders",
             ],
             [
-                TelegramConversationFork("utilities"),
-                TelegramConversationFork("clothes"),
-                TelegramConversationFork("storage"),
+                "utilities",
+                "clothes",
+                "storage",
             ],
             [
-                TelegramConversationFork("health"),
-                TelegramConversationFork("food"),
-                TelegramConversationFork("plants"),
+                "health",
+                "food",
+                "plants",
             ],
-            [TelegramConversationFork("users")],
+            ["organizations", "people"],
         ],
     )

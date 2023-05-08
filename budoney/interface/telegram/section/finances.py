@@ -1,7 +1,6 @@
 from interface.telegram.classes import (
     DefaultTelegramConversationView,
     DatabaseTelegramConversationView,
-    TelegramConversationFork,
 )
 
 
@@ -10,16 +9,73 @@ def init():
         "finances",
         [
             [
-                TelegramConversationFork("transactions"),
+                "transactions",
             ],
             [
-                TelegramConversationFork("merchants"),
-                TelegramConversationFork("methods"),
+                "financial_accounts",
+                "payment_cards",
             ],
             [
-                TelegramConversationFork("categories"),
-                TelegramConversationFork("currencies"),
+                "categories",
+                "currencies",
             ],
         ],
+    ),
+    DefaultTelegramConversationView(
+        "transactions",
+        [
+            [
+                "income",
+                "expense",
+            ],
+            ["transfer"],
+        ],
     )
-    DatabaseTelegramConversationView("transactions")
+    DatabaseTelegramConversationView(
+        "income",
+        [
+            ["date", "date"],
+            ["sum", "float"],
+            ["currency", "data", "currencies"],
+            ["financial_account", "data", "financial_accounts"],
+            ["organization", "data", "organizations"],
+            ["description", "text"],
+        ],
+    ),
+    DatabaseTelegramConversationView(
+        "expenses",
+        [
+            ["date", "date"],
+            ["sum", "float"],
+            ["currency", "data", "currencies"],
+            ["financial_account", "data", "financial_accounts"],
+            ["organization", "data", "organizations"],
+            ["description", "text"],
+        ],
+    ),
+    DatabaseTelegramConversationView(
+        "transfers",
+        [
+            ["date", "date"],
+            ["sum", "float"],
+            ["currency", "data", "currencies"],
+            ["account_source", "data", "financial_accounts"],
+            ["faccount_target", "data", "financial_accounts"],
+            ["description", "text"],
+        ],
+    ),
+    DatabaseTelegramConversationView(
+        "financial_accounts",
+        [
+            ["name", "text"],
+            ["number", "int"],
+            ["operator", "data", "organizations"],
+        ],
+    ),
+    DatabaseTelegramConversationView(
+        "payment_cards",
+        [
+            ["name", "text"],
+            ["number", "int"],
+        ],
+    ),

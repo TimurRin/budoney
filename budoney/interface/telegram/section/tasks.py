@@ -1,6 +1,5 @@
 from interface.telegram.classes import (
     DefaultTelegramConversationView,
-    TelegramConversationFork,
 )
 
 
@@ -9,8 +8,8 @@ def init():
         "tasks",
         [
             [
-                TelegramConversationFork("tasks_current"),
-                TelegramConversationFork("tasks_scheduled"),
+                "tasks_current",
+                "tasks_scheduled",
             ],
         ],
     )

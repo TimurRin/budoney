@@ -29,7 +29,7 @@ states:
     tasks_current: "🗒 Current tasks",
     tasks_scheduled: "⏰ Scheduled tasks",
     _BACK: "🔙 Back",
-    _ALL: "🗄 Records",
+    _RECORDS: "🗄 Records",
     _ADD: "➕ Add new",
     _SUBMIT: "✅ Submit",
   }

@@ -79,7 +79,7 @@ class TelegramConversationView:
     def handle(self, update: Update, data):
         pass
 
-    def handle_all(self, update: Update):
+    def handle_records(self, update: Update):
         pass
 
     def handle_add(self, update: Update):
@@ -116,9 +116,9 @@ class TelegramConversationView:
                 update,
                 state,
             )
-        elif data == "_ALL":
+        elif data == "_RECORDS":
             telegram_user.states_sequence.append(self.state_name)
-            return self.handle_all(update)
+            return self.handle_records(update)
         elif data == "_ADD":
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
@@ -191,7 +191,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                 )
 
         special_handlers = {
-            "all": AllTelegramConversationView(f"_DB__{state_name}___ALL", state_name),
+            "all": AllTelegramConversationView(f"_DB__{state_name}___RECORDS", state_name),
             "add": AddTelegramConversationView(f"_DB__{state_name}___ADD", state_name),
         }
 
@@ -210,7 +210,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
             True,
         )
 
-    def handle_all(self, update: Update):
+    def handle_records(self, update: Update):
         return self._special_handlers["all"].state(
             update.callback_query.message,
             "",
@@ -299,8 +299,8 @@ back_button = InlineKeyboardButton(
     text=localization["states"].get("_BACK", "_BACK"),
 )
 all_button = InlineKeyboardButton(
-    callback_data="_ALL",
-    text=localization["states"].get("_ALL", "_ALL"),
+    callback_data="_RECORDS",
+    text=localization["states"].get("_RECORDS", "_RECORDS"),
 )
 add_button = InlineKeyboardButton(
     callback_data="_ADD",

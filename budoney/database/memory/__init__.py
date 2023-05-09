@@ -32,5 +32,5 @@ class MemoryDatabase(Database):
 
     def _check_data(self, data):
         if "id" not in data:
-            data["id"] = self.record_ids
+            data["id"] = f"ID_{self.record_ids}"
             self.record_ids = self.record_ids + 1

@@ -1,13 +1,22 @@
 from collections import deque
 from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
-from telegram.ext import CallbackContext, CallbackQueryHandler
+from telegram.ext import CallbackContext, CallbackQueryHandler, MessageHandler, Filters
 from loc import localization
 from database import DATABASE_DRIVER
 import configs
 
 print_label: str = "[budoney :: Telegram Interface]"
 
+def text_filters():
+    return Filters.text & auth_filter() & conversation_filter()
+
+def auth_filter():
+    return Filters.user(user_id=configs.telegram["authorized"])
+
+
+def conversation_filter():
+    return Filters.chat(chat_id=configs.telegram["authorized"])
 
 class TelegramUser:
     name: str = "User"
@@ -23,7 +32,10 @@ class TelegramConversationView:
     def __init__(self, state_name: str) -> None:
         conversation_views[state_name] = self
         self.state_name = state_name
-        self.handlers = [CallbackQueryHandler(self._handle)]
+        self.handlers = [
+            CallbackQueryHandler(self._handle),
+            MessageHandler(text_filters(), self.handle_typed),
+        ]
 
     def state(self, message: Message, text: str, edit: bool):
         print(
@@ -87,6 +99,14 @@ class TelegramConversationView:
 
     def handle_submit(self, update: Update):
         pass
+
+    def handle_typed(self, update: Update, context: CallbackContext):
+        # print(print_label, f"typed found in the state of {self.state_name} | {update.message.text}")
+        conversation_views[self.state_name].state(
+            update.message,
+            f"⚠️ Typing is not supported here",
+            False,
+        )
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
@@ -179,7 +199,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
 
         for column in columns:
             if column["type"] == "data":
-                code = f"_DB__{state_name}__{column['column']}"
+                code = f"{state_name}_GROUPBY_{column['column']}"
                 InfoTelegramConversationView(code, state_name)
                 keyboard.append(
                     [
@@ -191,11 +211,15 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                 )
 
         special_handlers = {
-            "all": AllTelegramConversationView(f"_DB__{state_name}___RECORDS", state_name),
-            "add": AddTelegramConversationView(f"_DB__{state_name}___ADD", state_name),
+            "get_records": GetRecordsTelegramConversationView(
+                f"{state_name}_RECORDS", state_name
+            ),
+            "add_record": AddRecordTelegramConversationView(
+                f"{state_name}_ADD", state_name, columns
+            ),
         }
 
-        keyboard.append([back_button, all_button, add_button])
+        keyboard.append([back_button, records_button, add_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
@@ -211,14 +235,14 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         )
 
     def handle_records(self, update: Update):
-        return self._special_handlers["all"].state(
+        return self._special_handlers["get_records"].state(
             update.callback_query.message,
             "",
             True,
         )
 
     def handle_add(self, update: Update):
-        return self._special_handlers["add"].state(
+        return self._special_handlers["add_record"].state(
             update.callback_query.message,
             "",
             True,
@@ -239,7 +263,7 @@ class InfoTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
 
-class AllTelegramConversationView(TelegramConversationView):
+class GetRecordsTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         self.table_name = table_name
@@ -250,36 +274,63 @@ class AllTelegramConversationView(TelegramConversationView):
         records = DATABASE_DRIVER.get_records(self.table_name)
         for record in records:
             keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        callback_data=f"_DB_RECORD_{record['id']}", text=record["id"]
-                    )
-                ]
+                [InlineKeyboardButton(callback_data=record["id"], text=record["id"])]
             )
 
-        keyboard.append([back_button])
+        keyboard.append([back_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
 
     def handle(self, update: Update, data):
         return conversation_views["_WIP"].state(
             update.callback_query.message,
+            "No support for view yet",
+            True,
+        )
+
+    def handle_add(self, update: Update):
+        return conversation_views[f"{self.table_name}_ADD"].state(
+            update.callback_query.message,
             "",
             True,
         )
 
 
-class AddTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, table_name) -> None:
+class AddRecordTelegramConversationView(TelegramConversationView):
+    def __init__(self, state_name: str, table_name, columns: list[list]) -> None:
         super().__init__(state_name)
         self.table_name = table_name
-
-    def keyboard(self) -> InlineKeyboardMarkup:
         keyboard = []
+
+        for column in columns:
+            code = f"{state_name}_{column['column']}"
+            InfoTelegramConversationView(code, state_name)
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        callback_data=code,
+                        text=localization["states"].get(code, code),
+                    )
+                ]
+            )
+
+        special_handlers = {}
 
         keyboard.append([back_button, submit_button])
 
-        return InlineKeyboardMarkup(keyboard)
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+        self._special_handlers = special_handlers
+        self._columns = columns
+
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return self._keyboard
+
+    def handle(self, update: Update, data):
+        return conversation_views["_WIP"].state(
+            update.callback_query.message,
+            "No support for change yet",
+            True,
+        )
 
     def handle_submit(self, update: Update, state):
         DATABASE_DRIVER.append_data(self.table_name, {})
@@ -298,7 +349,7 @@ back_button = InlineKeyboardButton(
     callback_data="_BACK",
     text=localization["states"].get("_BACK", "_BACK"),
 )
-all_button = InlineKeyboardButton(
+records_button = InlineKeyboardButton(
     callback_data="_RECORDS",
     text=localization["states"].get("_RECORDS", "_RECORDS"),
 )

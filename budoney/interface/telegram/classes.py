@@ -21,20 +21,19 @@ def conversation_filter():
     return Filters.chat(chat_id=configs.telegram["authorized"])
 
 
-def check_record_params(state, records):
-    print(
-        state.state_name,
-        state.table_name,
-        conversation_views[state.table_name].columns,
-        records,
-    )
-    if state.table_name not in records:
-        records[state.table_name] = {}
+def check_record_params(state, telegram_user):
+    if state.table_name not in telegram_user.records:
+        telegram_user.records[state.table_name] = {}
+    if state.table_name not in telegram_user.ignore_fast:
+        telegram_user.ignore_fast[state.table_name] = {}
     for column in conversation_views[state.table_name].columns:
-        if column["column"] not in records[state.table_name]:
+        if column["column"] not in telegram_user.records[state.table_name] and (
+            column["column"] not in telegram_user.ignore_fast[state.table_name]
+            or not telegram_user.ignore_fast[state.table_name][column["column"]]
+        ):
             print(f"{column['column']} is not typed")
             return conversation_views[f"{state.state_name}_{column['column']}"]
-    print("everything is typed")
+    print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
     return state
 
 
@@ -44,6 +43,7 @@ class TelegramUser:
     states_sequence = deque()
     operational_sequence = deque()
     records: dict = {}
+    ignore_fast: dict[str, dict[str, bool]] = {}
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -137,6 +137,7 @@ class TelegramConversationView:
         pass
 
     def _handle_cancel(self, update: Update, state):
+        self.handle_cancel(update)
         return conversation_views[state].state(
             update.callback_query.message,
             "❌ Operation has been cancelled",
@@ -311,7 +312,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
     def handle_add(self, update: Update):
         state = check_record_params(
             self._special_handlers["add_record"],
-            telegram_users[update.callback_query.message.chat.id].records,
+            telegram_users[update.callback_query.message.chat.id],
         )
         return state.state(
             update.callback_query.message,
@@ -364,7 +365,7 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
     def handle_add(self, update: Update):
         state = check_record_params(
             conversation_views[f"{self.table_name}_ADD"],
-            telegram_users[update.callback_query.message.chat.id].records,
+            telegram_users[update.callback_query.message.chat.id],
         )
         return state.state(
             update.callback_query.message,
@@ -417,11 +418,27 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         )
 
     def handle_cancel(self, update: Update):
-        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
+        print("cancel from AddRecordTelegramConversationView")
+        telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ].clear()
+        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+            self.table_name
+        ].clear()
 
     def handle_submit(self, update: Update, state):
-        DATABASE_DRIVER.append_data(self.table_name, telegram_users[update.callback_query.message.chat.id].records[self.table_name])
-        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
+        DATABASE_DRIVER.append_data(
+            self.table_name,
+            telegram_users[update.callback_query.message.chat.id].records[
+                self.table_name
+            ],
+        )
+        telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ].clear()
+        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+            self.table_name
+        ].clear()
         return conversation_views[state].state(
             update.callback_query.message,
             "✅ The record has been added successfully",
@@ -440,7 +457,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         self.column = column
         keyboard = []
 
-        keyboard.append([back_button, cancel_button])
+        keyboard.append([back_button, cancel_button, next_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
@@ -450,14 +467,44 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
     def keyboard(self) -> InlineKeyboardMarkup:
         return self._keyboard
 
-    def handle_cancel(self, update: Update):
-        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
-
-    def handle_typed(self, update: Update):
-        telegram_users[update.message.chat.id].records[self.table_name][self.column['column']] = update.message.text
+    def handle_next(self, update: Update):
+        check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.callback_query.message.chat.id],
+        )
+        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+            self.table_name
+        ][self.column["column"]] = True
         state = check_record_params(
             conversation_views[self.parent_state_name],
-            telegram_users[update.message.chat.id].records,
+            telegram_users[update.callback_query.message.chat.id],
+        )
+        return state.state(
+            update.callback_query.message,
+            f"⚠️ Skipping column <i>{self.column['column']}</i>",
+            False,
+        )
+
+    def handle_cancel(self, update: Update):
+        print("cancel from ChangeRecordTelegramConversationView")
+        telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ].clear()
+        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+            self.table_name
+        ].clear()
+
+    def handle_typed(self, update: Update):
+        check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.message.chat.id],
+        )
+        telegram_users[update.message.chat.id].records[self.table_name][
+            self.column["column"]
+        ] = update.message.text
+        state = check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.message.chat.id],
         )
         print("next state is " + state.state_name)
         return state.state(

@@ -9,15 +9,12 @@ def init():
         "finances",
         [
             [
+                "currencies",
                 "transactions",
             ],
             [
                 "financial_accounts",
                 "payment_cards",
-            ],
-            [
-                "categories",
-                "currencies",
             ],
         ],
     ),
@@ -83,9 +80,15 @@ def init():
     DatabaseTelegramConversationView(
         "financial_accounts",
         [
-            {"column": "name", "type": "text"},
-            {"column": "number", "type": "int"},
+            {"column": "number", "type": "text"},
             {"column": "operator", "type": "data", "data_type": "organizations"},
+            {
+                "column": "type",
+                "type": "select",
+                "select": ["BANK", "PHONE"],
+            },
+            {"column": "currency", "type": "data", "data_type": "currencies"},
+            {"column": "credit", "type": "boolean"},
         ],
     ),
     DatabaseTelegramConversationView(
@@ -93,5 +96,22 @@ def init():
         [
             {"column": "name", "type": "text"},
             {"column": "number", "type": "int"},
+            {
+                "column": "financial_account",
+                "type": "data",
+                "data_type": "financial_accounts",
+            },
+            {
+                "column": "payment_system",
+                "type": "select",
+                "select": [
+                    "VISA",
+                    "MASTERCARD",
+                    "AMERICAEXPRESS",
+                    "MIR",
+                    "UNIONPAY",
+                    "CUSTOM",
+                ],
+            },
         ],
     ),

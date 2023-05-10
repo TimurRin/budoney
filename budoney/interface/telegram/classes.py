@@ -80,9 +80,14 @@ class TelegramConversationView:
             result_text = result_text + "\n\n" + state_text
 
         if edit:
-            message.edit_text(
-                result_text, reply_markup=self.keyboard(), parse_mode="html"
-            )
+            try:
+                message.edit_text(
+                    result_text, reply_markup=self.keyboard(), parse_mode="html"
+                )
+            except:
+                message.reply_text(
+                    result_text, reply_markup=self.keyboard(), parse_mode="html"
+                )
         else:
             message.reply_text(
                 result_text, reply_markup=self.keyboard(), parse_mode="html"
@@ -462,7 +467,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
     def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}"
+        return f"{self.table_name} {telegram_user.records[self.table_name]}\nType your value below or skip it to the next value"
 
     def keyboard(self) -> InlineKeyboardMarkup:
         return self._keyboard

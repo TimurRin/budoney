@@ -8,8 +8,10 @@ import configs
 
 print_label: str = "[budoney :: Telegram Interface]"
 
+
 def text_filters():
     return Filters.text & auth_filter() & conversation_filter()
+
 
 def auth_filter():
     return Filters.user(user_id=configs.telegram["authorized"])
@@ -17,6 +19,7 @@ def auth_filter():
 
 def conversation_filter():
     return Filters.chat(chat_id=configs.telegram["authorized"])
+
 
 class TelegramUser:
     name: str = "User"
@@ -101,11 +104,9 @@ class TelegramConversationView:
         pass
 
     def handle_typed(self, update: Update, context: CallbackContext):
-        # print(print_label, f"typed found in the state of {self.state_name} | {update.message.text}")
-        conversation_views[self.state_name].state(
-            update.message,
-            f"⚠️ Typing is not supported here",
-            False,
+        print(
+            print_label,
+            f"{update.message.chat.first_name} ({update.message.chat.id}) has illegaly typed in state {self.state_name}",
         )
 
     def _handle(self, update: Update, context: CallbackContext):

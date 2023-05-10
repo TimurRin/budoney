@@ -28,8 +28,10 @@ states:
     body_temperature: "🤒 Temperature",
     tasks_current: "🗒 Current tasks",
     tasks_scheduled: "⏰ Scheduled tasks",
-    _BACK: "🔙 Back",
+    _BACK: "⬅️ Back",
     _RECORDS: "🗄 Records",
-    _ADD: "➕ Add new",
+    _ADD: "🆕 Add new",
+    _NEXT: "➡️ Next",
+    _CANCEL: "❌ Cancel",
     _SUBMIT: "✅ Submit",
   }

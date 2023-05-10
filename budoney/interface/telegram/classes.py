@@ -37,7 +37,7 @@ class TelegramConversationView:
         self.state_name = state_name
         self.handlers = [
             CallbackQueryHandler(self._handle),
-            MessageHandler(text_filters(), self.handle_typed),
+            MessageHandler(text_filters(), self._handle_typed),
         ]
 
     def state(self, message: Message, text: str, edit: bool):
@@ -92,22 +92,56 @@ class TelegramConversationView:
         pass
 
     def handle(self, update: Update, data):
-        pass
-
-    def handle_records(self, update: Update):
-        pass
-
-    def handle_add(self, update: Update):
-        pass
-
-    def handle_submit(self, update: Update):
-        pass
-
-    def handle_typed(self, update: Update, context: CallbackContext):
         print(
             print_label,
-            f"{update.message.chat.first_name} ({update.message.chat.id}) has illegaly typed in state {self.state_name}",
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle",
         )
+
+    def handle_records(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_records",
+        )
+
+    def handle_add(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_add",
+        )
+
+    def handle_next(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_next",
+        )
+
+    def handle_cancel(self, update: Update):
+        pass
+
+    def _handle_cancel(self, update: Update, state):
+        return conversation_views[state].state(
+            update.callback_query.message,
+            "❌ Operation has been cancelled",
+            True,
+        )
+
+    def handle_submit(self, update: Update, state):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_submit",
+        )
+
+    def handle_typed(self, update: Update):
+        print(
+            print_label,
+            f"{update.message.chat.first_name} ({update.message.chat.id}) state {self.state_name} doesn't have handle_typed",
+        )
+
+    def _handle_typed(self, update: Update, context: CallbackContext):
+        telegram_users[update.message.chat.id].operational_sequence.append(
+            self.state_name
+        )
+        self.handle_typed(update)
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
@@ -127,6 +161,16 @@ class TelegramConversationView:
                 "",
                 True,
             )
+        elif data == "_NEXT":
+            telegram_user.operational_sequence.append(self.state_name)
+            return self.handle_next(update)
+        elif data == "_CANCEL":
+            telegram_user.operational_sequence.clear()
+            if len(telegram_user.states_sequence) > 0:
+                state = telegram_user.states_sequence.pop()
+            else:
+                state = "main"
+            return self._handle_cancel(update, state)
         elif data == "_SUBMIT":
             telegram_user.operational_sequence.clear()
             if len(telegram_user.states_sequence) > 0:
@@ -144,7 +188,10 @@ class TelegramConversationView:
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
         else:
-            telegram_user.states_sequence.append(self.state_name)
+            if self.state_name in operational_states:
+                telegram_user.operational_sequence.append(self.state_name)
+            else:
+                telegram_user.states_sequence.append(self.state_name)
             if data in conversation_views:
                 return self.handle(update, data)
             else:
@@ -193,8 +240,9 @@ class DefaultTelegramConversationView(TelegramConversationView):
 
 
 class DatabaseTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, columns: list[list]) -> None:
+    def __init__(self, state_name: str, columns: list[dict]) -> None:
         super().__init__(state_name)
+        self.columns = columns
 
         keyboard = []
 
@@ -216,7 +264,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                 f"{state_name}_RECORDS", state_name
             ),
             "add_record": AddRecordTelegramConversationView(
-                f"{state_name}_ADD", state_name, columns
+                f"{state_name}_ADD", state_name
             ),
         }
 
@@ -253,6 +301,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
 class InfoTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
+        operational_states[state_name] = self
 
         keyboard = []
 
@@ -267,6 +316,7 @@ class InfoTelegramConversationView(TelegramConversationView):
 class GetRecordsTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
+        operational_states[state_name] = self
         self.table_name = table_name
 
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -298,14 +348,19 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
 
 
 class AddRecordTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, table_name, columns: list[list]) -> None:
+    def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
+        operational_states[state_name] = self
         self.table_name = table_name
         keyboard = []
 
-        for column in columns:
+        print(conversation_views[table_name].columns)
+
+        for column in conversation_views[table_name].columns:
             code = f"{state_name}_{column['column']}"
-            InfoTelegramConversationView(code, state_name)
+            operational_states[code] = ChangeRecordTelegramConversationView(
+                code, state_name, table_name, column
+            )
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -317,19 +372,18 @@ class AddRecordTelegramConversationView(TelegramConversationView):
 
         special_handlers = {}
 
-        keyboard.append([back_button, submit_button])
+        keyboard.append([back_button, cancel_button, submit_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
-        self._columns = columns
 
     def keyboard(self) -> InlineKeyboardMarkup:
         return self._keyboard
 
     def handle(self, update: Update, data):
-        return conversation_views["_WIP"].state(
+        return conversation_views[data].state(
             update.callback_query.message,
-            "No support for change yet",
+            "",
             True,
         )
 
@@ -342,8 +396,36 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         )
 
 
+class ChangeRecordTelegramConversationView(TelegramConversationView):
+    def __init__(
+        self, state_name: str, parent_state_name: str, table_name, column
+    ) -> None:
+        super().__init__(state_name)
+        operational_states[state_name] = self
+        self.parent_state_name = parent_state_name
+        self.table_name = table_name
+        self.column = column
+        keyboard = []
+
+        keyboard.append([back_button, cancel_button])
+
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return self._keyboard
+
+    def handle_typed(self, update: Update):
+        return conversation_views[self.parent_state_name].state(
+            update.message,
+            f"✅ Successfully added {update.message.text} for column {self.column['column']}",
+            False,
+        )
+
+
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, TelegramConversationView]" = {}
+
+operational_states = {}
 
 # special handlers that don't have view
 back_button = InlineKeyboardButton(
@@ -357,6 +439,14 @@ records_button = InlineKeyboardButton(
 add_button = InlineKeyboardButton(
     callback_data="_ADD",
     text=localization["states"].get("_ADD", "_ADD"),
+)
+next_button = InlineKeyboardButton(
+    callback_data="_NEXT",
+    text=localization["states"].get("_NEXT", "_NEXT"),
+)
+cancel_button = InlineKeyboardButton(
+    callback_data="_CANCEL",
+    text=localization["states"].get("_CANCEL", "_CANCEL"),
 )
 submit_button = InlineKeyboardButton(
     callback_data="_SUBMIT",

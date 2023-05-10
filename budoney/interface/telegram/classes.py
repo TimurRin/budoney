@@ -21,11 +21,29 @@ def conversation_filter():
     return Filters.chat(chat_id=configs.telegram["authorized"])
 
 
+def check_record_params(state, records):
+    print(
+        state.state_name,
+        state.table_name,
+        conversation_views[state.table_name].columns,
+        records,
+    )
+    if state.table_name not in records:
+        records[state.table_name] = {}
+    for column in conversation_views[state.table_name].columns:
+        if column["column"] not in records[state.table_name]:
+            print(f"{column['column']} is not typed")
+            return conversation_views[f"{state.state_name}_{column['column']}"]
+    print("everything is typed")
+    return state
+
+
 class TelegramUser:
     name: str = "User"
     state: str = "none"
     states_sequence = deque()
     operational_sequence = deque()
+    records: dict = {}
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -57,7 +75,7 @@ class TelegramConversationView:
             + f"{localization['states'].get(self.state_name, self.state_name)}"
         )
 
-        state_text = self.state_text()
+        state_text = self.state_text(telegram_users[message.chat.id])
         if state_text:
             result_text = result_text + "\n\n" + state_text
 
@@ -85,7 +103,7 @@ class TelegramConversationView:
 
         return text + "\n"
 
-    def state_text(self):
+    def state_text(self, telegram_user):
         return ""
 
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -141,7 +159,7 @@ class TelegramConversationView:
         telegram_users[update.message.chat.id].operational_sequence.append(
             self.state_name
         )
-        self.handle_typed(update)
+        return self.handle_typed(update)
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
@@ -291,7 +309,11 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         )
 
     def handle_add(self, update: Update):
-        return self._special_handlers["add_record"].state(
+        state = check_record_params(
+            self._special_handlers["add_record"],
+            telegram_users[update.callback_query.message.chat.id].records,
+        )
+        return state.state(
             update.callback_query.message,
             "",
             True,
@@ -325,7 +347,7 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         records = DATABASE_DRIVER.get_records(self.table_name)
         for record in records:
             keyboard.append(
-                [InlineKeyboardButton(callback_data=record["id"], text=record["id"])]
+                [InlineKeyboardButton(callback_data=record["id"], text=str(record))]
             )
 
         keyboard.append([back_button, add_button])
@@ -340,7 +362,11 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         )
 
     def handle_add(self, update: Update):
-        return conversation_views[f"{self.table_name}_ADD"].state(
+        state = check_record_params(
+            conversation_views[f"{self.table_name}_ADD"],
+            telegram_users[update.callback_query.message.chat.id].records,
+        )
+        return state.state(
             update.callback_query.message,
             "",
             True,
@@ -377,6 +403,9 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
 
+    def state_text(self, telegram_user):
+        return f"{self.table_name} {telegram_user.records[self.table_name]}"
+
     def keyboard(self) -> InlineKeyboardMarkup:
         return self._keyboard
 
@@ -387,8 +416,12 @@ class AddRecordTelegramConversationView(TelegramConversationView):
             True,
         )
 
+    def handle_cancel(self, update: Update):
+        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
+
     def handle_submit(self, update: Update, state):
-        DATABASE_DRIVER.append_data(self.table_name, {})
+        DATABASE_DRIVER.append_data(self.table_name, telegram_users[update.callback_query.message.chat.id].records[self.table_name])
+        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
         return conversation_views[state].state(
             update.callback_query.message,
             "✅ The record has been added successfully",
@@ -411,11 +444,23 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
+    def state_text(self, telegram_user):
+        return f"{self.table_name} {telegram_user.records[self.table_name]}"
+
     def keyboard(self) -> InlineKeyboardMarkup:
         return self._keyboard
 
+    def handle_cancel(self, update: Update):
+        telegram_users[update.callback_query.message.chat.id].records[self.table_name] = None
+
     def handle_typed(self, update: Update):
-        return conversation_views[self.parent_state_name].state(
+        telegram_users[update.message.chat.id].records[self.table_name][self.column['column']] = update.message.text
+        state = check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.message.chat.id].records,
+        )
+        print("next state is " + state.state_name)
+        return state.state(
             update.message,
             f"✅ Successfully added {update.message.text} for column {self.column['column']}",
             False,

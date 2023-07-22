@@ -8,5 +8,6 @@ def init():
         "organizations",
         [
             {"column": "name", "type": "text"},
+            {"column": "emoji", "type": "text", "skippable": True},
         ],
     )

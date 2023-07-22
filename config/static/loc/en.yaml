@@ -32,6 +32,7 @@ states:
     _RECORDS: "🗄 See all",
     _ADD: "🆕 Add",
     _NEXT: "➡️ Next",
+    _SKIP: "🦥 Skip",
     _CANCEL: "❌ Cancel",
     _SUBMIT: "✅ Submit",
   }

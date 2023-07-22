@@ -18,6 +18,13 @@ def init():
             ],
         ],
     ),
+    DatabaseTelegramConversationView(
+        "currencies",
+        [
+            {"column": "name", "type": "text"},
+            {"column": "code", "type": "text"},
+        ],
+    ),
     DefaultTelegramConversationView(
         "transactions",
         [
@@ -54,6 +61,12 @@ def init():
                 "type": "data",
                 "data_type": "financial_accounts",
             },
+            {
+                "column": "payment_card",
+                "type": "data",
+                "data_type": "payment_cards",
+                "conditions": [("specified", "financial_account")],
+            },
             {"column": "organization", "type": "data", "data_type": "organizations"},
             {"column": "description", "type": "text"},
         ],
@@ -80,8 +93,13 @@ def init():
     DatabaseTelegramConversationView(
         "financial_accounts",
         [
-            {"column": "number", "type": "text"},
-            {"column": "operator", "type": "data", "data_type": "organizations"},
+            {"column": "number", "type": "text", "id_composition": True},
+            {
+                "column": "operator",
+                "type": "data",
+                "data_type": "organizations",
+                "id_composition": True,
+            },
             {
                 "column": "type",
                 "type": "select",
@@ -89,13 +107,14 @@ def init():
             },
             {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "credit", "type": "boolean"},
+            {"column": "owner", "type": "data", "data_type": "people"},
         ],
     ),
     DatabaseTelegramConversationView(
         "payment_cards",
         [
-            {"column": "name", "type": "text"},
-            {"column": "number", "type": "int"},
+            {"column": "name", "type": "text", "id_composition": True},
+            {"column": "number", "type": "int", "id_composition": True},
             {
                 "column": "financial_account",
                 "type": "data",
@@ -107,11 +126,13 @@ def init():
                 "select": [
                     "VISA",
                     "MASTERCARD",
+                    "MAESTRO",
                     "AMERICAEXPRESS",
                     "MIR",
                     "UNIONPAY",
-                    "CUSTOM",
                 ],
+                "id_composition": True,
             },
+            {"column": "owner", "type": "data", "data_type": "people"},
         ],
     ),

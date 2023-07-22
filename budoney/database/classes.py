@@ -13,3 +13,6 @@ class Database:
 
     def append_data(self, table, data):
         pass
+
+    def create_table(self, table_name, columns):
+        pass

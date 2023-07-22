@@ -1,10 +1,13 @@
 from database.memory import MemoryDatabase
+from database.sqlite import SQLiteDatabase
 import configs
 
 print_label: str = "[budoney :: Database]"
 
-DATABASE_ENGINE = "memory"
+DATABASE_ENGINE = "sqlite"
 DATABASE_DRIVER = None
 print(print_label, "DATABASE_ENGINE", DATABASE_ENGINE)
 if DATABASE_ENGINE == "memory":
-    DATABASE_DRIVER = MemoryDatabase()
+    DATABASE_DRIVER = MemoryDatabase("data/memory")
+elif DATABASE_ENGINE == "sqlite":
+    DATABASE_DRIVER = SQLiteDatabase("data/budoney.sqlite")

@@ -8,6 +8,6 @@ def init():
         "people",
         [
             {"column": "name", "type": "text"},
-            {"column": "emoji", "type": "text"},
+            {"column": "emoji", "type": "text", "skippable": True},
         ],
     )

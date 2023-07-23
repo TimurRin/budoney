@@ -64,6 +64,7 @@ class TelegramConversationView:
     def __init__(self, state_name: str) -> None:
         conversation_views[state_name] = self
         self.state_name = state_name
+        self.skip_to_records = False
         self.handle_anything = False
         self.handlers = [
             CallbackQueryHandler(self._handle),
@@ -297,7 +298,9 @@ class DefaultTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
     def handle(self, update: Update, data):
-        return conversation_views[data].state(
+        return conversation_views[
+            conversation_views[data].skip_to_records and f"{data}_RECORDS" or data
+        ].state(
             update.callback_query.message,
             "",
             True,
@@ -316,8 +319,12 @@ class DatabaseTelegramConversationView(TelegramConversationView):
 
         DATABASE_DRIVER.create_table(state_name, columns)
 
+        skip_to_records = True
+
         for column in columns:
             if "aggregate" in column:
+                if skip_to_records:
+                    skip_to_records = False
                 aggregated_columns.append(column["column"])
                 code = f"{state_name}_STATS_{column['column']}"
                 stats_view = DatabaseStatsTelegramConversationView(
@@ -332,6 +339,8 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                         )
                     ]
                 )
+
+        self.skip_to_records = skip_to_records
 
         special_handlers = {
             "get_records": GetRecordsTelegramConversationView(

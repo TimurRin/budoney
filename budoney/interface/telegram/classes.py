@@ -633,7 +633,8 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
 
     def state_name_text_short(self):
         return localization["states"].get(
-            f"{self.table_name}_PARAM_SHORT_{self.column['column']}", self.state_name
+            f"{self.table_name}_PARAM_SHORT_{self.column['column']}",
+            super().state_name_text(),
         )
 
     def state_text(self, telegram_user):

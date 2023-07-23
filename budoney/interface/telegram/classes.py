@@ -471,7 +471,14 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         records = DATABASE_DRIVER.get_records(self.table_name)
         for record in records:
             keyboard.append(
-                [InlineKeyboardButton(callback_data=record["id"], text=str(record))]
+                [
+                    InlineKeyboardButton(
+                        callback_data=record["id"],
+                        text=conversation_views[self.table_name].display_func
+                        and conversation_views[self.table_name].display_func(record)
+                        or str(record),
+                    )
+                ]
             )
 
         keyboard.append([back_button, add_button])
@@ -542,8 +549,16 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
 
+    def record_display(self, record):
+        print(self.table_name, str(record))
+        return (
+            conversation_views[self.table_name].display_func
+            and conversation_views[self.table_name].display_func(record)
+            or str(record)
+        )
+
     def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}"
+        return f"<u>Preview</u>\n{self.record_display(telegram_user.records[self.table_name])}"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -594,9 +609,26 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         self.table_name = table_name
         self.column = column
         self.handle_anything = True
+        self._help_text = "Set your value below"
+
+    def record_display(self, record):
+        print(self.table_name, str(record))
+        return (
+            conversation_views[self.table_name].display_func
+            and conversation_views[self.table_name].display_func(record)
+            or str(record)
+        )
+
+    def state_name_text(self):
+        return f"{localization['states'].get(self.parent_state_name, self.parent_state_name)} > {localization['states'].get(self.state_name, self.state_name)}"
+
+    def state_name_text_short(self):
+        return localization["states"].get(
+            f"{self.table_name}_PARAM_SHORT_{self.column['column']}", self.state_name
+        )
 
     def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSet your value below or skip it to the next value"
+        return f"<u>Preview</u>\n{self.record_display(telegram_user.records[self.table_name])}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
 
     def verify_next(self, message: Message, data):
         check_record_params(
@@ -676,9 +708,7 @@ class ChangeTextRecordTelegramConversationView(ChangeRecordTelegramConversationV
         keyboard.append(controls)
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
-
-    def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nType your value below or skip it to the next value"
+        self._help_text = "Type your value below or skip it to the next value"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -714,9 +744,7 @@ class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversati
         keyboard.append(controls)
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
-
-    def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below"
+        self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -745,9 +773,7 @@ class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversatio
         keyboard.append(controls)
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
-
-    def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below"
+        self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -758,9 +784,7 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-
-    def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below or type to find"
+        self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -785,9 +809,7 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-
-    def state_text(self, telegram_user):
-        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below or type to find"
+        self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []

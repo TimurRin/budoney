@@ -41,14 +41,24 @@ class SQLiteDatabase(Database):
         self.cursor.execute(query)
         return dict(self.cursor.fetchone())
 
-    def get_records(self, table):
+    def get_records(self, table, offset=0, limit=0):
         query = f"SELECT * FROM {table}"
+        if limit > 0:
+            query += " LIMIT " + str(limit)
+        if offset > 0:
+            query += " OFFSET " + str(offset)
         print("get_records", query)
         self.cursor.execute(query)
         records = list()
         for record in self.cursor.fetchall():
             records.append(dict(record))
         return records
+
+    def get_records_count(self, table):
+        query = f"SELECT COUNT(*) FROM {table}"
+        print("get_records_count", query)
+        self.cursor.execute(query)
+        return self.cursor.fetchone()[0]
 
     def replace_data(self, table, record_id, data):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])

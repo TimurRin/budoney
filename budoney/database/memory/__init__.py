@@ -18,9 +18,13 @@ class MemoryDatabase(Database):
         self._check_table(table)
         return record_id in self.db["data"][table] and self.db["data"][table] or None
 
-    def get_records(self, table):
+    def get_records(self, table, offset=0, limit=0):
         self._check_table(table)
         return list(self.db["data"][table].values())
+
+    def get_records_count(self, table):
+        self._check_table(table)
+        return len(list(self.db["data"][table].values()))
 
     def replace_data(self, table, record_id, data):
         self._check_table(table)

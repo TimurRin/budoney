@@ -7,6 +7,7 @@ from database import DATABASE_DRIVER
 import utils.date_utils as date_utils
 from datetime import datetime, timedelta
 import configs
+import math
 
 print_label: str = "[budoney :: Telegram Interface]"
 
@@ -39,25 +40,25 @@ def check_record_params(state, telegram_user):
     return state
 
 
-class TelegramUser:
-    name: str
-    state: str
-    old_state: str
-    states_sequence: deque
-    operational_sequence: deque
-    records: dict
-    ignore_fast: dict[str, dict[str, bool]]
-    date_offset: int
+class Pagination:
+    def __init__(self) -> None:
+        self.offset: int = 0
+        self.limit: int = 5
+        self.total: int = 0
+        self.pages: int = 0
 
+
+class TelegramUser:
     def __init__(self, name: str) -> None:
-        self.name = name
-        self.state = "none"
-        self.old_state = "none"
-        self.states_sequence = deque()
-        self.operational_sequence = deque()
+        self.name: str = name
+        self.state: str = "none"
+        self.old_state: str = "none"
+        self.states_sequence: deque = deque()
+        self.operational_sequence: deque = deque()
         self.records: dict = dict()
-        self.ignore_fast = dict()
-        self.date_offset = 0
+        self.ignore_fast: dict[str, dict[str, bool]] = dict()
+        self.pagination: dict[str, Pagination] = dict()
+        self.date_offset: int = 0
 
 
 class TelegramConversationView:
@@ -473,12 +474,23 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         super().__init__(state_name)
         operational_states[state_name] = self
         self.table_name = table_name
+        self.handle_anything = True
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
-        records = DATABASE_DRIVER.get_records(self.table_name)
-        for record in records:
+        if not (self.table_name in telegram_users[message.chat.id].pagination):
+            telegram_users[message.chat.id].pagination[self.table_name] = Pagination()
+
+        pagination = telegram_users[message.chat.id].pagination[self.table_name]
+
+        pagination.total = DATABASE_DRIVER.get_records_count(self.table_name)
+        pagination.pages = math.ceil(pagination.total / pagination.limit)
+
+        records = DATABASE_DRIVER.get_records(
+            self.table_name, offset=pagination.offset, limit=pagination.limit
+        )
+        for record, index in enumerate(records):
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -490,16 +502,47 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
                 ]
             )
 
+        if pagination.pages > 0:
+            keyboard.append(
+                [
+                    InlineKeyboardButton("⬅️", callback_data="_PAGE_BACKWARD"),
+                    InlineKeyboardButton("➡️", callback_data="_PAGE_FORWARD"),
+                ]
+            )
+
         keyboard.append([back_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
 
     def handle(self, update: Update, data):
-        return conversation_views["_WIP"].state(
-            update.callback_query.message,
-            "No support for view yet",
-            True,
-        )
+        pagination = telegram_users[update.callback_query.message.chat.id].pagination[
+            self.table_name
+        ]
+
+        options_changed = False
+        data_button = False
+
+        if data == "_PAGE_BACKWARD":
+            if pagination.offset >= pagination.limit:
+                options_changed = True
+                pagination.offset = max(pagination.offset - pagination.limit, 0)
+        elif data == "_PAGE_FORWARD":
+            if pagination.offset < pagination.total - pagination.limit:
+                options_changed = True
+                pagination.offset = min(
+                    pagination.offset + pagination.limit, pagination.total
+                )
+        else:
+            data_button = True
+
+        if options_changed:
+            return conversation_views[self.state_name].state(
+                update.callback_query.message,
+                "",
+                True,
+            )
+        elif data_button:
+            pass
 
     def handle_add(self, update: Update):
         state = check_record_params(
@@ -898,8 +941,6 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
                     ].date_offset = 0
         else:
             date_button = True
-
-        print(data, "options_changed", options_changed, "date_button", date_button)
 
         if options_changed:
             return conversation_views[self.state_name].state(

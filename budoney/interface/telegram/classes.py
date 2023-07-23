@@ -4,6 +4,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler, MessageHandler, Filters
 from loc import localization
 from database import DATABASE_DRIVER
+import utils.date_utils as date_utils
+from datetime import datetime, timedelta
 import configs
 
 print_label: str = "[budoney :: Telegram Interface]"
@@ -32,26 +34,30 @@ def check_record_params(state, telegram_user):
             or not telegram_user.ignore_fast[state.table_name][column["column"]]
         ):
             print(f"{column['column']} is not typed")
-            return conversation_views[f"{state.state_name}_{column['column']}"]
+            return conversation_views[f"{state.table_name}_PARAM_{column['column']}"]
     print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
     return state
 
 
 class TelegramUser:
-    name: str = "User"
-    state: str = "none"
+    name: str
+    state: str
+    old_state: str
     states_sequence: deque
     operational_sequence: deque
     records: dict
     ignore_fast: dict[str, dict[str, bool]]
+    date_offset: int
 
     def __init__(self, name: str) -> None:
         self.name = name
         self.state = "none"
+        self.old_state = "none"
         self.states_sequence = deque()
         self.operational_sequence = deque()
         self.records: dict = dict()
         self.ignore_fast = dict()
+        self.date_offset = 0
 
 
 class TelegramConversationView:
@@ -69,6 +75,9 @@ class TelegramConversationView:
             print_label,
             f"{message.chat.first_name} ({message.chat.id}) has moved from '{telegram_users[message.chat.id].state}' to '{self.state_name}'",
         )
+        telegram_users[message.chat.id].old_state = telegram_users[
+            message.chat.id
+        ].state
         telegram_users[message.chat.id].state = self.state_name
 
         result_text = self.debug_text(telegram_users[message.chat.id]) or ""
@@ -76,10 +85,7 @@ class TelegramConversationView:
         if text:
             result_text = result_text + text + "\n\n"
 
-        result_text = (
-            result_text
-            + f"<b>{localization['states'].get(self.state_name, self.state_name)}</b>"
-        )
+        result_text = result_text + f"<b>{self.state_name_text()}</b>"
 
         state_text = self.state_text(telegram_users[message.chat.id])
         if state_text:
@@ -88,19 +94,25 @@ class TelegramConversationView:
         if edit:
             try:
                 message.edit_text(
-                    result_text, reply_markup=self.keyboard(), parse_mode="html"
+                    result_text, reply_markup=self.keyboard(message), parse_mode="html"
                 )
             except:
                 message.reply_text(
-                    result_text, reply_markup=self.keyboard(), parse_mode="html"
+                    result_text, reply_markup=self.keyboard(message), parse_mode="html"
                 )
         else:
             message.reply_text(
-                result_text, reply_markup=self.keyboard(), parse_mode="html"
+                result_text, reply_markup=self.keyboard(message), parse_mode="html"
             )
         return self.state_name
 
-    def debug_text(self, user):
+    def state_name_text(self):
+        return localization["states"].get(self.state_name, self.state_name)
+
+    def state_name_text_short(self):
+        return self.state_name_text()
+
+    def debug_text(self, user: TelegramUser):
         if configs.general["production_mode"]:
             return ""
 
@@ -112,13 +124,14 @@ class TelegramConversationView:
             + f"- operational_sequence: <code>{str(user.operational_sequence)}</code>\n"
         )
         text = text + f"- state: <code>{str(user.state)}</code>\n"
+        text = text + f"- records: <code>{str(user.records)}</code>\n"
 
         return text + "\n"
 
     def state_text(self, telegram_user):
         return ""
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         pass
 
     def handle(self, update: Update, data):
@@ -228,16 +241,28 @@ class TelegramConversationView:
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
         else:
-            if self.state_name in operational_states:
-                telegram_user.operational_sequence.append(self.state_name)
-            else:
-                telegram_user.states_sequence.append(self.state_name)
+            if (
+                telegram_users[update.callback_query.message.chat.id].state
+                != telegram_users[update.callback_query.message.chat.id].old_state
+            ):
+                if self.state_name in operational_states:
+                    if (
+                        len(telegram_user.operational_sequence) == 0
+                        or telegram_user.operational_sequence[-1] != self.state_name
+                    ):
+                        telegram_user.operational_sequence.append(self.state_name)
+                else:
+                    if (
+                        len(telegram_user.states_sequence) == 0
+                        or telegram_user.states_sequence[-1] != self.state_name
+                    ):
+                        telegram_user.states_sequence.append(self.state_name)
             if data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
             else:
                 return conversation_views["_WIP"].state(
                     update.callback_query.message,
-                    f"⚠️ State '<b>{data}</b>' doesn't exist. Go back to '<b>{telegram_user.states_sequence[-1]}</b>' state",
+                    f"⚠️ State '<b>{data}</b>' doesn't exist",
                     True,
                 )
 
@@ -268,7 +293,7 @@ class DefaultTelegramConversationView(TelegramConversationView):
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
 
     def handle(self, update: Update, data):
@@ -295,12 +320,15 @@ class DatabaseTelegramConversationView(TelegramConversationView):
             if "aggregate" in column:
                 aggregated_columns.append(column["column"])
                 code = f"{state_name}_STATS_{column['column']}"
-                DatabaseStatsTelegramConversationView(code, columns)
+                stats_view = DatabaseStatsTelegramConversationView(
+                    code, state_name, column, columns
+                )
+
                 keyboard.append(
                     [
                         InlineKeyboardButton(
                             callback_data=code,
-                            text=localization["states"].get(code, code),
+                            text=stats_view.state_name_text_short(),
                         )
                     ]
                 )
@@ -319,7 +347,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
 
     def handle(self, update: Update, data):
@@ -349,23 +377,41 @@ class DatabaseTelegramConversationView(TelegramConversationView):
 
 
 class DatabaseStatsTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, columns: list[dict]) -> None:
+    def __init__(
+        self, state_name: str, parent_state_name, agg_column, columns: list[dict]
+    ) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
+        self.parent_state_name = parent_state_name
+        self.agg_column = agg_column
         self.columns = columns
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def state_name_text(self):
+        return "Report: " + localization["states"].get(
+            f"{self.parent_state_name}_PARAM_{self.agg_column['column']}",
+            self.state_name,
+        )
+
+    def state_name_text_short(self):
+        return "Report: " + localization["states"].get(
+            f"{self.parent_state_name}_PARAM_SHORT_{self.agg_column['column']}",
+            self.state_name,
+        )
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         for column in self.columns:
             if column["type"] == "data" or column["type"] == "date":
                 code = f"{self.state_name}_GROUPBY_{column['column']}"
-                InfoTelegramConversationView(code, self.state_name)
+                info_view = InfoTelegramConversationView(
+                    code, column, self.state_name, self.parent_state_name
+                )
                 keyboard.append(
                     [
                         InlineKeyboardButton(
                             callback_data=code,
-                            text=localization["states"].get(code, code),
+                            text=info_view.state_name_text_short(),
                         )
                     ]
                 )
@@ -376,9 +422,15 @@ class DatabaseStatsTelegramConversationView(TelegramConversationView):
 
 
 class InfoTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, table_name) -> None:
+    def __init__(
+        self, state_name: str, groupby_column, parent_state_name, grandparent_state_name
+    ) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
+
+        self.groupby_column = groupby_column
+        self.parent_state_name = parent_state_name
+        self.grandparent_state_name = grandparent_state_name
 
         keyboard = []
 
@@ -386,7 +438,24 @@ class InfoTelegramConversationView(TelegramConversationView):
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def state_name_text(self):
+        return (
+            f"{conversation_views[self.parent_state_name].state_name_text()} by "
+            + localization["states"].get(
+                f"{self.grandparent_state_name}_PARAM_{self.groupby_column['column']}",
+                self.state_name,
+            )
+        )
+
+    def state_name_text_short(self):
+        return f"{conversation_views[self.parent_state_name].state_name_text_short()} by " + localization[
+            "states"
+        ].get(
+            f"{self.grandparent_state_name}_PARAM_SHORT_{self.groupby_column['column']}",
+            self.state_name,
+        )
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
 
 
@@ -396,7 +465,7 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         operational_states[state_name] = self
         self.table_name = table_name
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         records = DATABASE_DRIVER.get_records(self.table_name)
@@ -436,7 +505,7 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         keyboard = []
 
         for column in conversation_views[table_name].columns:
-            code = f"{state_name}_{column['column']}"
+            code = f"{table_name}_PARAM_{column['column']}"
             if column["type"] == "boolean":
                 operational_states[code] = ChangeBooleanRecordTelegramConversationView(
                     code, state_name, table_name, column
@@ -447,6 +516,10 @@ class AddRecordTelegramConversationView(TelegramConversationView):
                 )
             elif column["type"] == "data":
                 operational_states[code] = ChangeDataRecordTelegramConversationView(
+                    code, state_name, table_name, column
+                )
+            elif column["type"] == "date":
+                operational_states[code] = ChangeDateRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
             else:
@@ -472,7 +545,7 @@ class AddRecordTelegramConversationView(TelegramConversationView):
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}"
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
 
     def handle(self, update: Update, data):
@@ -525,9 +598,6 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}\nSet your value below or skip it to the next value"
 
-    def keyboard(self) -> InlineKeyboardMarkup:
-        return self._keyboard
-
     def verify_next(self, message: Message, data):
         check_record_params(
             conversation_views[self.parent_state_name],
@@ -536,7 +606,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         if (
             self.column["type"] == "number"
             or self.column["type"] == "data"
-            or self.column["type"] == "date"
+            # or self.column["type"] == "date"
         ):
             parsed_data = int(data)
         elif self.column["type"] == "float":
@@ -610,6 +680,9 @@ class ChangeTextRecordTelegramConversationView(ChangeRecordTelegramConversationV
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}\nType your value below or skip it to the next value"
 
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        return self._keyboard
+
 
 class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversationView):
     def __init__(
@@ -645,6 +718,9 @@ class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversati
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below"
 
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        return self._keyboard
+
 
 class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversationView):
     def __init__(
@@ -673,6 +749,9 @@ class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversatio
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below"
 
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        return self._keyboard
+
 
 class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationView):
     def __init__(
@@ -683,7 +762,7 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
     def state_text(self, telegram_user):
         return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below or type to find"
 
-    def keyboard(self) -> InlineKeyboardMarkup:
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         print(self.column)
@@ -699,6 +778,105 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
         keyboard.append(controls)
 
         return InlineKeyboardMarkup(keyboard)
+
+
+class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+    def __init__(
+        self, state_name: str, parent_state_name: str, table_name, column
+    ) -> None:
+        super().__init__(state_name, parent_state_name, table_name, column)
+
+    def state_text(self, telegram_user):
+        return f"{self.table_name} {telegram_user.records[self.table_name]}\nSelect your value below or type to find"
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        date_offset = telegram_users[message.chat.id].date_offset
+
+        today = datetime.today()
+
+        dates = date_utils.date_range(
+            today - timedelta(days=(date_offset * 3 + 2)),
+            today - timedelta(days=(date_offset * 3)),
+        )
+
+        for date in dates:
+            date_string = date.strftime("%Y-%m-%d (%a)")
+            days_ago = (today - date).days
+            if days_ago == 0:
+                date_string = f"{date_string}, today"
+            elif days_ago == 1:
+                date_string = f"{date_string}, yesterday"
+            elif days_ago == -1:
+                date_string = f"{date_string}, tomorrow"
+            else:
+                date_string = f"{date_string}, {days_ago}d ago"
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        date_string,
+                        callback_data=int(date.timestamp()),
+                    )
+                ]
+            )
+
+        keyboard.append(
+            [
+                # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
+                InlineKeyboardButton("⬅️", callback_data="_DATE_BACKWARD"),
+                InlineKeyboardButton(
+                    date_offset > 0 and "Last 3d" or "🌫️", callback_data="_DATE_TODAY"
+                ),
+                InlineKeyboardButton(
+                    date_offset > 0 and "➡️" or "🌫️", callback_data="_DATE_FORWARD"
+                ),
+                # InlineKeyboardButton(date_offset > 2 and "⏩" or "🌫️", callback_data="_DATE_REWIND_FORWARD"),
+            ]
+        )
+
+        controls = [back_button, cancel_button]
+        if "skippable" in self.column and self.column["skippable"]:
+            controls.append(skip_button)
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
+
+    def handle(self, update: Update, data):
+        options_changed = False
+        date_button = False
+
+        if data == "_DATE_TODAY":
+            if telegram_users[update.callback_query.message.chat.id].date_offset > 0:
+                options_changed = True
+                telegram_users[update.callback_query.message.chat.id].date_offset = 0
+        elif data == "_DATE_BACKWARD":
+            options_changed = True
+            telegram_users[update.callback_query.message.chat.id].date_offset += 1
+        elif data == "_DATE_FORWARD":
+            if telegram_users[update.callback_query.message.chat.id].date_offset > 0:
+                options_changed = True
+                telegram_users[update.callback_query.message.chat.id].date_offset -= 1
+                if (
+                    telegram_users[update.callback_query.message.chat.id].date_offset
+                    < 0
+                ):
+                    telegram_users[
+                        update.callback_query.message.chat.id
+                    ].date_offset = 0
+        else:
+            date_button = True
+
+        print(data, "options_changed", options_changed, "date_button", date_button)
+
+        if options_changed:
+            return conversation_views[self.state_name].state(
+                update.callback_query.message,
+                "",
+                True,
+            )
+        elif date_button:
+            return self.verify_next(update.callback_query.message, data)
 
 
 telegram_users: "dict[Any, TelegramUser]" = {}

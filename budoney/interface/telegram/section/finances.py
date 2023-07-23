@@ -142,7 +142,6 @@ def init():
     DatabaseTelegramConversationView(
         "payment_cards",
         [
-            {"column": "name", "type": "text", "id_composition": True},
             {"column": "number", "type": "int", "id_composition": True},
             {
                 "column": "financial_account",

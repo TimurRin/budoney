@@ -294,20 +294,16 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         for column in columns:
             if "aggregate" in column:
                 aggregated_columns.append(column["column"])
-
-        for column in columns:
-            if column["type"] == "data" or column["type"] == "date":
-                for agg_column_name in aggregated_columns:
-                    code = f"{state_name}_{agg_column_name}_GROUPBY_{column['column']}"
-                    InfoTelegramConversationView(code, state_name)
-                    keyboard.append(
-                        [
-                            InlineKeyboardButton(
-                                callback_data=code,
-                                text=localization["states"].get(code, code),
-                            )
-                        ]
-                    )
+                code = f"{state_name}_STATS_{column['column']}"
+                DatabaseStatsTelegramConversationView(code, columns)
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            callback_data=code,
+                            text=localization["states"].get(code, code),
+                        )
+                    ]
+                )
 
         special_handlers = {
             "get_records": GetRecordsTelegramConversationView(
@@ -350,6 +346,33 @@ class DatabaseTelegramConversationView(TelegramConversationView):
             "",
             True,
         )
+
+
+class DatabaseStatsTelegramConversationView(TelegramConversationView):
+    def __init__(self, state_name: str, columns: list[dict]) -> None:
+        super().__init__(state_name)
+        operational_states[state_name] = self
+        self.columns = columns
+
+    def keyboard(self) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        for column in self.columns:
+            if column["type"] == "data" or column["type"] == "date":
+                code = f"{self.state_name}_GROUPBY_{column['column']}"
+                InfoTelegramConversationView(code, self.state_name)
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            callback_data=code,
+                            text=localization["states"].get(code, code),
+                        )
+                    ]
+                )
+
+        keyboard.append([back_button])
+
+        return InlineKeyboardMarkup(keyboard)
 
 
 class InfoTelegramConversationView(TelegramConversationView):

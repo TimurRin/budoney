@@ -73,6 +73,12 @@ class SQLiteDatabase(Database):
             for column in columns
         ]
 
+        for column in columns:
+            if column["type"] == "data":
+                column_definitions.append(
+                    f"FOREIGN KEY ({column['column']}) REFERENCES {column['data_type']} (id) ON DELETE CASCADE"
+                )
+
         query = f"CREATE TABLE IF NOT EXISTS {table_name} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join(column_definitions)});"
         print("create_table", query)
 

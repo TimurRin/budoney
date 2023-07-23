@@ -39,55 +39,84 @@ def init():
         "income",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum", "type": "float", "aggregate": True},
             {"column": "currency", "type": "data", "data_type": "currencies"},
+            {"column": "sum", "type": "float", "aggregate": True},
             {
                 "column": "financial_account",
                 "type": "data",
                 "data_type": "financial_accounts",
+                "conditions": [
+                    {
+                        "type": "equals",
+                        "our_column": "currency",
+                        "their_column": "currency",
+                    }
+                ],
             },
             {"column": "organization", "type": "data", "data_type": "organizations"},
-            {"column": "description", "type": "text"},
+            {"column": "description", "type": "text", "skippable": True},
         ],
     ),
     DatabaseTelegramConversationView(
         "expenses",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum", "type": "float", "aggregate": True},
             {"column": "currency", "type": "data", "data_type": "currencies"},
+            {"column": "sum", "type": "float", "aggregate": True},
             {
                 "column": "financial_account",
                 "type": "data",
                 "data_type": "financial_accounts",
+                "conditions": [
+                    {
+                        "type": "equals",
+                        "our_column": "currency",
+                        "their_column": "currency",
+                    }
+                ],
             },
             {
                 "column": "payment_card",
                 "type": "data",
                 "data_type": "payment_cards",
-                "conditions": [("specified", "financial_account")],
+                "conditions": [
+                    {
+                        "type": "equals",
+                        "our_column": "financial_account",
+                        "their_column": "financial_account",
+                    }
+                ],
+                "skippable": True,
             },
             {"column": "organization", "type": "data", "data_type": "organizations"},
-            {"column": "description", "type": "text"},
+            {"column": "description", "type": "text", "skippable": True},
         ],
     ),
     DatabaseTelegramConversationView(
         "transfers",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum", "type": "float", "aggregate": True},
-            {"column": "currency", "type": "data", "data_type": "currencies"},
+            {"column": "currency_source", "type": "data", "data_type": "currencies"},
+            {"column": "sum_source", "type": "float", "aggregate": True},
             {
                 "column": "account_source",
                 "type": "data",
                 "data_type": "financial_accounts",
             },
             {
+                "column": "currency_target",
+                "type": "data",
+                "data_type": "currencies",
+                "skippable": True,
+                "if_skipped": "currency_source",
+            },
+            {"column": "sum_target", "type": "float", "aggregate": True},
+            {
                 "column": "account_target",
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "description", "type": "text"},
+            {"column": "description", "type": "text", "skippable": True},
         ],
     ),
     DatabaseTelegramConversationView(
@@ -132,7 +161,6 @@ def init():
                     "UNIONPAY",
                 ],
                 "id_composition": True,
-            },
-            {"column": "owner", "type": "data", "data_type": "people"},
+            }
         ],
     ),

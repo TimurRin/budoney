@@ -476,21 +476,40 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         self.table_name = table_name
         self.handle_anything = True
 
-    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        keyboard = []
+    def state_text(self, telegram_user):
+        if not (self.table_name in telegram_user.pagination):
+            telegram_user.pagination[self.table_name] = Pagination()
 
-        if not (self.table_name in telegram_users[message.chat.id].pagination):
-            telegram_users[message.chat.id].pagination[self.table_name] = Pagination()
-
-        pagination = telegram_users[message.chat.id].pagination[self.table_name]
+        pagination = telegram_user.pagination[self.table_name]
 
         pagination.total = DATABASE_DRIVER.get_records_count(self.table_name)
         pagination.pages = math.ceil(pagination.total / pagination.limit)
+        text = (
+            pagination.total > 0
+            and (
+                pagination.total == 1
+                and (f"Displaying <b>1</b> record")
+                or (
+                    pagination.total > pagination.limit
+                    and (
+                        f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
+                    )
+                    or (f"Displaying <b>{pagination.total}</b> records")
+                )
+            )
+            or "No records found"
+        )
+        return text
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        pagination = telegram_users[message.chat.id].pagination[self.table_name]
 
         records = DATABASE_DRIVER.get_records(
             self.table_name, offset=pagination.offset, limit=pagination.limit
         )
-        for record, index in enumerate(records):
+        for index, record in enumerate(records):
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -502,11 +521,29 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
                 ]
             )
 
-        if pagination.pages > 0:
+        if pagination.pages > 1:
             keyboard.append(
                 [
-                    InlineKeyboardButton("⬅️", callback_data="_PAGE_BACKWARD"),
-                    InlineKeyboardButton("➡️", callback_data="_PAGE_FORWARD"),
+                    InlineKeyboardButton(
+                        (pagination.offset > 0) and "⏪" or "🌫",
+                        callback_data="_PAGE_REWIND",
+                    ),
+                    InlineKeyboardButton(
+                        (pagination.offset > 0) and "◀️" or "🌫",
+                        callback_data="_PAGE_BACKWARD",
+                    ),
+                    InlineKeyboardButton(
+                        (pagination.offset < pagination.total - pagination.limit)
+                        and "▶️"
+                        or "🌫",
+                        callback_data="_PAGE_FORWARD",
+                    ),
+                    InlineKeyboardButton(
+                        (pagination.offset < pagination.total - pagination.limit)
+                        and "⏩"
+                        or "🌫",
+                        callback_data="_PAGE_FASTFORWARD",
+                    ),
                 ]
             )
 
@@ -522,16 +559,26 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         options_changed = False
         data_button = False
 
-        if data == "_PAGE_BACKWARD":
-            if pagination.offset >= pagination.limit:
+        if data == "_PAGE_REWIND":
+            if pagination.offset > 0:
+                options_changed = True
+                pagination.offset = 0
+        elif data == "_PAGE_BACKWARD":
+            if pagination.offset > 0:
                 options_changed = True
                 pagination.offset = max(pagination.offset - pagination.limit, 0)
         elif data == "_PAGE_FORWARD":
             if pagination.offset < pagination.total - pagination.limit:
                 options_changed = True
                 pagination.offset = min(
-                    pagination.offset + pagination.limit, pagination.total
+                    pagination.offset + pagination.limit,
+                    pagination.total,
+                    pagination.total - pagination.limit,
                 )
+        elif data == "_PAGE_FASTFORWARD":
+            if pagination.offset < pagination.total - pagination.limit:
+                options_changed = True
+                pagination.offset = pagination.total - pagination.limit
         else:
             data_button = True
 
@@ -899,12 +946,12 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
         keyboard.append(
             [
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
-                InlineKeyboardButton("⬅️", callback_data="_DATE_BACKWARD"),
+                InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
                     date_offset > 0 and "Last 3d" or "🌫️", callback_data="_DATE_TODAY"
                 ),
                 InlineKeyboardButton(
-                    date_offset > 0 and "➡️" or "🌫️", callback_data="_DATE_FORWARD"
+                    date_offset > 0 and "▶️" or "🌫️", callback_data="_DATE_FORWARD"
                 ),
                 # InlineKeyboardButton(date_offset > 2 and "⏩" or "🌫️", callback_data="_DATE_REWIND_FORWARD"),
             ]

@@ -93,7 +93,7 @@ states:
     financial_accounts_PARAM_SHORT_owner: "Owner",
     payment_cards: "💳 Payment cards",
     payment_cards_RECORDS: "List of payment cards",
-    payment_cards_ADD: "New payment",
+    payment_cards_ADD: "New payment card",
     payment_cards_PARAM_number: "Card number",
     payment_cards_PARAM_SHORT_number: "Number",
     payment_cards_PARAM_financial_account: "Card account",

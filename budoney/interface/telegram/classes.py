@@ -52,7 +52,6 @@ class TelegramUser:
     def __init__(self, name: str) -> None:
         self.name: str = name
         self.state: str = "none"
-        self.old_state: str = "none"
         self.states_sequence: deque = deque()
         self.operational_sequence: deque = deque()
         self.records: dict = dict()
@@ -77,9 +76,6 @@ class TelegramConversationView:
             print_label,
             f"{message.chat.first_name} ({message.chat.id}) has moved from '{telegram_users[message.chat.id].state}' to '{self.state_name}'",
         )
-        telegram_users[message.chat.id].old_state = telegram_users[
-            message.chat.id
-        ].state
         telegram_users[message.chat.id].state = self.state_name
 
         result_text = self.debug_text(telegram_users[message.chat.id]) or ""
@@ -148,6 +144,18 @@ class TelegramConversationView:
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_records",
         )
 
+    def handle_pagination(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_pagination",
+        )
+
+    def handle_date(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_date",
+        )
+
     def handle_add(self, update: Update):
         print(
             print_label,
@@ -190,6 +198,7 @@ class TelegramConversationView:
         )
 
     def _handle_typed(self, update: Update, context: CallbackContext):
+        print("_handle_typed", self.state_name)
         telegram_users[update.message.chat.id].operational_sequence.append(
             self.state_name
         )
@@ -197,6 +206,7 @@ class TelegramConversationView:
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
+        print("_handle", self.state_name, data)
         context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
 
         telegram_user = telegram_users[update.callback_query.message.chat.id]
@@ -219,6 +229,17 @@ class TelegramConversationView:
         elif data == "_SKIP":
             telegram_user.operational_sequence.append(self.state_name)
             return self.handle_skip(update)
+        elif (
+            data == "_PAGE_REWIND"
+            or data == "_PAGE_BACKWARD"
+            or data == "_PAGE_FORWARD"
+            or data == "_PAGE_FASTFORWARD"
+        ):
+            return self.handle_pagination(update, data)
+        elif (
+            data == "_DATE_TODAY" or data == "_DATE_BACKWARD" or data == "_DATE_FORWARD"
+        ):
+            return self.handle_date(update, data)
         elif data == "_CANCEL":
             telegram_user.operational_sequence.clear()
             if len(telegram_user.states_sequence) > 0:
@@ -243,10 +264,9 @@ class TelegramConversationView:
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
         else:
-            if (
-                telegram_users[update.callback_query.message.chat.id].state
-                != telegram_users[update.callback_query.message.chat.id].old_state
-            ):
+            if data in conversation_views and conversation_views[data].skip_to_records:
+                data = f"{data}_RECORDS"
+            if telegram_users[update.callback_query.message.chat.id].state != data:
                 if self.state_name in operational_states:
                     if (
                         len(telegram_user.operational_sequence) == 0
@@ -299,9 +319,7 @@ class DefaultTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
     def handle(self, update: Update, data):
-        return conversation_views[
-            conversation_views[data].skip_to_records and f"{data}_RECORDS" or data
-        ].state(
+        return conversation_views[data].state(
             update.callback_query.message,
             "",
             True,
@@ -551,7 +569,7 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
 
         return InlineKeyboardMarkup(keyboard)
 
-    def handle(self, update: Update, data):
+    def handle_pagination(self, update: Update, data):
         pagination = telegram_users[update.callback_query.message.chat.id].pagination[
             self.table_name
         ]
@@ -964,7 +982,7 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
 
         return InlineKeyboardMarkup(keyboard)
 
-    def handle(self, update: Update, data):
+    def handle_date(self, update: Update, data):
         options_changed = False
         date_button = False
 

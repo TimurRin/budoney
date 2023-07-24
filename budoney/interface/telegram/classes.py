@@ -53,7 +53,8 @@ class TelegramUser:
         self.name: str = name
         self.state: str = "none"
         self.states_sequence: deque = deque()
-        self.operational_sequence: deque = deque()
+        self.operational_sequence: deque[deque] = deque()
+        self.operational_sequence.append(deque())
         self.records: dict = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
@@ -199,7 +200,7 @@ class TelegramConversationView:
 
     def _handle_typed(self, update: Update, context: CallbackContext):
         print("_handle_typed", self.state_name)
-        telegram_users[update.message.chat.id].operational_sequence.append(
+        telegram_users[update.message.chat.id].operational_sequence[-1].append(
             self.state_name
         )
         return self.handle_typed(update)
@@ -212,8 +213,13 @@ class TelegramConversationView:
         telegram_user = telegram_users[update.callback_query.message.chat.id]
 
         if data == "_BACK":
-            if len(telegram_user.operational_sequence) > 0:
-                state = telegram_user.operational_sequence.pop()
+            if len(telegram_user.operational_sequence[-1]) > 0:
+                state = telegram_user.operational_sequence[-1].pop()
+                if (
+                    len(telegram_user.operational_sequence[-1]) == 0
+                    and len(telegram_user.operational_sequence) > 1
+                ):
+                    telegram_user.operational_sequence.pop()
             elif len(telegram_user.states_sequence) > 0:
                 state = telegram_user.states_sequence.pop()
             else:
@@ -224,10 +230,10 @@ class TelegramConversationView:
                 True,
             )
         elif data == "_NEXT":
-            telegram_user.operational_sequence.append(self.state_name)
+            telegram_user.operational_sequence[-1].append(self.state_name)
             return self.handle_next(update)
         elif data == "_SKIP":
-            telegram_user.operational_sequence.append(self.state_name)
+            telegram_user.operational_sequence[-1].append(self.state_name)
             return self.handle_skip(update)
         elif (
             data == "_PAGE_REWIND"
@@ -241,15 +247,27 @@ class TelegramConversationView:
         ):
             return self.handle_date(update, data)
         elif data == "_CANCEL":
-            telegram_user.operational_sequence.clear()
-            if len(telegram_user.states_sequence) > 0:
+            if len(telegram_user.operational_sequence) > 0:
+                if len(telegram_user.operational_sequence) > 1:
+                    telegram_user.operational_sequence.pop()
+                else:
+                    telegram_user.operational_sequence[0].clear()
+            if len(telegram_user.states_sequence[-1]) > 0:
+                state = telegram_user.states_sequence.pop()
+            elif len(telegram_user.states_sequence) > 0:
                 state = telegram_user.states_sequence.pop()
             else:
                 state = "main"
             return self._handle_cancel(update, state)
         elif data == "_SUBMIT":
-            telegram_user.operational_sequence.clear()
-            if len(telegram_user.states_sequence) > 0:
+            if len(telegram_user.operational_sequence) > 0:
+                if len(telegram_user.operational_sequence) > 1:
+                    telegram_user.operational_sequence.pop()
+                else:
+                    telegram_user.operational_sequence[0].clear()
+            if len(telegram_user.states_sequence[-1]) > 0:
+                state = telegram_user.states_sequence.pop()
+            elif len(telegram_user.states_sequence) > 0:
                 state = telegram_user.states_sequence.pop()
             else:
                 state = "main"
@@ -269,10 +287,10 @@ class TelegramConversationView:
             if telegram_users[update.callback_query.message.chat.id].state != data:
                 if self.state_name in operational_states:
                     if (
-                        len(telegram_user.operational_sequence) == 0
-                        or telegram_user.operational_sequence[-1] != self.state_name
+                        len(telegram_user.operational_sequence[-1]) == 0
+                        or telegram_user.operational_sequence[-1][-1] != self.state_name
                     ):
-                        telegram_user.operational_sequence.append(self.state_name)
+                        telegram_user.operational_sequence[-1].append(self.state_name)
                 else:
                     if (
                         len(telegram_user.states_sequence) == 0

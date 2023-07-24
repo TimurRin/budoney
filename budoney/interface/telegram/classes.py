@@ -40,6 +40,116 @@ def check_record_params(state, telegram_user):
     return state
 
 
+# records outer functions to reuse them
+
+
+def _records_state_text(table_name, telegram_user):
+    pagination = telegram_user.get_pagination(table_name)
+
+    pagination.total = DATABASE_DRIVER.get_records_count(table_name)
+    pagination.pages = math.ceil(pagination.total / pagination.limit)
+    text = (
+        pagination.total > 0
+        and (
+            pagination.total == 1
+            and (f"Displaying <b>1</b> record")
+            or (
+                pagination.total > pagination.limit
+                and (
+                    f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
+                )
+                or (f"Displaying <b>{pagination.total}</b> records")
+            )
+        )
+        or "No records found"
+    )
+    return text
+
+
+def _records_keyboard(table_name, keyboard, message: Message):
+    pagination = telegram_users[message.chat.id].get_pagination(table_name)
+
+    records = DATABASE_DRIVER.get_records(
+        table_name, offset=pagination.offset, limit=pagination.limit
+    )
+    for index, record in enumerate(records):
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    callback_data=record["id"],
+                    text=conversation_views[table_name].display_func
+                    and conversation_views[table_name].display_func(record)
+                    or str(record),
+                )
+            ]
+        )
+
+    if pagination.pages > 1:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    (pagination.offset > 0) and "⏪" or "🌫",
+                    callback_data="_PAGE_REWIND",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset > 0) and "◀️" or "🌫",
+                    callback_data="_PAGE_BACKWARD",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset < pagination.total - pagination.limit)
+                    and "▶️"
+                    or "🌫",
+                    callback_data="_PAGE_FORWARD",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset < pagination.total - pagination.limit)
+                    and "⏩"
+                    or "🌫",
+                    callback_data="_PAGE_FASTFORWARD",
+                ),
+            ]
+        )
+    return keyboard
+
+
+def _records_handle_pagination(table_name, update: Update, data):
+    pagination = telegram_users[update.callback_query.message.chat.id].get_pagination(
+        table_name
+    )
+
+    options_changed = False
+
+    if data == "_PAGE_REWIND":
+        if pagination.offset > 0:
+            options_changed = True
+            pagination.offset = 0
+    elif data == "_PAGE_BACKWARD":
+        if pagination.offset > 0:
+            options_changed = True
+            pagination.offset = max(pagination.offset - pagination.limit, 0)
+    elif data == "_PAGE_FORWARD":
+        if pagination.offset < pagination.total - pagination.limit:
+            options_changed = True
+            pagination.offset = min(
+                pagination.offset + pagination.limit,
+                pagination.total,
+                pagination.total - pagination.limit,
+            )
+    elif data == "_PAGE_FASTFORWARD":
+        if pagination.offset < pagination.total - pagination.limit:
+            options_changed = True
+            pagination.offset = pagination.total - pagination.limit
+
+    return options_changed
+
+
+def _records_handle_add(table_name, update: Update):
+    return check_record_params(
+        conversation_views[f"{table_name}_ADD"],
+        telegram_users[update.callback_query.message.chat.id],
+    )
+
+
 class Pagination:
     def __init__(self) -> None:
         self.offset: int = 0
@@ -59,6 +169,11 @@ class TelegramUser:
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
         self.date_offset: int = 0
+
+    def get_pagination(self, table_name):
+        if table_name not in self.pagination:
+            self.pagination[table_name] = Pagination()
+        return self.pagination[table_name]
 
 
 class TelegramConversationView:
@@ -513,110 +628,22 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         self.handle_anything = True
 
     def state_text(self, telegram_user):
-        if not (self.table_name in telegram_user.pagination):
-            telegram_user.pagination[self.table_name] = Pagination()
-
-        pagination = telegram_user.pagination[self.table_name]
-
-        pagination.total = DATABASE_DRIVER.get_records_count(self.table_name)
-        pagination.pages = math.ceil(pagination.total / pagination.limit)
-        text = (
-            pagination.total > 0
-            and (
-                pagination.total == 1
-                and (f"Displaying <b>1</b> record")
-                or (
-                    pagination.total > pagination.limit
-                    and (
-                        f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
-                    )
-                    or (f"Displaying <b>{pagination.total}</b> records")
-                )
-            )
-            or "No records found"
-        )
-        return text
+        return _records_state_text(self.table_name, telegram_user)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        keyboard = []
-
-        pagination = telegram_users[message.chat.id].pagination[self.table_name]
-
-        records = DATABASE_DRIVER.get_records(
-            self.table_name, offset=pagination.offset, limit=pagination.limit
-        )
-        for index, record in enumerate(records):
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        callback_data=record["id"],
-                        text=conversation_views[self.table_name].display_func
-                        and conversation_views[self.table_name].display_func(record)
-                        or str(record),
-                    )
-                ]
-            )
-
-        if pagination.pages > 1:
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        (pagination.offset > 0) and "⏪" or "🌫",
-                        callback_data="_PAGE_REWIND",
-                    ),
-                    InlineKeyboardButton(
-                        (pagination.offset > 0) and "◀️" or "🌫",
-                        callback_data="_PAGE_BACKWARD",
-                    ),
-                    InlineKeyboardButton(
-                        (pagination.offset < pagination.total - pagination.limit)
-                        and "▶️"
-                        or "🌫",
-                        callback_data="_PAGE_FORWARD",
-                    ),
-                    InlineKeyboardButton(
-                        (pagination.offset < pagination.total - pagination.limit)
-                        and "⏩"
-                        or "🌫",
-                        callback_data="_PAGE_FASTFORWARD",
-                    ),
-                ]
-            )
-
+        keyboard = _records_keyboard(self.table_name, [], message)
         keyboard.append([back_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
 
     def handle_pagination(self, update: Update, data):
-        pagination = telegram_users[update.callback_query.message.chat.id].pagination[
-            self.table_name
-        ]
+        options_changed = _records_handle_pagination(self.table_name, update, data)
 
-        options_changed = False
-        data_button = False
-
-        if data == "_PAGE_REWIND":
-            if pagination.offset > 0:
-                options_changed = True
-                pagination.offset = 0
-        elif data == "_PAGE_BACKWARD":
-            if pagination.offset > 0:
-                options_changed = True
-                pagination.offset = max(pagination.offset - pagination.limit, 0)
-        elif data == "_PAGE_FORWARD":
-            if pagination.offset < pagination.total - pagination.limit:
-                options_changed = True
-                pagination.offset = min(
-                    pagination.offset + pagination.limit,
-                    pagination.total,
-                    pagination.total - pagination.limit,
-                )
-        elif data == "_PAGE_FASTFORWARD":
-            if pagination.offset < pagination.total - pagination.limit:
-                options_changed = True
-                pagination.offset = pagination.total - pagination.limit
-        else:
-            data_button = True
+        print(
+            self.table_name,
+            "options_changed",
+            options_changed,
+        )
 
         if options_changed:
             return conversation_views[self.state_name].state(
@@ -624,14 +651,9 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
                 "",
                 True,
             )
-        elif data_button:
-            pass
 
     def handle_add(self, update: Update):
-        state = check_record_params(
-            conversation_views[f"{self.table_name}_ADD"],
-            telegram_users[update.callback_query.message.chat.id],
-        )
+        state = _records_handle_add(self.table_name, update)
         return state.state(
             update.callback_query.message,
             "",
@@ -922,22 +944,46 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
         super().__init__(state_name, parent_state_name, table_name, column)
         self._help_text = "Select your value below"
 
+    def state_text(self, telegram_user):
+        return (
+            super().state_text(telegram_user)
+            + "\n\n"
+            + _records_state_text(self.column["data_type"], telegram_user)
+        )
+
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        keyboard = []
+        keyboard = _records_keyboard(self.column["data_type"], [], message)
 
-        print(self.column)
-        records = DATABASE_DRIVER.get_records(self.column["data_type"])
-        for record in records:
-            keyboard.append(
-                [InlineKeyboardButton(callback_data=record["id"], text=str(record))]
-            )
-
-        controls = [back_button, cancel_button]
+        controls = [back_button, cancel_button, add_button]
         if "skippable" in self.column and self.column["skippable"]:
             controls.append(skip_button)
         keyboard.append(controls)
 
         return InlineKeyboardMarkup(keyboard)
+
+    def handle_pagination(self, update: Update, data):
+        options_changed = _records_handle_pagination(
+            self.column["data_type"], update, data
+        )
+
+        if options_changed:
+            return conversation_views[self.state_name].state(
+                update.callback_query.message,
+                "",
+                True,
+            )
+
+    def handle_add(self, update: Update):
+        state = _records_handle_add(self.column["data_type"], update)
+        print(state)
+        telegram_users[
+            update.callback_query.message.chat.id
+        ].operational_sequence.append(deque())
+        return state.state(
+            update.callback_query.message,
+            "",
+            True,
+        )
 
 
 class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationView):
@@ -968,6 +1014,8 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
                 date_string = f"{date_string}, yesterday"
             elif days_ago == -1:
                 date_string = f"{date_string}, tomorrow"
+            elif days_ago < 0:
+                date_string = f"{date_string}, in {days_ago}d"
             else:
                 date_string = f"{date_string}, {days_ago}d ago"
             keyboard.append(

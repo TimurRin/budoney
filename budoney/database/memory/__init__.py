@@ -14,11 +14,16 @@ class MemoryDatabase(Database):
         else:
             self.db["data"] = yaml_manager.load(f"{self.yaml_file}-original")
 
-    def get_record(self, table, record_id):
-        self._check_table(table)
-        return record_id in self.db["data"][table] and self.db["data"][table] or None
-
-    def get_records(self, table, offset=0, limit=0):
+    def get_records(
+        self,
+        table=None,
+        external=None,
+        join=None,
+        join_select=None,
+        offset=None,
+        limit=None,
+        record_id=None,
+    ):
         self._check_table(table)
         return list(self.db["data"][table].values())
 

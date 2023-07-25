@@ -91,6 +91,8 @@ states:
     financial_accounts_PARAM_SHORT_credit: "Is credit?",
     financial_accounts_PARAM_owner: "Account owner",
     financial_accounts_PARAM_SHORT_owner: "Owner",
+    financial_accounts_SELECT_type_BANK: "Bank Account",
+    financial_accounts_SELECT_type_SIM: "SIM Account",
     payment_cards: "💳 Payment cards",
     payment_cards_RECORDS: "List of payment cards",
     payment_cards_ADD: "New payment card",

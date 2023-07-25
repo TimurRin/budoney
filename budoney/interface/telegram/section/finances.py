@@ -2,6 +2,36 @@ from interface.telegram.classes import (
     DefaultTelegramConversationView,
     DatabaseTelegramConversationView,
 )
+from loc import localization
+
+
+def _display_inline_financial_account(record):
+    text_parts = []
+
+    owner_emoji = record.get("owner_emoji", "")
+    if owner_emoji:
+        text_parts.append(owner_emoji)
+
+    operator_emoji = record.get("operator_emoji", "")
+    if operator_emoji:
+        text_parts.append(operator_emoji)
+
+    text_parts.append(record.get("operator_name", "XXX"))
+
+    text_parts.append(record.get("currency_code", "XXX"))
+
+    text_parts.append("*" + record.get("number", "????"))
+
+    if record.get("credit", "0") == "1":
+        text_parts.append("Credit")
+
+    name = record.get("name", "")
+    if name:
+        text_parts.append("(" + name + ")")
+
+    print(" ".join(text_parts))
+
+    return " ".join(text_parts)
 
 
 def init():
@@ -24,6 +54,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "code", "type": "text"},
         ],
+        lambda record: f"{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
     ),
     DefaultTelegramConversationView(
         "transactions",
@@ -122,27 +153,28 @@ def init():
     DatabaseTelegramConversationView(
         "financial_accounts",
         [
-            {"column": "number", "type": "text", "id_composition": True},
+            {"column": "name", "type": "text", "skippable": True},
+            {"column": "number", "type": "text"},
             {
                 "column": "operator",
                 "type": "data",
                 "data_type": "organizations",
-                "id_composition": True,
             },
             {
                 "column": "type",
                 "type": "select",
-                "select": ["BANK", "PHONE"],
+                "select": ["BANK", "SIM"],
             },
             {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "credit", "type": "boolean"},
             {"column": "owner", "type": "data", "data_type": "people"},
         ],
+        _display_inline_financial_account,
     ),
     DatabaseTelegramConversationView(
         "payment_cards",
         [
-            {"column": "number", "type": "int", "id_composition": True},
+            {"column": "number", "type": "int"},
             {
                 "column": "financial_account",
                 "type": "data",
@@ -159,7 +191,7 @@ def init():
                     "MIR",
                     "UNIONPAY",
                 ],
-                "id_composition": True,
-            }
+            },
         ],
+        lambda record: f"*{record.get('number', '????')} {record.get('payment_system', '???')}",
     ),

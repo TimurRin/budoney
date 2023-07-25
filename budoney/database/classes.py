@@ -2,10 +2,16 @@ class Database:
     def __init__(self):
         pass
 
-    def get_record(self, table, record_id):
-        pass
-
-    def get_records(self, table, offset=0, limit=0):
+    def get_records(
+        self,
+        table=None,
+        external=None,
+        join=None,
+        join_select=None,
+        offset=None,
+        limit=None,
+        record_id=None,
+    ):
         pass
 
     def get_records_count(self, table):

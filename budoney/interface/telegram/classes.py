@@ -66,12 +66,64 @@ def _records_state_text(table_name, telegram_user):
     return text
 
 
+def link_tables(linked_tables, table_name, alias=None, record=None):
+    for column in conversation_views[table_name].columns:
+        if column["type"] == "data" and (not record or (column["column"] in record)):
+            prefix = alias
+            old_prefix = alias or table_name
+            if not prefix:
+                prefix = column["column"]
+            else:
+                prefix += "__" + column["column"]
+            linked_tables.append(
+                {
+                    "name": column["data_type"],
+                    "linkedBy": column["column"],
+                    "alias": prefix,
+                    "parent": old_prefix,
+                }
+            )
+            linked_tables = link_tables(
+                linked_tables, column["data_type"], alias=prefix
+            )
+
+    return linked_tables
+
+
+def _get_records(
+    table_name=None, pagination=None, external=None, record_id=None, one=None
+):
+    join_select = []
+
+    linked_tables = link_tables([], table_name, record=external)
+
+    print("_get_records", "linked_tables", linked_tables)
+
+    for linked_table in linked_tables:
+        for column in conversation_views[linked_table["name"]].columns:
+            join_select.append(
+                {"table": linked_table["alias"], "column": column["column"]}
+            )
+
+    print("_get_records", "join_select", join_select)
+
+    result = DATABASE_DRIVER.get_records(
+        table=table_name,
+        external=external,
+        join=linked_tables,
+        join_select=join_select,
+        offset=pagination and pagination.offset,
+        limit=pagination and pagination.limit,
+        record_id=record_id,
+    )
+
+    return one and (result and result[0] or {"_EMPTY": True}) or result
+
+
 def _records_keyboard(table_name, keyboard, message: Message):
     pagination = telegram_users[message.chat.id].get_pagination(table_name)
 
-    records = DATABASE_DRIVER.get_records(
-        table_name, offset=pagination.offset, limit=pagination.limit
-    )
+    records = _get_records(table_name=table_name, pagination=pagination)
     for index, record in enumerate(records):
         keyboard.append(
             [
@@ -79,7 +131,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
                     callback_data=record["id"],
                     text=conversation_views[table_name].display_func
                     and conversation_views[table_name].display_func(record)
-                    or str(record),
+                    or str(record["id"]),
                 )
             ]
         )
@@ -707,15 +759,15 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         self._special_handlers = special_handlers
 
     def record_display(self, record):
-        print(self.table_name, str(record))
+        print(self.table_name, str(record.get("id", "?")))
         return (
             conversation_views[self.table_name].display_func
             and conversation_views[self.table_name].display_func(record)
-            or str(record)
+            or str(record.get("id", "?"))
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(telegram_user.records[self.table_name])}"
+        return f"<u>Preview</u>\n{self.record_display(_get_records(table_name=self.table_name, external=telegram_user.records[self.table_name], one=True))}"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -769,11 +821,11 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         self._help_text = "Set your value below"
 
     def record_display(self, record):
-        print(self.table_name, str(record))
+        print(self.table_name, str(record.get("id", "?")))
         return (
             conversation_views[self.table_name].display_func
             and conversation_views[self.table_name].display_func(record)
-            or str(record)
+            or str(record.get("id", "?"))
         )
 
     def state_name_text(self):
@@ -786,7 +838,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(telegram_user.records[self.table_name])}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
+        return f"<u>Preview</u>\n{self.record_display(_get_records(table_name=self.table_name, external=telegram_user.records[self.table_name], one=True))}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
 
     def verify_next(self, message: Message, data):
         check_record_params(

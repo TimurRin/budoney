@@ -35,20 +35,60 @@ class SQLiteDatabase(Database):
         self._init_connection_and_cursor()
         return self._local.cursor
 
-    def get_record(self, table, record_id):
-        query = f"SELECT * FROM {table} WHERE id=?", (record_id,)
-        print("get_record", query)
-        self.cursor.execute(query)
-        return dict(self.cursor.fetchone())
+    def get_records(
+        self,
+        table=None,
+        external=None,
+        join=None,
+        join_select=None,
+        offset=None,
+        limit=None,
+        record_id=None,
+    ):
+        selects = []
+        selects_external = []
+        joins = []
+        values = []
+        query = "SELECT"
 
-    def get_records(self, table, offset=0, limit=0):
-        query = f"SELECT * FROM {table}"
-        if limit > 0:
+        if external:
+            for key, value in external.items():
+                if key[0] != "_":
+                    selects_external.append(f"'{value}' AS {key}")
+        if table:
+            selects.append(f"{table}.*")
+
+        if (not external and len(selects) == 0) or (external and len(selects_external) == 0):
+            return external and [external] or []
+
+        for join_selectee in join_select:
+            selects.append(
+                f"{join_selectee['table']}.{join_selectee['column']} AS {join_selectee['table']}_{join_selectee['column']}"
+            )
+        if join:
+            for linked_table in join:
+                joins.append(
+                    f"LEFT JOIN {linked_table['name']} AS {linked_table['alias']} ON {linked_table['alias']}.id = {linked_table['parent']}.{linked_table['linkedBy']}"
+                )
+        if len(selects) > 0:
+            query += f" {', '.join(selects)}"
+        else:
+            query += " *"
+        if external and len(selects_external) > 0:
+            query += f" FROM (SELECT {', '.join(selects_external)}) AS {table}"
+        elif table:
+            query += f" FROM {table}"
+        if join:
+            query += f" {' '.join(joins)}"
+        if record_id and not external and table:
+            query += f" {table}.id = ?"
+            values.append(record_id)
+        if limit and limit > 0:
             query += " LIMIT " + str(limit)
-        if offset > 0:
+        if offset and offset > 0:
             query += " OFFSET " + str(offset)
-        print("get_records", query)
-        self.cursor.execute(query)
+        print("get_records", query, values)
+        self.cursor.execute(query, values)
         records = list()
         for record in self.cursor.fetchall():
             records.append(dict(record))
@@ -64,16 +104,17 @@ class SQLiteDatabase(Database):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])
         values = tuple(data.values()) + (record_id,)
         query = f"UPDATE {table} SET {placeholders} WHERE id = ?"
-        print("replace_data", query)
+        print("replace_data", query, values)
         self.cursor.execute(query, values)
         self.connection.commit()
 
     def append_data(self, table, data):
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join(["?" for column in data.keys()])
+        parsed_data = {k: v for k, v in data.items() if not k.startswith('_')}
+        columns = ", ".join(parsed_data.keys())
+        placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
-        print("append_data", query, data.values())
-        hehe = self.cursor.execute(query, list(data.values()))
+        print("append_data", query, list(parsed_data.values()))
+        hehe = self.cursor.execute(query, list(parsed_data.values()))
         print(hehe)
         self.connection.commit()
 

@@ -63,7 +63,7 @@ class SQLiteDatabase(Database):
 
         for join_selectee in join_select:
             selects.append(
-                f"{join_selectee['table']}.{join_selectee['column']} AS {join_selectee['table']}_{join_selectee['column']}"
+                f"{join_selectee['table']}.{join_selectee['column']} AS {join_selectee['table']}__{join_selectee['column']}"
             )
         if join:
             for linked_table in join:
@@ -115,7 +115,6 @@ class SQLiteDatabase(Database):
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         print("append_data", query, list(parsed_data.values()))
         hehe = self.cursor.execute(query, list(parsed_data.values()))
-        print(hehe)
         self.connection.commit()
 
     def create_table(self, table_name, columns):

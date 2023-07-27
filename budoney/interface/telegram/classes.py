@@ -140,23 +140,23 @@ def _records_keyboard(table_name, keyboard, message: Message):
         keyboard.append(
             [
                 InlineKeyboardButton(
-                    (pagination.offset > 0) and "⏪" or "🌫",
+                    (pagination.offset > 0) and "⏪" or "🚫",
                     callback_data="_PAGE_REWIND",
                 ),
                 InlineKeyboardButton(
-                    (pagination.offset > 0) and "◀️" or "🌫",
+                    (pagination.offset > 0) and "◀️" or "🚫",
                     callback_data="_PAGE_BACKWARD",
                 ),
                 InlineKeyboardButton(
                     (pagination.offset < pagination.total - pagination.limit)
                     and "▶️"
-                    or "🌫",
+                    or "🚫",
                     callback_data="_PAGE_FORWARD",
                 ),
                 InlineKeyboardButton(
                     (pagination.offset < pagination.total - pagination.limit)
                     and "⏩"
-                    or "🌫",
+                    or "🚫",
                     callback_data="_PAGE_FASTFORWARD",
                 ),
             ]
@@ -1084,12 +1084,12 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
                 InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
-                    date_offset > 0 and "Last 3d" or "🌫️", callback_data="_DATE_TODAY"
+                    date_offset > 0 and "Last 3d" or "🚫", callback_data="_DATE_TODAY"
                 ),
                 InlineKeyboardButton(
-                    date_offset > 0 and "▶️" or "🌫️", callback_data="_DATE_FORWARD"
+                    date_offset > 0 and "▶️" or "🚫", callback_data="_DATE_FORWARD"
                 ),
-                # InlineKeyboardButton(date_offset > 2 and "⏩" or "🌫️", callback_data="_DATE_REWIND_FORWARD"),
+                # InlineKeyboardButton(date_offset > 2 and "⏩" or "🚫", callback_data="_DATE_REWIND_FORWARD"),
             ]
         )
 

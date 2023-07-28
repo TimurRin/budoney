@@ -91,11 +91,16 @@ def link_tables(linked_tables, table_name, alias=None, record=None):
 
 
 def _get_records(
-    table_name=None, pagination=None, external=None, record_id=None, one=None
+    table_name=None,
+    pagination=None,
+    external=None,
+    record_id=None,
+    one=None,
+    no_join=None,
 ):
     join_select = []
 
-    linked_tables = link_tables([], table_name, record=external)
+    linked_tables = not no_join and link_tables([], table_name, record=external) or []
 
     print("_get_records", "linked_tables", linked_tables)
 
@@ -513,7 +518,9 @@ class DefaultTelegramConversationView(TelegramConversationView):
 
 
 class DatabaseTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, columns: list[dict], display_func=None, order_by=None) -> None:
+    def __init__(
+        self, state_name: str, columns: list[dict], display_func=None, order_by=None
+    ) -> None:
         super().__init__(state_name)
         self.columns = columns
         self.display_func = display_func
@@ -549,10 +556,10 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         self.skip_to_records = skip_to_records
 
         special_handlers = {
-            "get_records": GetRecordsTelegramConversationView(
+            "get_records": ListRecordsTelegramConversationView(
                 f"{state_name}_RECORDS", state_name
             ),
-            "add_record": AddRecordTelegramConversationView(
+            "add_record": ViewRecordTelegramConversationView(
                 f"{state_name}_ADD", state_name
             ),
         }
@@ -674,7 +681,7 @@ class InfoTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
 
-class GetRecordsTelegramConversationView(TelegramConversationView):
+class ListRecordsTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
@@ -689,6 +696,19 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         keyboard.append([back_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
+
+    def handle(self, update: Update, data):
+        telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ] = _get_records(
+            table_name=self.table_name, record_id=data, one=True, no_join=True
+        )
+        return conversation_views[self.table_name + "_ADD"].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+        pass
 
     def handle_pagination(self, update: Update, data):
         options_changed = _records_handle_pagination(self.table_name, update, data)
@@ -715,7 +735,7 @@ class GetRecordsTelegramConversationView(TelegramConversationView):
         )
 
 
-class AddRecordTelegramConversationView(TelegramConversationView):
+class ViewRecordTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
@@ -782,21 +802,33 @@ class AddRecordTelegramConversationView(TelegramConversationView):
         )
 
     def handle_cancel(self, update: Update):
-        print("cancel from AddRecordTelegramConversationView")
+        print("cancel from ViewRecordTelegramConversationView")
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
         ].clear()
-        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+        if (
             self.table_name
-        ].clear()
+            in telegram_users[update.callback_query.message.chat.id].ignore_fast
+        ):
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                self.table_name
+            ].clear()
 
     def handle_submit(self, update: Update, state):
-        DATABASE_DRIVER.append_data(
-            self.table_name,
-            telegram_users[update.callback_query.message.chat.id].records[
-                self.table_name
-            ],
-        )
+        record = telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ]
+        if "id" in record:
+            DATABASE_DRIVER.replace_data(
+                self.table_name,
+                record["id"],
+                record,
+            )
+        else:
+            DATABASE_DRIVER.append_data(
+                self.table_name,
+                record,
+            )
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
         ].clear()
@@ -841,6 +873,17 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
 
     def state_text(self, telegram_user):
         return f"<u>Preview</u>\n{self.record_display(_get_records(table_name=self.table_name, external=telegram_user.records[self.table_name], one=True))}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
+
+    def _keyboard_controls(self, telegram_user, add=False):
+        controls = []
+        if self.table_name in telegram_user.records and telegram_user.records[self.table_name]:
+            controls.append(back_button)
+        controls.append(cancel_button)
+        if add:
+            controls.append(add_button)
+        if "skippable" in self.column and self.column["skippable"]:
+            controls.append(skip_button)
+        return controls
 
     def verify_next(self, message: Message, data):
         check_record_params(
@@ -912,18 +955,15 @@ class ChangeTextRecordTelegramConversationView(ChangeRecordTelegramConversationV
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-        keyboard = []
-
-        controls = [back_button, cancel_button]
-        if "skippable" in column and column["skippable"]:
-            controls.append(skip_button)
-        keyboard.append(controls)
-
-        self._keyboard = InlineKeyboardMarkup(keyboard)
         self._help_text = "Type your value below or skip it to the next value"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        return self._keyboard
+        keyboard = []
+
+        controls = self._keyboard_controls(telegram_users[message.chat.id])
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
 
 
 class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversationView):
@@ -931,6 +971,10 @@ class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversati
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
+
+        self._help_text = "Select your value below"
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         keyboard.append(
@@ -950,16 +994,10 @@ class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversati
             ]
         )
 
-        controls = [back_button, cancel_button]
-        if "skippable" in column and column["skippable"]:
-            controls.append(skip_button)
+        controls = self._keyboard_controls(telegram_users[message.chat.id])
         keyboard.append(controls)
 
-        self._keyboard = InlineKeyboardMarkup(keyboard)
-        self._help_text = "Select your value below"
-
-    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        return self._keyboard
+        return InlineKeyboardMarkup(keyboard)
 
 
 class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversationView):
@@ -967,6 +1005,9 @@ class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversatio
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
+        self._help_text = "Select your value below"
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         for selectee in self.column["select"]:
@@ -979,16 +1020,10 @@ class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversatio
                 ]
             )
 
-        controls = [back_button, cancel_button]
-        if "skippable" in column and column["skippable"]:
-            controls.append(skip_button)
+        controls = self._keyboard_controls(telegram_users[message.chat.id])
         keyboard.append(controls)
 
-        self._keyboard = InlineKeyboardMarkup(keyboard)
-        self._help_text = "Select your value below"
-
-    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        return self._keyboard
+        return InlineKeyboardMarkup(keyboard)
 
 
 class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationView):
@@ -1008,9 +1043,7 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = _records_keyboard(self.column["data_type"], [], message)
 
-        controls = [back_button, cancel_button, add_button]
-        if "skippable" in self.column and self.column["skippable"]:
-            controls.append(skip_button)
+        controls = self._keyboard_controls(telegram_users[message.chat.id], add=True)
         keyboard.append(controls)
 
         return InlineKeyboardMarkup(keyboard)
@@ -1095,9 +1128,7 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
             ]
         )
 
-        controls = [back_button, cancel_button]
-        if "skippable" in self.column and self.column["skippable"]:
-            controls.append(skip_button)
+        controls = self._keyboard_controls(telegram_users[message.chat.id])
         keyboard.append(controls)
 
         return InlineKeyboardMarkup(keyboard)

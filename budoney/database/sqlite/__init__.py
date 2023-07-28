@@ -82,9 +82,11 @@ class SQLiteDatabase(Database):
         if join:
             query += f" {' '.join(joins)}"
         if record_id and not external and table:
-            query += f" {table}.id = ?"
+            limit = 1
+            offset = 0
+            query += f" WHERE {table}.id = ?"
             values.append(record_id)
-        if order_by:
+        if order_by and not record_id:
             query += " ORDER BY " + ", ".join(order_by)
         if limit and limit > 0:
             query += " LIMIT " + str(limit)

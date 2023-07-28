@@ -114,6 +114,7 @@ def _get_records(
         join_select=join_select,
         offset=pagination and pagination.offset,
         limit=pagination and pagination.limit,
+        order_by=conversation_views[table_name].order_by,
         record_id=record_id,
     )
 
@@ -512,10 +513,11 @@ class DefaultTelegramConversationView(TelegramConversationView):
 
 
 class DatabaseTelegramConversationView(TelegramConversationView):
-    def __init__(self, state_name: str, columns: list[dict], display_func=None) -> None:
+    def __init__(self, state_name: str, columns: list[dict], display_func=None, order_by=None) -> None:
         super().__init__(state_name)
         self.columns = columns
         self.display_func = display_func
+        self.order_by = order_by
 
         keyboard = []
 

@@ -28,5 +28,5 @@ def init():
             {"column": "category", "type": "data", "data_type": "financial_categories"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        _display_inline_organization,
+        display_func=_display_inline_organization,
     )

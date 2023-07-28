@@ -72,7 +72,11 @@ def _display_inline_financial_account(record):
     if "operator__emoji" in record and record["operator__emoji"]:
         text_parts.append(record["operator__emoji"])
 
-    if "type" in record and record["type"] and record["type"] in select_emoji["financial_accounts"]["type"]:
+    if (
+        "type" in record
+        and record["type"]
+        and record["type"] in select_emoji["financial_accounts"]["type"]
+    ):
         text_parts.append(select_emoji["financial_accounts"]["type"][record["type"]])
 
     text_parts_account = []
@@ -156,7 +160,7 @@ def init():
             {"column": "code", "type": "text"},
             {"column": "emoji", "type": "text"},
         ],
-        lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
+        display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
     ),
     DefaultTelegramConversationView(
         "transactions",
@@ -189,7 +193,7 @@ def init():
             {"column": "organization", "type": "data", "data_type": "organizations"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        _display_inline_transaction,
+        display_func=_display_inline_transaction,
     ),
     DatabaseTelegramConversationView(
         "expenses",
@@ -225,7 +229,7 @@ def init():
             {"column": "organization", "type": "data", "data_type": "organizations"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        _display_inline_transaction,
+        display_func=_display_inline_transaction,
     ),
     DatabaseTelegramConversationView(
         "transfers",
@@ -253,7 +257,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
+        display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
     ),
     DatabaseTelegramConversationView(
         "financial_accounts",
@@ -280,7 +284,8 @@ def init():
                 "skippable": True,
             },
         ],
-        _display_inline_financial_account,
+        display_func=_display_inline_financial_account,
+        order_by=["type", "operator__name", "owner__name", "name", "number"],
     ),
     DatabaseTelegramConversationView(
         "payment_cards",
@@ -305,5 +310,6 @@ def init():
                 ],
             },
         ],
-        _display_inline_payment_card,
+        display_func=_display_inline_payment_card,
+        order_by=["financial_account__operator__name", "financial_account__owner__name", "payment_system", "number"],
     ),

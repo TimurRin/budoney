@@ -41,6 +41,7 @@ class SQLiteDatabase(Database):
         external=None,
         join=None,
         join_select=None,
+        order_by=None,
         offset=None,
         limit=None,
         record_id=None,
@@ -83,6 +84,8 @@ class SQLiteDatabase(Database):
         if record_id and not external and table:
             query += f" {table}.id = ?"
             values.append(record_id)
+        if order_by:
+            query += " ORDER BY " + ", ".join(order_by)
         if limit and limit > 0:
             query += " LIMIT " + str(limit)
         if offset and offset > 0:

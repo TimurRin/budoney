@@ -94,7 +94,6 @@ def _get_records(
     table_name=None,
     pagination=None,
     external=None,
-    record_id=None,
     one=None,
     no_join=None,
 ):
@@ -120,7 +119,7 @@ def _get_records(
         offset=pagination and pagination.offset,
         limit=pagination and pagination.limit,
         order_by=conversation_views[table_name].order_by,
-        record_id=record_id,
+        record_id=(one != True and one or None),
     )
 
     return one and (result and result[0] or {"_EMPTY": True}) or result
@@ -211,7 +210,7 @@ def _records_handle_add(table_name, update: Update):
 class Pagination:
     def __init__(self) -> None:
         self.offset: int = 0
-        self.limit: int = 5
+        self.limit: int = 3
         self.total: int = 0
         self.pages: int = 0
 
@@ -700,9 +699,7 @@ class ListRecordsTelegramConversationView(TelegramConversationView):
     def handle(self, update: Update, data):
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
-        ] = _get_records(
-            table_name=self.table_name, record_id=data, one=True, no_join=True
-        )
+        ] = _get_records(table_name=self.table_name, one=data, no_join=True)
         return conversation_views[self.table_name + "_ADD"].state(
             update.callback_query.message,
             "",
@@ -876,7 +873,10 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []
-        if self.table_name in telegram_user.records and telegram_user.records[self.table_name]:
+        if (
+            self.table_name in telegram_user.records
+            and telegram_user.records[self.table_name]
+        ):
             controls.append(back_button)
         controls.append(cancel_button)
         if add:
@@ -1093,18 +1093,7 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
         )
 
         for date in dates:
-            date_string = date.strftime("%Y-%m-%d (%a)")
-            days_ago = (today - date).days
-            if days_ago == 0:
-                date_string = f"{date_string}, today"
-            elif days_ago == 1:
-                date_string = f"{date_string}, yesterday"
-            elif days_ago == -1:
-                date_string = f"{date_string}, tomorrow"
-            elif days_ago < 0:
-                date_string = f"{date_string}, in {days_ago}d"
-            else:
-                date_string = f"{date_string}, {days_ago}d ago"
+            date_string = f"{date.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp(date.timestamp(), today=today)}"
             keyboard.append(
                 [
                     InlineKeyboardButton(

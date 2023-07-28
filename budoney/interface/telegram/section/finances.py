@@ -3,6 +3,7 @@ from interface.telegram.classes import (
     DatabaseTelegramConversationView,
 )
 from loc import localization
+import utils.date_utils as date_utils
 
 
 select_emoji = {
@@ -20,10 +21,14 @@ select_emoji = {
 def _display_inline_transaction(record):
     text_parts = []
 
+    if "date" in record and record["date"]:
+        text_parts.append(date_utils.get_relative_timestamp(record["date"]))
+        text_parts.append("—")
+
     text_parts.append(str(record.get("sum", 0)))
     text_parts.append(record.get("currency__code", "XXX"))
 
-    text_parts.append("|")
+    text_parts.append("—")
 
     if (
         "organization__category__emoji" in record
@@ -37,7 +42,7 @@ def _display_inline_transaction(record):
     if "organization__name" in record and record["organization__name"]:
         text_parts.append(record["organization__name"])
 
-    text_parts.append("|")
+    text_parts.append("—")
 
     if (
         "financial_account__owner__emoji" in record
@@ -194,6 +199,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_transaction,
+        order_by=["date", "organization__name"],
     ),
     DatabaseTelegramConversationView(
         "expenses",
@@ -230,6 +236,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_transaction,
+        order_by=["date", "organization__name"],
     ),
     DatabaseTelegramConversationView(
         "transfers",
@@ -250,6 +257,7 @@ def init():
             {"column": "comission", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
+        order_by=["date"],
     ),
     DatabaseTelegramConversationView(
         "financial_categories",
@@ -258,6 +266,7 @@ def init():
             {"column": "emoji", "type": "text", "skippable": True},
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
+        order_by=["Name"],
     ),
     DatabaseTelegramConversationView(
         "financial_accounts",
@@ -311,5 +320,10 @@ def init():
             },
         ],
         display_func=_display_inline_payment_card,
-        order_by=["financial_account__operator__name", "financial_account__owner__name", "payment_system", "number"],
+        order_by=[
+            "financial_account__operator__name",
+            "financial_account__owner__name",
+            "payment_system",
+            "number",
+        ],
     ),

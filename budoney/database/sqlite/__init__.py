@@ -55,11 +55,16 @@ class SQLiteDatabase(Database):
         if external:
             for key, value in external.items():
                 if key[0] != "_":
-                    selects_external.append(f"'{value}' AS {key}")
+                    if isinstance(value, str):
+                        selects_external.append(f"'{value}' AS {key}")
+                    else:
+                        selects_external.append(f"{value} AS {key}")
         if table:
             selects.append(f"{table}.*")
 
-        if (not external and len(selects) == 0) or (external and len(selects_external) == 0):
+        if (not external and len(selects) == 0) or (
+            external and len(selects_external) == 0
+        ):
             return external and [external] or []
 
         for join_selectee in join_select:
@@ -86,7 +91,11 @@ class SQLiteDatabase(Database):
             offset = 0
             query += f" WHERE {table}.id = ?"
             values.append(record_id)
-        if order_by and not record_id:
+        if order_by and not record_id and not external:
+            # if external:
+            #     order_by_joined = [column for column in order_by if column in external and external[column]]
+            # else:
+            #     order_by_joined = order_by
             query += " ORDER BY " + ", ".join(order_by)
         if limit and limit > 0:
             query += " LIMIT " + str(limit)
@@ -114,7 +123,7 @@ class SQLiteDatabase(Database):
         self.connection.commit()
 
     def append_data(self, table, data):
-        parsed_data = {k: v for k, v in data.items() if not k.startswith('_')}
+        parsed_data = {k: v for k, v in data.items() if not k.startswith("_")}
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"

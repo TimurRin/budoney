@@ -127,7 +127,7 @@ def _display_inline_payment_card(record):
 
     text_parts.append(record.get("payment_system", "???"))
 
-    if record.get("credit", "0") == "1":
+    if record.get("financial_account__credit", "0") == "1":
         text_parts.append("Credit")
 
     if "financial_account__name" in record and record["financial_account__name"]:

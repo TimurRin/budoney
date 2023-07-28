@@ -27,6 +27,7 @@ def conversation_filter():
 def check_record_params(state, telegram_user):
     if state.table_name not in telegram_user.records:
         telegram_user.records[state.table_name] = {}
+        telegram_user.records_data[state.table_name] = {}
     if state.table_name not in telegram_user.ignore_fast:
         telegram_user.ignore_fast[state.table_name] = {}
     for column in conversation_views[state.table_name].columns:
@@ -223,6 +224,7 @@ class TelegramUser:
         self.operational_sequence: deque[deque] = deque()
         self.operational_sequence.append(deque())
         self.records: dict = dict()
+        self.records_data: dict = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
         self.date_offset: int = 0
@@ -231,6 +233,22 @@ class TelegramUser:
         if table_name not in self.pagination:
             self.pagination[table_name] = Pagination()
         return self.pagination[table_name]
+
+    def is_operational(self):
+        return (
+            len(self.operational_sequence) > 1 or len(self.operational_sequence[0]) > 0
+        )
+    
+    def update_records_data(self, table_name):
+        self.records_data[table_name] = _get_records(table_name=table_name, external=self.records[table_name], one=True)
+
+    def clear_edits(self, table_name):
+        if table_name in self.records:
+            del self.records[table_name]
+        if table_name in self.records_data:
+            del self.records_data[table_name]
+        if table_name in self.ignore_fast:
+            del self.ignore_fast[table_name]
 
 
 class TelegramConversationView:
@@ -296,6 +314,7 @@ class TelegramConversationView:
         )
         text = text + f"- state: <code>{str(user.state)}</code>\n"
         text = text + f"- records: <code>{str(user.records)}</code>\n"
+        text = text + f"- records_data: <code>{str(user.records_data)}</code>\n"
 
         return text + "\n"
 
@@ -419,11 +438,10 @@ class TelegramConversationView:
         ):
             return self.handle_date(update, data)
         elif data == "_CANCEL":
-            if len(telegram_user.operational_sequence) > 0:
-                if len(telegram_user.operational_sequence) > 1:
-                    telegram_user.operational_sequence.pop()
-                else:
-                    telegram_user.operational_sequence[0].clear()
+            if len(telegram_user.operational_sequence) > 1:
+                telegram_user.operational_sequence.pop()
+            else:
+                telegram_user.operational_sequence[0].clear()
             if len(telegram_user.states_sequence[-1]) > 0:
                 state = telegram_user.states_sequence.pop()
             elif len(telegram_user.states_sequence) > 0:
@@ -432,11 +450,10 @@ class TelegramConversationView:
                 state = "main"
             return self._handle_cancel(update, state)
         elif data == "_SUBMIT":
-            if len(telegram_user.operational_sequence) > 0:
-                if len(telegram_user.operational_sequence) > 1:
-                    telegram_user.operational_sequence.pop()
-                else:
-                    telegram_user.operational_sequence[0].clear()
+            if len(telegram_user.operational_sequence) > 1:
+                telegram_user.operational_sequence.pop()
+            else:
+                telegram_user.operational_sequence[0].clear()
             if len(telegram_user.states_sequence[-1]) > 0:
                 state = telegram_user.states_sequence.pop()
             elif len(telegram_user.states_sequence) > 0:
@@ -683,7 +700,6 @@ class InfoTelegramConversationView(TelegramConversationView):
 class ListRecordsTelegramConversationView(TelegramConversationView):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
-        operational_states[state_name] = self
         self.table_name = table_name
         self.handle_anything = True
 
@@ -700,6 +716,7 @@ class ListRecordsTelegramConversationView(TelegramConversationView):
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
         ] = _get_records(table_name=self.table_name, one=data, no_join=True)
+        telegram_users[update.callback_query.message.chat.id].update_records_data(self.table_name)
         return conversation_views[self.table_name + "_ADD"].state(
             update.callback_query.message,
             "",
@@ -737,45 +754,29 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         super().__init__(state_name)
         operational_states[state_name] = self
         self.table_name = table_name
-        keyboard = []
 
         for column in conversation_views[table_name].columns:
             code = f"{table_name}_PARAM_{column['column']}"
             if column["type"] == "boolean":
-                operational_states[code] = ChangeBooleanRecordTelegramConversationView(
+                ChangeBooleanRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
             elif column["type"] == "select":
-                operational_states[code] = ChangeSelectRecordTelegramConversationView(
+                ChangeSelectRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
             elif column["type"] == "data":
-                operational_states[code] = ChangeDataRecordTelegramConversationView(
+                ChangeDataRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
             elif column["type"] == "date":
-                operational_states[code] = ChangeDateRecordTelegramConversationView(
+                ChangeDateRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
             else:
-                operational_states[code] = ChangeTextRecordTelegramConversationView(
+                ChangeTextRecordTelegramConversationView(
                     code, state_name, table_name, column
                 )
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        callback_data=code,
-                        text=localization["states"].get(code, code),
-                    )
-                ]
-            )
-
-        special_handlers = {}
-
-        keyboard.append([back_button, cancel_button, submit_button])
-
-        self._keyboard = InlineKeyboardMarkup(keyboard)
-        self._special_handlers = special_handlers
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
@@ -786,10 +787,51 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(_get_records(table_name=self.table_name, external=telegram_user.records[self.table_name], one=True))}"
+        return f"<u>Preview</u>\n{self.record_display(telegram_user.records_data[self.table_name])}"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        return self._keyboard
+        keyboard = []
+
+        for column in conversation_views[self.table_name].columns:
+            code = f"{self.table_name}_PARAM_{column['column']}"
+            code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
+            text = localization["states"].get(code_text, code_text)
+            if (
+                column["column"]
+                in telegram_users[message.chat.id].records[self.table_name]
+            ):
+                value = telegram_users[message.chat.id].records[self.table_name][column['column']]
+                if column["type"] == "date":
+                    date_timestamp = datetime.fromtimestamp(value)
+                    date_string = f"{date_timestamp.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp(value)}"
+                    text = f"{text}: {date_string}"
+                elif column["type"] == "data":
+                    relevant = {k.replace(column["column"] + "__", ""): v for k, v in telegram_users[message.chat.id].records_data[self.table_name].items() if k.startswith(column["column"] + "__")}
+                    text_value = conversation_views[column['data_type']].display_func(relevant)
+                    if text_value:
+                        text = f"{text}: {text_value}"
+                else:
+                    text_value = str(value)
+                    if value:
+                        text = f"{text}: {text_value}"
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        callback_data=code,
+                        text=text,
+                    )
+                ]
+            )
+
+        controls = []
+        if telegram_users[message.chat.id].is_operational():
+            controls.append(back_button)
+        controls.append(cancel_button)
+        controls.append(submit_button)
+
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
 
     def handle(self, update: Update, data):
         return conversation_views[data].state(
@@ -800,16 +842,9 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
 
     def handle_cancel(self, update: Update):
         print("cancel from ViewRecordTelegramConversationView")
-        telegram_users[update.callback_query.message.chat.id].records[
+        telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
-        ].clear()
-        if (
-            self.table_name
-            in telegram_users[update.callback_query.message.chat.id].ignore_fast
-        ):
-            telegram_users[update.callback_query.message.chat.id].ignore_fast[
-                self.table_name
-            ].clear()
+        )
 
     def handle_submit(self, update: Update, state):
         record = telegram_users[update.callback_query.message.chat.id].records[
@@ -826,12 +861,9 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
                 self.table_name,
                 record,
             )
-        telegram_users[update.callback_query.message.chat.id].records[
+        telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
-        ].clear()
-        telegram_users[update.callback_query.message.chat.id].ignore_fast[
-            self.table_name
-        ].clear()
+        )
         return conversation_views[state].state(
             update.callback_query.message,
             "✅ The record has been added successfully",
@@ -869,14 +901,11 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(_get_records(table_name=self.table_name, external=telegram_user.records[self.table_name], one=True))}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
+        return f"<u>Preview</u>\n{self.record_display(telegram_user.records_data[self.table_name])}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []
-        if (
-            self.table_name in telegram_user.records
-            and telegram_user.records[self.table_name]
-        ):
+        if telegram_user.is_operational():
             controls.append(back_button)
         controls.append(cancel_button)
         if add:
@@ -905,6 +934,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         telegram_users[message.chat.id].records[self.table_name][
             self.column["column"]
         ] = parsed_data
+        telegram_users[message.chat.id].update_records_data(self.table_name)
         state = check_record_params(
             conversation_views[self.parent_state_name],
             telegram_users[message.chat.id],
@@ -939,12 +969,9 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
 
     def handle_cancel(self, update: Update):
         print("cancel from ChangeRecordTelegramConversationView")
-        telegram_users[update.callback_query.message.chat.id].records[
+        telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
-        ].clear()
-        telegram_users[update.callback_query.message.chat.id].ignore_fast[
-            self.table_name
-        ].clear()
+        )
 
     def handle_typed(self, update: Update):
         return self.verify_next(update.message, update.message.text)

@@ -2,6 +2,22 @@ from interface.telegram.classes import (
     DatabaseTelegramConversationView,
 )
 
+def _display_inline_organization(record):
+    text_parts = []
+
+    if "category__emoji" in record and record["category__emoji"]:
+        text_parts.append(record["category__emoji"])
+
+    if "emoji" in record and record["emoji"]:
+        text_parts.append(record["emoji"])
+
+    text_parts.append(record.get("name", "Generic organization"))
+
+    if "category__name" in record and record["category__name"]:
+        text_parts.append("(" + record["category__name"] + ")")
+
+    return " ".join(text_parts)
+
 
 def init():
     DatabaseTelegramConversationView(
@@ -12,5 +28,5 @@ def init():
             {"column": "category", "type": "data", "data_type": "financial_categories"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed organization')}",
+        _display_inline_organization,
     )

@@ -5,6 +5,18 @@ from interface.telegram.classes import (
 from loc import localization
 
 
+select_emoji = {
+    "financial_accounts": {
+        "type": {
+            "CASH": "💵",
+            "BANK": "🏦",
+            "SIM": "📱",
+            "WALLET": "👛",
+        }
+    }
+}
+
+
 def _display_inline_transaction(record):
     text_parts = []
 
@@ -44,9 +56,7 @@ def _display_inline_transaction(record):
         if "payment_card__number" in record and record["payment_card__number"]:
             text_parts.append("*" + record.get("payment_card__number", "????"))
     elif "financial_account__number" in record and record["financial_account__number"]:
-        text_parts.append(
-            "*" + record.get("financial_account__number", "????")
-        )
+        text_parts.append("*" + record.get("financial_account__number", "????"))
 
     return " ".join(text_parts)
 
@@ -54,24 +64,35 @@ def _display_inline_transaction(record):
 def _display_inline_financial_account(record):
     text_parts = []
 
+    name = "name" in record and record["name"]
+
     if "owner__emoji" in record and record["owner__emoji"]:
         text_parts.append(record["owner__emoji"])
 
-    if "operator__emoji" in record and record["owner__emoji"]:
+    if "operator__emoji" in record and record["operator__emoji"]:
         text_parts.append(record["operator__emoji"])
 
-    text_parts.append("*" + record.get("number", "????"))
+    if "type" in record and record["type"] and record["type"] in select_emoji["financial_accounts"]["type"]:
+        text_parts.append(select_emoji["financial_accounts"]["type"][record["type"]])
 
-    text_parts.append(record.get("operator__name", "XXX"))
+    text_parts_account = []
+
+    if "number" in record and record["number"]:
+        text_parts_account.append("*" + record["number"])
+
+    if "operator__name" in record and record["operator__name"]:
+        text_parts_account.append(record["operator__name"])
 
     if record.get("credit", "0") == "1":
-        text_parts.append("Credit")
+        text_parts_account.append("Credit")
 
-    text_parts.append(record.get("currency__code", "XXX"))
+    text_parts_account.append(record.get("currency__code", "XXX"))
 
-    name = record.get("name", "")
-    if name:
-        text_parts.append("(" + name + ")")
+    if "name" in record and record["name"]:
+        text_parts.append(record["name"])
+        text_parts.append("(" + (" ".join(text_parts_account)) + ")")
+    else:
+        text_parts = text_parts_account
 
     return " ".join(text_parts)
 
@@ -79,15 +100,17 @@ def _display_inline_financial_account(record):
 def _display_inline_payment_card(record):
     text_parts = []
 
-    financial_account__owner__emoji = record.get("financial_account__owner__emoji", "")
-    if financial_account__owner__emoji:
-        text_parts.append(financial_account__owner__emoji)
+    if (
+        "financial_account__owner__emoji" in record
+        and record["financial_account__owner__emoji"]
+    ):
+        text_parts.append(record["financial_account__owner__emoji"])
 
-    financial_account__operator__emoji = record.get(
-        "financial_account__operator__emoji", ""
-    )
-    if financial_account__operator__emoji:
-        text_parts.append(financial_account__operator__emoji)
+    if (
+        "financial_account__operator__emoji" in record
+        and record["financial_account__operator__emoji"]
+    ):
+        text_parts.append(record["financial_account__operator__emoji"])
 
     text_parts.append("💳")
 
@@ -97,6 +120,16 @@ def _display_inline_payment_card(record):
 
     if record.get("credit", "0") == "1":
         text_parts.append("Credit")
+
+    if "financial_account__name" in record and record["financial_account__name"]:
+        text_parts.append("(" + record["financial_account__name"] + ")")
+    elif "financial_account__number" in record and record["financial_account__number"]:
+        text_parts.append("*" + record["financial_account__number"])
+    elif (
+        "financial_account__operator__name" in record
+        and record["financial_account__operator__name"]
+    ):
+        text_parts.append(record["financial_account__operator__name"])
 
     return " ".join(text_parts)
 
@@ -156,7 +189,7 @@ def init():
             {"column": "organization", "type": "data", "data_type": "organizations"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        _display_inline_transaction
+        _display_inline_transaction,
     ),
     DatabaseTelegramConversationView(
         "expenses",
@@ -231,6 +264,7 @@ def init():
                 "column": "operator",
                 "type": "data",
                 "data_type": "organizations",
+                "skippable": True,
             },
             {
                 "column": "type",
@@ -239,7 +273,12 @@ def init():
             },
             {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "credit", "type": "boolean"},
-            {"column": "owner", "type": "data", "data_type": "people"},
+            {
+                "column": "owner",
+                "type": "data",
+                "data_type": "people",
+                "skippable": True,
+            },
         ],
         _display_inline_financial_account,
     ),

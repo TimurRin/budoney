@@ -848,7 +848,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         if (
             self.column["type"] == "number"
             or self.column["type"] == "data"
-            # or self.column["type"] == "date"
+            or self.column["type"] == "date"
         ):
             parsed_data = int(data)
         elif self.column["type"] == "float":

@@ -203,7 +203,7 @@ def _records_handle_pagination(table_name, update: Update, data):
 
 def _records_handle_add(table_name, update: Update):
     return check_record_params(
-        conversation_views[f"{table_name}_ADD"],
+        conversation_views[f"{table_name}_VIEW"],
         telegram_users[update.callback_query.message.chat.id],
     )
 
@@ -211,7 +211,7 @@ def _records_handle_add(table_name, update: Update):
 class Pagination:
     def __init__(self) -> None:
         self.offset: int = 0
-        self.limit: int = 3
+        self.limit: int = 5
         self.total: int = 0
         self.pages: int = 0
 
@@ -576,7 +576,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                 f"{state_name}_RECORDS", state_name
             ),
             "add_record": ViewRecordTelegramConversationView(
-                f"{state_name}_ADD", state_name
+                f"{state_name}_VIEW", state_name
             ),
         }
 
@@ -717,7 +717,7 @@ class ListRecordsTelegramConversationView(TelegramConversationView):
             self.table_name
         ] = _get_records(table_name=self.table_name, one=data, no_join=True)
         telegram_users[update.callback_query.message.chat.id].update_records_data(self.table_name)
-        return conversation_views[self.table_name + "_ADD"].state(
+        return conversation_views[self.table_name + "_VIEW"].state(
             update.callback_query.message,
             "",
             True,
@@ -787,7 +787,8 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(telegram_user.records_data[self.table_name])}"
+        record_data = telegram_user.records_data[self.table_name]
+        return f"<i>{'id' in record_data and ('Editing record ID ' + str(record_data['id'])) or 'New record'}</i>\n{self.record_display(record_data)}"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -891,9 +892,6 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
             or str(record.get("id", "?"))
         )
 
-    def state_name_text(self):
-        return f"{localization['states'].get(self.parent_state_name, self.parent_state_name)} > {localization['states'].get(self.state_name, self.state_name)}"
-
     def state_name_text_short(self):
         return localization["states"].get(
             f"{self.table_name}_PARAM_SHORT_{self.column['column']}",
@@ -901,7 +899,8 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         )
 
     def state_text(self, telegram_user):
-        return f"<u>Preview</u>\n{self.record_display(telegram_user.records_data[self.table_name])}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
+        record_data = telegram_user.records_data[self.table_name]
+        return f"<i>{'id' in record_data and ('Editing record ID ' + str(record_data['id'])) or 'New record'}</i>\n{self.record_display(record_data)}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []

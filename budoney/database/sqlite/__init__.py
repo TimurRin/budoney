@@ -57,8 +57,10 @@ class SQLiteDatabase(Database):
                 if key[0] != "_":
                     if isinstance(value, str):
                         selects_external.append(f"'{value}' AS {key}")
-                    else:
+                    elif value:
                         selects_external.append(f"{value} AS {key}")
+                    else:
+                        selects_external.append(f"NULL AS {key}")
         if table:
             selects.append(f"{table}.*")
 

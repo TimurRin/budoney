@@ -133,6 +133,7 @@ states:
     _BACK: "⬅️ Back",
     _RECORDS: "🗄 See all",
     _ADD: "🆕 Add",
+    _REMOVE: "🗑 Remove",
     _NEXT: "➡️ Next",
     _SKIP: "🦥 Skip",
     _CANCEL: "❌ Cancel",

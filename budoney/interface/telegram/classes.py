@@ -354,6 +354,12 @@ class TelegramConversationView:
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_add",
         )
 
+    def handle_remove(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_remove",
+        )
+
     def handle_next(self, update: Update):
         print(
             print_label,
@@ -470,6 +476,8 @@ class TelegramConversationView:
         elif data == "_ADD":
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
+        elif data == "_REMOVE":
+            return self.handle_remove(update)
         else:
             if data in conversation_views and conversation_views[data].skip_to_records:
                 data = f"{data}_RECORDS"
@@ -910,7 +918,10 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         if add:
             controls.append(add_button)
         if "skippable" in self.column and self.column["skippable"]:
-            controls.append(skip_button)
+            if "id" in telegram_user.records[self.table_name] and telegram_user.records[self.table_name]["id"]:
+                controls.append(remove_button)
+            else:
+                controls.append(skip_button)
         return controls
 
     def verify_next(self, message: Message, data):
@@ -948,6 +959,28 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
     def handle(self, update: Update, data):
         return self.verify_next(update.callback_query.message, data)
 
+    def handle_remove(self, update: Update):
+        check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.callback_query.message.chat.id],
+        )
+        telegram_users[update.callback_query.message.chat.id].records[
+            self.table_name
+        ][self.column["column"]] = None
+        telegram_users[update.callback_query.message.chat.id].ignore_fast[
+            self.table_name
+        ][self.column["column"]] = True
+        state = check_record_params(
+            conversation_views[self.parent_state_name],
+            telegram_users[update.callback_query.message.chat.id],
+        )
+        return state.state(
+            update.callback_query.message,
+            f"⚠️ Removing column <i>{self.column['column']}</i>",
+            True,
+        )
+        
+
     def handle_skip(self, update: Update):
         check_record_params(
             conversation_views[self.parent_state_name],
@@ -963,7 +996,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         return state.state(
             update.callback_query.message,
             f"⚠️ Skipping column <i>{self.column['column']}</i>",
-            False,
+            True,
         )
 
     def handle_cancel(self, update: Update):
@@ -1200,6 +1233,10 @@ records_button = InlineKeyboardButton(
 add_button = InlineKeyboardButton(
     callback_data="_ADD",
     text=localization["states"].get("_ADD", "_ADD"),
+)
+remove_button = InlineKeyboardButton(
+    callback_data="_REMOVE",
+    text=localization["states"].get("_REMOVE", "_REMOVE"),
 )
 next_button = InlineKeyboardButton(
     callback_data="_NEXT",

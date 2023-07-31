@@ -1,6 +1,8 @@
 /.idea
+/.vscode
 /config/local
 /data
+/budoney/convert.py
 
 __pycache__/
 *.py[cod]

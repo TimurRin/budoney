@@ -1,6 +1,6 @@
 /.idea
 /.vscode
-/config/local
+/config
 /data
 /budoney/convert.py
 

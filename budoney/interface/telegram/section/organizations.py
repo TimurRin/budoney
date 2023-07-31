@@ -12,7 +12,7 @@ def _display_inline_organization(record):
     if "emoji" in record and record["emoji"]:
         text_parts.append(record["emoji"])
 
-    text_parts.append(record.get("name", "Generic organization"))
+    text_parts.append(str(record.get("name", "Generic organization")))
 
     if "category__name" in record and record["category__name"]:
         text_parts.append("(" + record["category__name"] + ")")

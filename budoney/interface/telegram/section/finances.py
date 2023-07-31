@@ -157,7 +157,7 @@ def init():
                 "payment_cards",
             ],
         ],
-    ),
+    )
     DatabaseTelegramConversationView(
         "currencies",
         [
@@ -166,7 +166,7 @@ def init():
             {"column": "emoji", "type": "text"},
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
-    ),
+    )
     DefaultTelegramConversationView(
         "transactions",
         [
@@ -200,7 +200,7 @@ def init():
         ],
         display_func=_display_inline_transaction,
         order_by=["date", "organization__name"],
-    ),
+    )
     DatabaseTelegramConversationView(
         "expenses",
         [
@@ -237,7 +237,7 @@ def init():
         ],
         display_func=_display_inline_transaction,
         order_by=["date", "organization__name"],
-    ),
+    )
     DatabaseTelegramConversationView(
         "transfers",
         [
@@ -258,7 +258,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         order_by=["date"],
-    ),
+    )
     DatabaseTelegramConversationView(
         "financial_categories",
         [
@@ -267,7 +267,7 @@ def init():
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=["Name"],
-    ),
+    )
     DatabaseTelegramConversationView(
         "financial_accounts",
         [
@@ -295,7 +295,7 @@ def init():
         ],
         display_func=_display_inline_financial_account,
         order_by=["type", "operator__name", "owner__name", "name", "number"],
-    ),
+    )
     DatabaseTelegramConversationView(
         "payment_cards",
         [
@@ -326,4 +326,4 @@ def init():
             "payment_system",
             "number",
         ],
-    ),
+    )

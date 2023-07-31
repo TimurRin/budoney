@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+from typing import Any
 from database.classes import Database
 
 
@@ -37,15 +38,15 @@ class SQLiteDatabase(Database):
 
     def get_records(
         self,
-        table=None,
-        external=None,
-        join=None,
-        join_select=None,
-        order_by=None,
-        offset=None,
-        limit=None,
-        record_id=None,
-    ):
+        table: str | None = None,
+        external: dict[str, Any] | None = None,
+        join: list[dict[str, Any]] | None = None,
+        join_select: list[dict[str, Any]] | None = None,
+        order_by: list[str] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+        record_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         selects = []
         selects_external = []
         joins = []
@@ -64,15 +65,17 @@ class SQLiteDatabase(Database):
         if table:
             selects.append(f"{table}.*")
 
-        if (not external and len(selects) == 0) or (
-            external and len(selects_external) == 0
-        ):
-            return external and [external] or []
+        if not external and len(selects) == 0:
+            return []
 
-        for join_selectee in join_select:
-            selects.append(
-                f"{join_selectee['table']}.{join_selectee['column']} AS {join_selectee['table']}__{join_selectee['column']}"
-            )
+        if external and len(selects_external) == 0:
+            return [external]
+
+        if join_select:
+            for join_selectee in join_select:
+                selects.append(
+                    f"{join_selectee['table']}.{join_selectee['column']} AS {join_selectee['table']}__{join_selectee['column']}"
+                )
         if join:
             for linked_table in join:
                 joins.append(

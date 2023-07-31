@@ -1,5 +1,3 @@
-import database
-
 print_label: str = "[budoney]"
 
 TELEGRAM = True

@@ -545,12 +545,14 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         state_name: str,
         columns: list[dict],
         display_func: Callable[[dict[str, Any]], str] = default_display,
-        order_by: list[str] = [],
+        order_by: list[str] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
         self.columns = columns
         self.display_func: Callable[[dict[str, Any]], str] = display_func
+        if order_by == None:
+            order_by = []
         self.order_by: list[str] = order_by
 
         keyboard = []
@@ -734,7 +736,9 @@ class ListRecordsTelegramConversationView(TelegramConversationView):
             external=telegram_users[update.callback_query.message.chat.id].records[
                 self.table_name
             ],
-        )[0]
+        )[
+            0
+        ]
         return conversation_views[self.table_name + "_VIEW"].state(
             update.callback_query.message,
             "",
@@ -811,10 +815,13 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         for column in database_views[self.table_name].columns:
             code = f"{self.table_name}_PARAM_{column['column']}"
             code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
-            text = localization["states"].get(code_text, code_text)
+            text = localization["states"].get(code_text, column['column'])
             if (
                 column["column"]
                 in telegram_users[message.chat.id].records[self.table_name]
+                and telegram_users[message.chat.id].records[self.table_name][
+                    column["column"]
+                ]
             ):
                 value = telegram_users[message.chat.id].records[self.table_name][
                     column["column"]
@@ -822,7 +829,7 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
                 if column["type"] == "date":
                     date_timestamp = datetime.fromtimestamp(value)
                     date_string = f"{date_timestamp.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp(value)}"
-                    text = f"{text}: {date_string}"
+                    text = f"{text} [{date_string}]"
                 elif column["type"] == "data":
                     relevant = {
                         k.replace(column["column"] + "__", ""): v
@@ -835,11 +842,11 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
                         relevant
                     )
                     if text_value:
-                        text = f"{text}: {text_value}"
+                        text = f"{text} [{text_value}]"
                 else:
                     text_value = str(value)
                     if value:
-                        text = f"{text}: {text_value}"
+                        text = f"{text} [{text_value}]"
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -963,7 +970,8 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
             self.column["column"]
         ] = parsed_data
         telegram_users[message.chat.id].records_data[self.table_name] = _get_records(
-            table_name=self.table_name, external=telegram_users[message.chat.id].records[self.table_name]
+            table_name=self.table_name,
+            external=telegram_users[message.chat.id].records[self.table_name],
         )[0]
         state = check_record_params(
             conversation_views[self.parent_state_name],

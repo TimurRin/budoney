@@ -10,10 +10,10 @@ def init():
             [
                 "finances",
             ],
-            # [
-            #     "tasks",
-            #     "reminders",
-            # ],
+            [
+                "tasks",
+                # "reminders",
+            ],
             # [
             #     "utilities",
             #     "clothes",

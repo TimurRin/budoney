@@ -18,9 +18,20 @@ from telegram.ext import CallbackContext, CommandHandler, ConversationHandler
 print_label: str = "[budoney :: Telegram Interface]"
 state_handlers = {}
 
+budoney_link = InlineKeyboardMarkup(
+    [
+        [
+            InlineKeyboardButton(
+                text="Budoney GitHub repository",
+                url="https://github.com/TimurRin/budoney",
+            )
+        ]
+    ]
+)
+
 
 def command_start(update: Update, context: CallbackContext):
-    if update.message.from_user.id in configs.telegram["authorized"]:
+    if update.message.chat.type == "private" and update.message.from_user.id in configs.telegram["authorized"]:
         telegram_users[update.message.from_user.id] = TelegramUser(
             update.message.from_user.first_name
         )
@@ -33,24 +44,26 @@ def command_start(update: Update, context: CallbackContext):
             f"🤠 Hiya, {update.message.from_user.first_name}! Welcome to Budoney 🤗",
             False,
         )
+    elif update.message.chat.type != "private":
+        print(
+            print_label,
+            f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are using public chat or channel to do so",
+        )
+        if configs.telegram["reveal_unauthorized"]:
+            update.message.reply_text(
+                "👋 Hello there! You can use Budoney Household Management inside a bot dialog only. If you want a personal Budoney instance, follow the link below",
+                reply_markup=budoney_link,
+            )
     else:
         print(
             print_label,
             f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are not authorized",
         )
-        update.message.reply_text(
-            "👋 Hello there! This is a private instance of Budoney Household Management. If you want a personal Budoney instance, follow the link below",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            text="Budoney GitHub repository",
-                            url="https://github.com/TimurRin/budoney",
-                        )
-                    ]
-                ]
-            ),
-        )
+        if configs.telegram["reveal_unauthorized"]:
+            update.message.reply_text(
+                "👋 Hello there! This is a private instance of Budoney Household Management. If you want a personal Budoney instance, follow the link below",
+                reply_markup=budoney_link,
+            )
 
 
 # Technical coversation views

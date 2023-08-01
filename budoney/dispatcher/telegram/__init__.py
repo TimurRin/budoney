@@ -8,7 +8,7 @@ print_label: str = "[budoney :: Telegram Dispatcher]"
 
 def start(conversation: Union[ConversationHandler, None]):
     if conversation:
-        print(print_label, "Adding coversation handler...")
+        print(print_label, "Adding conversation handler...")
         updater.dispatcher.add_handler(conversation)
 
     print(print_label, "Starting Telegram updater polling...")

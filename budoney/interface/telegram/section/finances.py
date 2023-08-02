@@ -92,7 +92,7 @@ def _display_inline_financial_account(record):
     if "operator__name" in record and record["operator__name"]:
         text_parts_account.append(record["operator__name"])
 
-    if record.get("credit", "0") == "1":
+    if record.get("credit", 0) == 1:
         text_parts_account.append("Credit")
 
     text_parts_account.append(record.get("currency__code", "XXX"))

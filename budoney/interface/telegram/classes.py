@@ -963,7 +963,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         elif self.column["type"] == "float":
             parsed_data = float(data)
         elif self.column["type"] == "boolean":
-            parsed_data = data == "_TRUE" and True or False
+            parsed_data = data == "_TRUE" and 1 or 0
         else:
             parsed_data = data
         telegram_users[message.chat.id].records[self.table_name][

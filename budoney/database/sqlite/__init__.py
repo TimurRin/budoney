@@ -8,6 +8,7 @@ class SQLiteDatabase(Database):
     SQLITE_DATA_TYPES = {
         "text": "TEXT",
         "int": "INTEGER",
+        "boolean": "INTEGER",
         "float": "REAL",
         "date": "INTEGER",
         "data": "INTEGER",

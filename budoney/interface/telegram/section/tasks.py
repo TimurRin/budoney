@@ -10,11 +10,15 @@ def _display_inline_current_task(record):
 
     if "date_completed" in record and record["date_completed"]:
         text_parts.append("[☑️")
-        text_parts.append(date_utils.get_relative_timestamp(record["date_completed"]) + "]")
+        text_parts.append(
+            date_utils.get_relative_timestamp(record["date_completed"]) + "]"
+        )
     else:
         if "date_due" in record and record["date_due"]:
             text_parts.append("[🗓")
-            text_parts.append(date_utils.get_relative_timestamp(record["date_due"]) + "]")
+            text_parts.append(
+                date_utils.get_relative_timestamp(record["date_due"]) + "]"
+            )
 
         if "important" in record and record["important"]:
             text_parts.append("❗️")
@@ -57,6 +61,7 @@ def init():
             {"column": "date_completed", "type": "date", "skippable": True},
         ],
         display_func=_display_inline_current_task,
+        order_by=["date_created"],
     )
     DatabaseTelegramConversationView(
         "tasks_recurring",

@@ -1,5 +1,5 @@
 from interface.telegram.classes import (
-    DatabaseTelegramConversationView,
+    DatabaseView,
 )
 
 
@@ -21,7 +21,7 @@ def _display_inline_organization(record):
 
 
 def init():
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "organizations",
         [
             {"column": "name", "type": "text"},

@@ -1,6 +1,6 @@
 from interface.telegram.classes import (
-    DatabaseTelegramConversationView,
-    DefaultTelegramConversationView,
+    DatabaseView,
+    DefaultView,
 )
 import utils.date_utils as date_utils
 
@@ -64,7 +64,7 @@ def _display_inline_scheduled_task(record):
 
 
 def init():
-    DefaultTelegramConversationView(
+    DefaultView(
         "tasks",
         [
             [
@@ -73,7 +73,7 @@ def init():
             ],
         ],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "tasks_current",
         [
             {"column": "name", "type": "text"},
@@ -95,7 +95,7 @@ def init():
             ("important", True, None),
         ],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "tasks_recurring",
         [
             {"column": "name", "type": "text"},

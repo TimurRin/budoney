@@ -1,10 +1,10 @@
 from interface.telegram.classes import (
-    DefaultTelegramConversationView,
+    DefaultView,
 )
 
 
 def init():
-    DefaultTelegramConversationView(
+    DefaultView(
         "main",
         [
             [

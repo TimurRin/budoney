@@ -1,10 +1,10 @@
 from interface.telegram.classes import (
-    DatabaseTelegramConversationView,
+    DatabaseView,
 )
 
 
 def init():
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "people",
         [
             {"column": "name", "type": "text"},

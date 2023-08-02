@@ -203,7 +203,7 @@ def _records_handle_pagination(table_name, update: Update, data):
 
 def _records_handle_add(table_name, update: Update):
     return check_record_params(
-        conversation_views[f"{table_name}_VIEW"],
+        conversation_views[f"{table_name}_EDIT"],
         telegram_users[update.callback_query.message.chat.id],
     )
 
@@ -248,7 +248,7 @@ class TelegramUser:
             del self.ignore_fast[table_name]
 
 
-class TelegramConversationView:
+class View:
     def __init__(self, state_name: str) -> None:
         conversation_views[state_name] = self
         self.state_name = state_name
@@ -311,7 +311,7 @@ class TelegramConversationView:
         )
         text = text + f"- state: <code>{str(user.state)}</code>\n"
         text = text + f"- records: <code>{str(user.records)}</code>\n"
-        text = text + f"- records_data: <code>{str(user.records_data)}</code>\n"
+        # text = text + f"- records_data: <code>{str(user.records_data)}</code>\n"
 
         return text + "\n"
 
@@ -350,6 +350,12 @@ class TelegramConversationView:
         print(
             print_label,
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_add",
+        )
+
+    def handle_edit(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_edit",
         )
 
     def handle_remove(self, update: Update):
@@ -474,6 +480,9 @@ class TelegramConversationView:
         elif data == "_ADD":
             telegram_user.states_sequence.append(self.state_name)
             return self.handle_add(update)
+        elif data == "_EDIT":
+            # telegram_user.states_sequence.append(self.state_name)
+            return self.handle_edit(update)
         elif data == "_REMOVE":
             return self.handle_remove(update)
         else:
@@ -502,7 +511,7 @@ class TelegramConversationView:
                 )
 
 
-class DefaultTelegramConversationView(TelegramConversationView):
+class DefaultView(View):
     def __init__(
         self,
         state_name: str,
@@ -539,7 +548,7 @@ class DefaultTelegramConversationView(TelegramConversationView):
         )
 
 
-class DatabaseTelegramConversationView(TelegramConversationView):
+class DatabaseView(View):
     def __init__(
         self,
         state_name: str,
@@ -569,9 +578,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
                     skip_to_records = False
                 aggregated_columns.append(column["column"])
                 code = f"{state_name}_STATS_{column['column']}"
-                stats_view = DatabaseStatsTelegramConversationView(
-                    code, state_name, column, columns
-                )
+                stats_view = DatabaseStatsView(code, state_name, column, columns)
 
                 keyboard.append(
                     [
@@ -585,12 +592,9 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         self.skip_to_records = skip_to_records
 
         special_handlers = {
-            "get_records": ListRecordsTelegramConversationView(
-                f"{state_name}_RECORDS", state_name
-            ),
-            "add_record": ViewRecordTelegramConversationView(
-                f"{state_name}_VIEW", state_name
-            ),
+            "get_records": ListRecordsView(f"{state_name}_RECORDS", state_name),
+            "add_record": RecordView(f"{state_name}_VIEW", state_name),
+            "edit_record": EditRecordView(f"{state_name}_EDIT", state_name),
         }
 
         keyboard.append([back_button, records_button, add_button])
@@ -627,7 +631,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         )
 
 
-class DatabaseStatsTelegramConversationView(TelegramConversationView):
+class DatabaseStatsView(View):
     def __init__(
         self, state_name: str, parent_state_name, agg_column, columns: list[dict]
     ) -> None:
@@ -655,7 +659,7 @@ class DatabaseStatsTelegramConversationView(TelegramConversationView):
         for column in self.columns:
             if column["type"] == "data" or column["type"] == "date":
                 code = f"{self.state_name}_GROUPBY_{column['column']}"
-                info_view = InfoTelegramConversationView(
+                info_view = InfoView(
                     code, column, self.state_name, self.parent_state_name
                 )
                 keyboard.append(
@@ -672,7 +676,7 @@ class DatabaseStatsTelegramConversationView(TelegramConversationView):
         return InlineKeyboardMarkup(keyboard)
 
 
-class InfoTelegramConversationView(TelegramConversationView):
+class InfoView(View):
     def __init__(
         self, state_name: str, groupby_column, parent_state_name, grandparent_state_name
     ) -> None:
@@ -710,7 +714,7 @@ class InfoTelegramConversationView(TelegramConversationView):
         return self._keyboard
 
 
-class ListRecordsTelegramConversationView(TelegramConversationView):
+class ListRecordsView(View):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         self.table_name = table_name
@@ -770,7 +774,76 @@ class ListRecordsTelegramConversationView(TelegramConversationView):
         )
 
 
-class ViewRecordTelegramConversationView(TelegramConversationView):
+class RecordView(View):
+    def __init__(self, state_name: str, table_name) -> None:
+        super().__init__(state_name)
+        operational_states[state_name] = self
+        self.table_name = table_name
+
+    def record_display(self, record):
+        print(self.table_name, str(record.get("id", "?")))
+        return database_views[self.table_name].display_func(record) or str(
+            record.get("id", "?")
+        )
+
+    def state_text(self, telegram_user):
+        record_data = telegram_user.records_data[self.table_name]
+        return f"<i>{'id' in record_data and ('Viewing record ID ' + str(record_data['id'])) or 'New record'}</i>\n{self.record_display(record_data)}"
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        for column in database_views[self.table_name].columns:
+            display = False
+            code = f"{self.table_name}_PARAM_{column['column']}"
+            code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
+            text = localization["states"].get(code_text, column["column"])
+            if (
+                column["column"]
+                in telegram_users[message.chat.id].records[self.table_name]
+                and telegram_users[message.chat.id].records[self.table_name][
+                    column["column"]
+                ]
+            ):
+                if column["type"] == "data":
+                    display = True
+                    relevant = {
+                        k.replace(column["column"] + "__", ""): v
+                        for k, v in telegram_users[message.chat.id]
+                        .records_data[self.table_name]
+                        .items()
+                        if k.startswith(column["column"] + "__")
+                    }
+                    text_value = database_views[column["data_type"]].display_func(
+                        relevant
+                    )
+                    if text_value:
+                        text = f"Go to: {text} [{text_value}]"
+            if display:
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            callback_data=code,
+                            text=text,
+                        )
+                    ]
+                )
+
+        controls = [back_button, edit_button]
+
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
+
+    def handle_edit(self, update: Update):
+        return conversation_views[self.table_name + "_EDIT"].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+
+
+class EditRecordView(View):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
@@ -779,25 +852,15 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         for column in database_views[table_name].columns:
             code = f"{table_name}_PARAM_{column['column']}"
             if column["type"] == "boolean":
-                ChangeBooleanRecordTelegramConversationView(
-                    code, state_name, table_name, column
-                )
+                EditBooleanRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "select":
-                ChangeSelectRecordTelegramConversationView(
-                    code, state_name, table_name, column
-                )
+                EditSelectRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "data":
-                ChangeDataRecordTelegramConversationView(
-                    code, state_name, table_name, column
-                )
+                EditDataRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "date":
-                ChangeDateRecordTelegramConversationView(
-                    code, state_name, table_name, column
-                )
+                EditDateRecordValueView(code, state_name, table_name, column)
             else:
-                ChangeTextRecordTelegramConversationView(
-                    code, state_name, table_name, column
-                )
+                EditTextRecordValueView(code, state_name, table_name, column)
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
@@ -815,7 +878,7 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         for column in database_views[self.table_name].columns:
             code = f"{self.table_name}_PARAM_{column['column']}"
             code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
-            text = localization["states"].get(code_text, column['column'])
+            text = localization["states"].get(code_text, column["column"])
             if (
                 column["column"]
                 in telegram_users[message.chat.id].records[self.table_name]
@@ -874,7 +937,7 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         )
 
     def handle_cancel(self, update: Update):
-        print("cancel from ViewRecordTelegramConversationView")
+        print("cancel from EditRecordView")
         telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
         )
@@ -904,7 +967,7 @@ class ViewRecordTelegramConversationView(TelegramConversationView):
         )
 
 
-class ChangeRecordTelegramConversationView(TelegramConversationView):
+class EditRecordValueView(View):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1027,7 +1090,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         )
 
     def handle_cancel(self, update: Update):
-        print("cancel from ChangeRecordTelegramConversationView")
+        print("cancel from EditRecordView")
         telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
         )
@@ -1036,7 +1099,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
         return self.verify_next(update.message, update.message.text)
 
 
-class ChangeTextRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+class EditTextRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1052,7 +1115,7 @@ class ChangeTextRecordTelegramConversationView(ChangeRecordTelegramConversationV
         return InlineKeyboardMarkup(keyboard)
 
 
-class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+class EditBooleanRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1086,7 +1149,7 @@ class ChangeBooleanRecordTelegramConversationView(ChangeRecordTelegramConversati
         return InlineKeyboardMarkup(keyboard)
 
 
-class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+class EditSelectRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1112,7 +1175,7 @@ class ChangeSelectRecordTelegramConversationView(ChangeRecordTelegramConversatio
         return InlineKeyboardMarkup(keyboard)
 
 
-class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+class EditDataRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1159,7 +1222,7 @@ class ChangeDataRecordTelegramConversationView(ChangeRecordTelegramConversationV
         )
 
 
-class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationView):
+class EditDateRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
@@ -1244,8 +1307,8 @@ class ChangeDateRecordTelegramConversationView(ChangeRecordTelegramConversationV
 
 
 telegram_users: "dict[Any, TelegramUser]" = {}
-conversation_views: "dict[str, TelegramConversationView]" = {}
-database_views: "dict[str, DatabaseTelegramConversationView]" = {}
+conversation_views: "dict[str, View]" = {}
+database_views: "dict[str, DatabaseView]" = {}
 
 operational_states = {}
 
@@ -1261,6 +1324,10 @@ records_button = InlineKeyboardButton(
 add_button = InlineKeyboardButton(
     callback_data="_ADD",
     text=localization["states"].get("_ADD", "_ADD"),
+)
+edit_button = InlineKeyboardButton(
+    callback_data="_EDIT",
+    text=localization["states"].get("_EDIT", "_EDIT"),
 )
 remove_button = InlineKeyboardButton(
     callback_data="_REMOVE",

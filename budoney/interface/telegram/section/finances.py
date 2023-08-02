@@ -1,6 +1,6 @@
 from interface.telegram.classes import (
-    DefaultTelegramConversationView,
-    DatabaseTelegramConversationView,
+    DefaultView,
+    DatabaseView,
 )
 from loc import localization
 import utils.date_utils as date_utils
@@ -97,11 +97,11 @@ def _display_inline_financial_account(record):
 
     text_parts_account.append(record.get("currency__code", "XXX"))
 
-    if "name" in record and record["name"]:
-        text_parts.append(record["name"])
+    if name:
+        text_parts.append(name)
         text_parts.append("(" + (" ".join(text_parts_account)) + ")")
     else:
-        text_parts = text_parts_account
+        text_parts += text_parts_account
 
     return " ".join(text_parts)
 
@@ -133,18 +133,18 @@ def _display_inline_payment_card(record):
     if "financial_account__name" in record and record["financial_account__name"]:
         text_parts.append("(" + record["financial_account__name"] + ")")
     elif "financial_account__number" in record and record["financial_account__number"]:
-        text_parts.append("*" + record["financial_account__number"])
+        text_parts.append("(*" + record["financial_account__number"] + ")")
     elif (
         "financial_account__operator__name" in record
         and record["financial_account__operator__name"]
     ):
-        text_parts.append(record["financial_account__operator__name"])
+        text_parts.append("(" + record["financial_account__operator__name"] + ")")
 
     return " ".join(text_parts)
 
 
 def init():
-    DefaultTelegramConversationView(
+    DefaultView(
         "finances",
         [
             [
@@ -158,7 +158,7 @@ def init():
             ],
         ],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "currencies",
         [
             {"column": "name", "type": "text"},
@@ -167,7 +167,7 @@ def init():
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
     )
-    DefaultTelegramConversationView(
+    DefaultView(
         "transactions",
         [
             [
@@ -177,7 +177,7 @@ def init():
             ["transfers"],
         ],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "income",
         [
             {"column": "date", "type": "date"},
@@ -201,7 +201,7 @@ def init():
         display_func=_display_inline_transaction,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "expenses",
         [
             {"column": "date", "type": "date"},
@@ -238,7 +238,7 @@ def init():
         display_func=_display_inline_transaction,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "transfers",
         [
             {"column": "date", "type": "date"},
@@ -259,7 +259,7 @@ def init():
         ],
         order_by=[("date", True, None)],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "financial_categories",
         [
             {"column": "name", "type": "text"},
@@ -268,7 +268,7 @@ def init():
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=[("name", False, None)],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "financial_accounts",
         [
             {"column": "name", "type": "text", "skippable": True},
@@ -302,7 +302,7 @@ def init():
             ("number", False, None),
         ],
     )
-    DatabaseTelegramConversationView(
+    DatabaseView(
         "payment_cards",
         [
             {"column": "number", "type": "text"},
@@ -329,7 +329,8 @@ def init():
         order_by=[
             ("financial_account__operator__name", False, None),
             ("financial_account__owner__name", False, None),
-            ("payment_system", False, None),
+            ("financial_account", False, None),
+            ("financial_account__name", False, None),
             ("number", False, None),
         ],
     )

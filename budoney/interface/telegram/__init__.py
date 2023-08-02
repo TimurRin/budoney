@@ -2,7 +2,7 @@ import configs
 from interface.telegram.classes import (
     conversation_views,
     telegram_users,
-    DefaultTelegramConversationView,
+    DefaultView,
     TelegramUser,
 )
 
@@ -67,7 +67,7 @@ def command_start(update: Update, context: CallbackContext):
 
 
 # Technical coversation views
-DefaultTelegramConversationView("_WIP", [])
+DefaultView("_WIP", [])
 
 main_section.init()
 people_section.init()
@@ -87,6 +87,7 @@ conversation = ConversationHandler(
     entry_points=[entry_point_handler],
     states=state_handlers,
     fallbacks=[entry_point_handler],
+    allow_reentry=True
 )
 
 print(

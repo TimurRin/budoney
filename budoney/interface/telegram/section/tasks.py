@@ -15,7 +15,8 @@ def _display_inline_current_task(record):
         )
     else:
         if "date_due" in record and record["date_due"]:
-            text_parts.append("[🗓")
+            # text_parts.append("[🗓")
+            text_parts.append("[⚠️")
             text_parts.append(
                 date_utils.get_relative_timestamp(record["date_due"]) + "]"
             )
@@ -23,13 +24,41 @@ def _display_inline_current_task(record):
         if "important" in record and record["important"]:
             text_parts.append("❗️")
 
-        if "urgent" in record and record["urgent"]:
-            text_parts.append("⚠️")
-
     if "recurring" in record and record["recurring"]:
         text_parts.append("🔁")
 
     text_parts.append(str(record.get("name", "???")))
+
+    return " ".join(text_parts)
+
+
+def _display_inline_scheduled_task(record):
+    text_parts = []
+
+    paused = "paused" in record and record["paused"]
+
+    if paused:
+        text_parts.append("⏸")
+    else:
+        if "important" in record and record["important"]:
+            text_parts.append("‼️")
+
+        if "urgent" in record and record["urgent"] is not None and record["urgent"] >= 0:
+            text_parts.append("⚡️")
+
+    text_parts.append(str(record.get("name", "???")))
+
+    if not (paused) and "work_days" in record and "rest_days" in record:
+        work_days = int(record["work_days"]) or 0
+        rest_days = int(record["rest_days"]) or 0
+        if work_days > 0:
+            if rest_days > 0:
+                if work_days == 1:
+                    text_parts.append(f"[Every {rest_days+1}d]")
+                else:
+                    text_parts.append(f"[{work_days}/{rest_days} shift]")
+            else:
+                text_parts.append(f"[daily]")
 
     return " ".join(text_parts)
 
@@ -49,7 +78,6 @@ def init():
         [
             {"column": "name", "type": "text"},
             {"column": "important", "type": "boolean"},
-            {"column": "urgent", "type": "boolean"},
             {
                 "column": "recurring",
                 "type": "data",
@@ -61,16 +89,32 @@ def init():
             {"column": "date_completed", "type": "date", "skippable": True},
         ],
         display_func=_display_inline_current_task,
-        order_by=["date_created"],
+        order_by=[
+            ("date_completed", True, "IS NOT NULL"),
+            ("date_due", False, "IS NULL"),
+            ("important", True, None),
+        ],
     )
     DatabaseTelegramConversationView(
         "tasks_recurring",
         [
             {"column": "name", "type": "text"},
             {"column": "important", "type": "boolean"},
-            {"column": "urgent", "type": "boolean"},
-            {"column": "type", "type": "select", "select": ["DAILY"]},
-            {"column": "occurrence", "type": "text"},
+            {"column": "urgent", "type": "int", "skippable": True},
+            {"column": "work_days", "type": "int", "min": 1},
+            {"column": "rest_days", "type": "int", "min": 0},
+            {"column": "weekdays", "type": "text", "skippable": True},
+            {"column": "schedule_to_the_day", "type": "boolean"},
+            {"column": "schedule_since_created", "type": "boolean"},
             {"column": "paused", "type": "boolean"},
+        ],
+        display_func=_display_inline_scheduled_task,
+        order_by=[
+            ("paused", False, None),
+            ("urgent", False, "IS NULL"),
+            ("important", True, None),
+            ("work_days", True, None),
+            ("rest_days", False, None),
+            ("name", False, None),
         ],
     )

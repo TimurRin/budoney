@@ -43,7 +43,7 @@ class SQLiteDatabase(Database):
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
-        order_by: list[str] | None = None,
+        order_by: list[tuple[str, bool, str | None]] | None = None,
         offset: int | None = None,
         limit: int | None = None,
         record_id: str | None = None,
@@ -98,11 +98,12 @@ class SQLiteDatabase(Database):
             query += f" WHERE {table}.id = ?"
             values.append(record_id)
         if order_by and not record_id and not external:
-            # if external:
-            #     order_by_joined = [column for column in order_by if column in external and external[column]]
-            # else:
-            #     order_by_joined = order_by
-            query += " ORDER BY " + ", ".join(order_by)
+            order_by_query = []
+            for orderee in order_by:
+                if orderee[2]:
+                    order_by_query.append(f"{orderee[0]} {orderee[2]}")
+                order_by_query.append(f"{orderee[0]} {orderee[1] and 'DESC' or 'ASC'}")
+            query += " ORDER BY " + ", ".join(order_by_query)
         if limit and limit > 0:
             query += " LIMIT " + str(limit)
         if offset and offset > 0:

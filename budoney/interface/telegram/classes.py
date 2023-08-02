@@ -545,7 +545,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         state_name: str,
         columns: list[dict],
         display_func: Callable[[dict[str, Any]], str] = default_display,
-        order_by: list[str] | None = None,
+        order_by: list[tuple[str, bool, str | None]] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
@@ -553,7 +553,7 @@ class DatabaseTelegramConversationView(TelegramConversationView):
         self.display_func: Callable[[dict[str, Any]], str] = display_func
         if order_by == None:
             order_by = []
-        self.order_by: list[str] = order_by
+        self.order_by: list[tuple[str, bool, str | None]] = order_by
 
         keyboard = []
 
@@ -955,7 +955,7 @@ class ChangeRecordTelegramConversationView(TelegramConversationView):
             telegram_users[message.chat.id],
         )
         if (
-            self.column["type"] == "number"
+            self.column["type"] == "int"
             or self.column["type"] == "data"
             or self.column["type"] == "date"
         ):

@@ -30,5 +30,5 @@ def init():
             {"column": "emoji", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_organization,
-        order_by=["category__name", "name"],
+        order_by=[("category__name", False, None), ("name", False, None)],
     )

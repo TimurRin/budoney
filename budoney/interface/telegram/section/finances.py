@@ -199,7 +199,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_transaction,
-        order_by=["date", "organization__name"],
+        order_by=[("date", True, None), ("organization__name", False, None)],
     )
     DatabaseTelegramConversationView(
         "expenses",
@@ -236,7 +236,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_transaction,
-        order_by=["date", "organization__name"],
+        order_by=[("date", True, None), ("organization__name", False, None)],
     )
     DatabaseTelegramConversationView(
         "transfers",
@@ -257,7 +257,7 @@ def init():
             {"column": "comission", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        order_by=["date"],
+        order_by=[("date", True, None)],
     )
     DatabaseTelegramConversationView(
         "financial_categories",
@@ -266,7 +266,7 @@ def init():
             {"column": "emoji", "type": "text", "skippable": True},
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
-        order_by=["Name"],
+        order_by=[("name", False, None)],
     )
     DatabaseTelegramConversationView(
         "financial_accounts",
@@ -294,7 +294,13 @@ def init():
             },
         ],
         display_func=_display_inline_financial_account,
-        order_by=["type", "operator__name", "owner__name", "name", "number"],
+        order_by=[
+            ("type", False, None),
+            ("operator__name", False, None),
+            ("owner__name", False, None),
+            ("name", False, None),
+            ("number", False, None),
+        ],
     )
     DatabaseTelegramConversationView(
         "payment_cards",
@@ -321,9 +327,9 @@ def init():
         ],
         display_func=_display_inline_payment_card,
         order_by=[
-            "financial_account__operator__name",
-            "financial_account__owner__name",
-            "payment_system",
-            "number",
+            ("financial_account__operator__name", False, None),
+            ("financial_account__owner__name", False, None),
+            ("payment_system", False, None),
+            ("number", False, None),
         ],
     )

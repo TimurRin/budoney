@@ -1,3 +1,5 @@
+from typing import Any
+import configs
 from interface.telegram.classes import (
     DefaultView,
     DatabaseView,
@@ -64,6 +66,13 @@ def _display_inline_transaction(record):
         text_parts.append("*" + record.get("financial_account__number", "????"))
 
     return " ".join(text_parts)
+
+
+def _fast_type_expense(data: str) -> dict[str, Any]:
+    record = {}
+    record["sum"] = float(data)
+    record["currency"] = configs.general["main_currency"]
+    return record
 
 
 def _display_inline_financial_account(record):
@@ -148,13 +157,15 @@ def init():
         "finances",
         [
             [
+                "financial_categories",
                 "currencies",
-                "transactions",
             ],
             [
-                "financial_categories",
                 "financial_accounts",
                 "payment_cards",
+            ],
+            [
+                "transactions",
             ],
         ],
     )
@@ -236,6 +247,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_func=_display_inline_transaction,
+        fast_type_processor=_fast_type_expense,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )
     DatabaseView(

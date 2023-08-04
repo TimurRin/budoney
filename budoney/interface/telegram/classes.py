@@ -32,7 +32,10 @@ def default_display(record) -> str:
 def check_record_params(state, telegram_user):
     if state.table_name not in telegram_user.records:
         telegram_user.records[state.table_name] = {}
-        telegram_user.records_data[state.table_name] = {}
+    if state.table_name not in telegram_user.records_data:
+        telegram_user.records_data[state.table_name] = dict(
+            telegram_user.records[state.table_name]
+        )
     if state.table_name not in telegram_user.ignore_fast:
         telegram_user.ignore_fast[state.table_name] = {}
     for column in database_views[state.table_name].columns:
@@ -202,10 +205,14 @@ def _records_handle_pagination(table_name, update: Update, data):
 
 
 def _records_handle_add(table_name, update: Update):
-    return check_record_params(
-        conversation_views[f"{table_name}_EDIT"],
-        telegram_users[update.callback_query.message.chat.id],
-    )
+    fast_type_processor = database_views[table_name].fast_type_processor
+    if fast_type_processor:
+        return conversation_views[f"{table_name}_FAST_TYPE"]
+    else:
+        return check_record_params(
+            conversation_views[f"{table_name}_EDIT"],
+            telegram_users[update.callback_query.message.chat.id],
+        )
 
 
 class Pagination:
@@ -393,7 +400,7 @@ class View:
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_submit",
         )
 
-    def handle_typed(self, update: Update):
+    def handle_typed(self, update: Update, data):
         print(
             print_label,
             f"{update.message.chat.first_name} ({update.message.chat.id}) state {self.state_name} doesn't have handle_typed",
@@ -404,7 +411,7 @@ class View:
         telegram_users[update.message.chat.id].operational_sequence[-1].append(
             self.state_name
         )
-        return self.handle_typed(update)
+        return self.handle_typed(update, update.message.text)
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
@@ -503,12 +510,19 @@ class View:
                         telegram_user.states_sequence.append(self.state_name)
             if data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
-            else:
-                return conversation_views["_WIP"].state(
-                    update.callback_query.message,
-                    f"⚠️ State '<b>{data}</b>' doesn't exist",
-                    True,
-                )
+            elif data in shortcuts and shortcuts[data]:
+                if shortcuts[data][0] == "add":
+                    add_view = _records_handle_add(shortcuts[data][1], update)
+                    return add_view.state(
+                        update.callback_query.message,
+                        "",
+                        True,
+                    )
+            return conversation_views["_WIP"].state(
+                update.callback_query.message,
+                f"⚠️ State '<b>{data}</b>' doesn't exist",
+                True,
+            )
 
 
 class DefaultView(View):
@@ -554,12 +568,14 @@ class DatabaseView(View):
         state_name: str,
         columns: list[dict],
         display_func: Callable[[dict[str, Any]], str] = default_display,
+        fast_type_processor: Callable[[str], dict[str, Any]] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
         self.columns = columns
         self.display_func: Callable[[dict[str, Any]], str] = display_func
+        self.fast_type_processor: Callable[[str], dict[str, Any]] | None = fast_type_processor
         if order_by == None:
             order_by = []
         self.order_by: list[tuple[str, bool, str | None]] = order_by
@@ -596,6 +612,11 @@ class DatabaseView(View):
             "add_record": RecordView(f"{state_name}_VIEW", state_name),
             "edit_record": EditRecordView(f"{state_name}_EDIT", state_name),
         }
+        shortcuts[f"{state_name}_ADD"] = ("add", state_name)
+        if self.fast_type_processor:
+            special_handlers["fast_type"] = FastTypeRecordView(
+                f"{state_name}_FAST_TYPE", state_name
+            )
 
         keyboard.append([back_button, records_button, add_button])
 
@@ -620,10 +641,7 @@ class DatabaseView(View):
         )
 
     def handle_add(self, update: Update):
-        state = check_record_params(
-            self._special_handlers["add_record"],
-            telegram_users[update.callback_query.message.chat.id],
-        )
+        state = _records_handle_add(self.state_name, update)
         return state.state(
             update.callback_query.message,
             "",
@@ -838,6 +856,70 @@ class RecordView(View):
     def handle_edit(self, update: Update):
         return conversation_views[self.table_name + "_EDIT"].state(
             update.callback_query.message,
+            "",
+            True,
+        )
+
+
+class FastTypeRecordView(View):
+    def __init__(self, state_name: str, table_name) -> None:
+        super().__init__(state_name)
+        operational_states[state_name] = self
+        self.table_name = table_name
+        self.handle_anything = True
+
+    def state_text(self, telegram_user) -> str:
+        return "Select an appropriate template or type data to work with"
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    callback_data="_ALL",
+                    text="Enter all params",
+                )
+            ]
+        )
+
+        controls = [back_button]
+
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
+
+    def handle(self, update: Update, data):
+        if data == "_ALL":
+            pass
+        return check_record_params(
+            conversation_views[f"{self.table_name}_EDIT"],
+            telegram_users[update.callback_query.message.chat.id],
+        ).state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+
+    def handle_typed(self, update: Update, data):
+        proc = database_views[self.table_name].fast_type_processor
+        if proc is not None:
+            telegram_users[update.message.chat.id].records[self.table_name] = proc(data)
+            telegram_users[update.message.chat.id].records_data[
+                self.table_name
+            ] = _get_records(
+                table_name=self.table_name,
+                external=telegram_users[update.message.chat.id].records[
+                    self.table_name
+                ],
+            )[
+                0
+            ]
+        return check_record_params(
+            conversation_views[f"{self.table_name}_EDIT"],
+            telegram_users[update.message.chat.id],
+        ).state(
+            update.message,
             "",
             True,
         )
@@ -1095,8 +1177,8 @@ class EditRecordValueView(View):
             self.table_name
         )
 
-    def handle_typed(self, update: Update):
-        return self.verify_next(update.message, update.message.text)
+    def handle_typed(self, update: Update, data):
+        return self.verify_next(update.message, data)
 
 
 class EditTextRecordValueView(EditRecordValueView):
@@ -1309,6 +1391,8 @@ class EditDateRecordValueView(EditRecordValueView):
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, View]" = {}
 database_views: "dict[str, DatabaseView]" = {}
+
+shortcuts = {}
 
 operational_states = {}
 

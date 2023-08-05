@@ -5,6 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler, MessageHandler, Filters
 from loc import localization
 from database import DATABASE_DRIVER
+from dispatcher.telegram import send_info_message
 import utils.date_utils as date_utils
 import utils.string_utils as string_utils
 from datetime import datetime, timedelta
@@ -116,7 +117,9 @@ def _get_records(
         if not external:
             table_select.append("id")
         for column in database_views[table_name].columns:
-            if not external or (column["column"] in external and external[column["column"]]):
+            if not external or (
+                column["column"] in external and external[column["column"]]
+            ):
                 if column["type"] == "text":
                     search_columns.append(table_name + "." + column["column"])
                 table_select.append(column["column"])
@@ -170,7 +173,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
             [
                 InlineKeyboardButton(
                     callback_data=record["id"],
-                    text=database_views[table_name].display_func(record)
+                    text=database_views[table_name].display_inline_func(record)
                     or str(record["id"]),
                 )
             ]
@@ -233,7 +236,10 @@ def _records_handle_pagination(table_name, update: Update, data):
             pagination.offset = pagination.total - pagination.limit
     elif data == "_CLEAR_SEARCH":
         options_changed = True
-        telegram_users[update.callback_query.message.chat.id].search[table_name] = ("", set())
+        telegram_users[update.callback_query.message.chat.id].search[table_name] = (
+            "",
+            set(),
+        )
 
     return options_changed
 
@@ -605,14 +611,18 @@ class DatabaseView(View):
         self,
         state_name: str,
         columns: list[dict],
-        display_func: Callable[[dict[str, Any]], str] = default_display,
+        display_inline_func: Callable[[dict[str, Any]], str] = default_display,
+        display_full_func: Callable[[dict[str, Any]], str] | None = None,
         fast_type_processor: Callable[[str], dict[str, Any]] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
         self.columns = columns
-        self.display_func: Callable[[dict[str, Any]], str] = display_func
+        self.display_inline_func: Callable[[dict[str, Any]], str] = display_inline_func
+        self.display_full_func: Callable[[dict[str, Any]], str] = (
+            display_full_func or display_inline_func
+        )
         self.fast_type_processor: Callable[
             [str], dict[str, Any]
         ] | None = fast_type_processor
@@ -630,8 +640,8 @@ class DatabaseView(View):
 
         for column in columns:
             if "aggregate" in column:
-                if skip_to_records:
-                    skip_to_records = False
+                # if skip_to_records:
+                #     skip_to_records = False
                 aggregated_columns.append(column["column"])
                 code = f"{state_name}_STATS_{column['column']}"
                 stats_view = DatabaseStatsView(code, state_name, column, columns)
@@ -857,7 +867,7 @@ class RecordView(View):
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
-        return database_views[self.table_name].display_func(record) or str(
+        return database_views[self.table_name].display_full_func(record) or str(
             record.get("id", "?")
         )
 
@@ -889,9 +899,9 @@ class RecordView(View):
                         .items()
                         if k.startswith(column["column"] + "__")
                     }
-                    text_value = database_views[column["data_type"]].display_func(
-                        relevant
-                    )
+                    text_value = database_views[
+                        column["data_type"]
+                    ].display_inline_func(relevant)
                     if text_value:
                         text = f"Go to: {text} [{text_value}]"
             if display:
@@ -1003,7 +1013,7 @@ class EditRecordView(View):
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
-        return database_views[self.table_name].display_func(record) or str(
+        return database_views[self.table_name].display_full_func(record) or str(
             record.get("id", "?")
         )
 
@@ -1040,9 +1050,9 @@ class EditRecordView(View):
                         .items()
                         if k.startswith(column["column"] + "__")
                     }
-                    text_value = database_views[column["data_type"]].display_func(
-                        relevant
-                    )
+                    text_value = database_views[
+                        column["data_type"]
+                    ].display_inline_func(relevant)
                     if text_value:
                         text = f"{text} [{text_value}]"
                 else:
@@ -1096,6 +1106,15 @@ class EditRecordView(View):
                 self.table_name,
                 record,
             )
+            if database_views[self.table_name].display_full_func:
+                send_info_message(
+                    database_views[self.table_name].display_full_func(
+                        telegram_users[
+                            update.callback_query.message.chat.id
+                        ].records_data[self.table_name]
+                    )
+                )
+
         telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
         )
@@ -1120,7 +1139,7 @@ class EditRecordValueView(View):
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
-        return database_views[self.table_name].display_func(record) or str(
+        return database_views[self.table_name].display_full_func(record) or str(
             record.get("id", "?")
         )
 
@@ -1175,6 +1194,23 @@ class EditRecordValueView(View):
             table_name=self.table_name,
             external=telegram_users[message.chat.id].records[self.table_name],
         )[0]
+
+        if "set" in self.column and self.column["set"]:
+            for setee in self.column["set"]:
+                telegram_users[message.chat.id].records[self.table_name][
+                    setee["column"]
+                ] = telegram_users[message.chat.id].records_data[self.table_name][
+                    setee["from"]
+                ]
+            telegram_users[message.chat.id].records_data[
+                self.table_name
+            ] = _get_records(
+                table_name=self.table_name,
+                external=telegram_users[message.chat.id].records[self.table_name],
+            )[
+                0
+            ]
+
         state = check_record_params(
             conversation_views[self.parent_state_name],
             telegram_users[message.chat.id],

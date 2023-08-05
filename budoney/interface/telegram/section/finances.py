@@ -174,7 +174,7 @@ def init():
             {"column": "code", "type": "text"},
             {"column": "emoji", "type": "text"},
         ],
-        display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
+        display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
     )
     DatabaseView(
         "income",
@@ -196,43 +196,39 @@ def init():
             {"column": "organization", "type": "data", "data_type": "organizations"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        display_func=_display_inline_transaction,
+        display_inline_func=_display_inline_transaction,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )
     DatabaseView(
         "expenses",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum", "type": "float", "aggregate": True},
+            {"column": "organization", "type": "data", "data_type": "organizations"},
+            {
+                "column": "payment_card",
+                "type": "data",
+                "data_type": "payment_cards",
+                "set": [
+                    {"column": "financial_account", "from": "payment_card__financial_account"}
+                ],
+                "skippable": True,
+            },
             {
                 "column": "financial_account",
                 "type": "data",
                 "data_type": "financial_accounts",
                 "conditions": [
                     {
-                        "type": "equals",
-                        "our_column": "currency",
-                        "their_column": "currency",
+                        "type": "equals_if_set",
+                        "column": "currency",
+                        "extra": "currency",
                     }
                 ],
             },
-            {
-                "column": "payment_card",
-                "type": "data",
-                "data_type": "payment_cards",
-                "conditions": [
-                    {
-                        "type": "equals",
-                        "our_column": "financial_account",
-                        "their_column": "financial_account",
-                    }
-                ],
-                "skippable": True,
-            },
-            {"column": "organization", "type": "data", "data_type": "organizations"},
+            {"column": "sum", "type": "float", "aggregate": True},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        display_func=_display_inline_transaction,
+        display_inline_func=_display_inline_transaction,
         fast_type_processor=_fast_type_expense,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )
@@ -263,7 +259,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
+        display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=[("name", False, None)],
     )
     DatabaseView(
@@ -291,7 +287,7 @@ def init():
                 "skippable": True,
             },
         ],
-        display_func=_display_inline_financial_account,
+        display_inline_func=_display_inline_financial_account,
         order_by=[
             ("type", False, None),
             ("operator__name", False, None),
@@ -323,7 +319,7 @@ def init():
                 ],
             },
         ],
-        display_func=_display_inline_payment_card,
+        display_inline_func=_display_inline_payment_card,
         order_by=[
             ("financial_account__operator__name", False, None),
             ("financial_account__owner__name", False, None),

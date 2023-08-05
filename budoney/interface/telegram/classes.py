@@ -113,11 +113,13 @@ def _get_records(
     search_columns = []
 
     if table_name:
-        table_select.append("id")
+        if not external:
+            table_select.append("id")
         for column in database_views[table_name].columns:
-            if column["type"] == "text":
-                search_columns.append(table_name + "." + column["column"])
-            table_select.append(column["column"])
+            if not external or (column["column"] in external and external[column["column"]]):
+                if column["type"] == "text":
+                    search_columns.append(table_name + "." + column["column"])
+                table_select.append(column["column"])
 
     linked_tables = not no_join and link_tables([], table_name, record=external) or []
 
@@ -446,9 +448,6 @@ class View:
 
     def _handle_typed(self, update: Update, context: CallbackContext):
         print("_handle_typed", self.state_name)
-        telegram_users[update.message.chat.id].operational_sequence[-1].append(
-            self.state_name
-        )
         return self.handle_typed(update, update.message.text)
 
     def _handle(self, update: Update, context: CallbackContext):
@@ -650,7 +649,7 @@ class DatabaseView(View):
 
         special_handlers = {
             "get_records": ListRecordsView(f"{state_name}_RECORDS", state_name),
-            "add_record": RecordView(f"{state_name}_VIEW", state_name),
+            "add_record": RecordView(f"{state_name}_RECORD", state_name),
             "edit_record": EditRecordView(f"{state_name}_EDIT", state_name),
         }
         shortcuts[f"{state_name}_ADD"] = ("add", state_name)
@@ -802,7 +801,7 @@ class ListRecordsView(View):
         )[
             0
         ]
-        return conversation_views[self.table_name + "_VIEW"].state(
+        return conversation_views[self.table_name + "_RECORD"].state(
             update.callback_query.message,
             "",
             True,

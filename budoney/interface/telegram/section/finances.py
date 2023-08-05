@@ -28,7 +28,7 @@ def _display_inline_transaction(record):
         text_parts.append("—")
 
     text_parts.append(str(record.get("sum", 0)))
-    text_parts.append(record.get("currency__code", "XXX"))
+    text_parts.append(record.get("financial_account__currency__code", "XXX"))
 
     text_parts.append("—")
 
@@ -71,7 +71,7 @@ def _display_inline_transaction(record):
 def _fast_type_expense(data: str) -> dict[str, Any]:
     record = {}
     record["sum"] = float(data)
-    record["currency"] = configs.general["main_currency"]
+    # record["currency"] = configs.general["main_currency"]
     return record
 
 
@@ -164,9 +164,7 @@ def init():
                 "financial_accounts",
                 "payment_cards",
             ],
-            [
-                "transactions",
-            ],
+            ["income", "expenses", "transfers"],
         ],
     )
     DatabaseView(
@@ -178,21 +176,10 @@ def init():
         ],
         display_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
     )
-    DefaultView(
-        "transactions",
-        [
-            [
-                "income",
-            ],
-            ["expenses"],
-            ["transfers"],
-        ],
-    )
     DatabaseView(
         "income",
         [
             {"column": "date", "type": "date"},
-            {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "sum", "type": "float", "aggregate": True},
             {
                 "column": "financial_account",
@@ -216,7 +203,6 @@ def init():
         "expenses",
         [
             {"column": "date", "type": "date"},
-            {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "sum", "type": "float", "aggregate": True},
             {
                 "column": "financial_account",

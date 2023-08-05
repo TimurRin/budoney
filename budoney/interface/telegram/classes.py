@@ -6,6 +6,7 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, MessageHandler, 
 from loc import localization
 from database import DATABASE_DRIVER
 import utils.date_utils as date_utils
+import utils.string_utils as string_utils
 from datetime import datetime, timedelta
 import configs
 import math
@@ -102,25 +103,40 @@ def link_tables(linked_tables, table_name, alias=None, record=None):
 def _get_records(
     table_name=None,
     pagination=None,
+    search=None,
     external=None,
     record_id=None,
     no_join=None,
 ):
+    table_select = []
     join_select = []
+    search_columns = []
+
+    if table_name:
+        table_select.append("id")
+        for column in database_views[table_name].columns:
+            if column["type"] == "text":
+                search_columns.append(table_name + "." + column["column"])
+            table_select.append(column["column"])
 
     linked_tables = not no_join and link_tables([], table_name, record=external) or []
 
     for linked_table in linked_tables:
         for column in database_views[linked_table["name"]].columns:
+            if column["type"] == "text":
+                search_columns.append(linked_table["alias"] + "." + column["column"])
             join_select.append(
                 {"table": linked_table["alias"], "column": column["column"]}
             )
 
     result = DATABASE_DRIVER.get_records(
         table=table_name,
+        table_select=table_select,
         external=external,
         join=linked_tables,
         join_select=join_select,
+        search=search,
+        search_columns=search_columns,
         offset=pagination and pagination.offset,
         limit=pagination and pagination.limit,
         order_by=table_name and database_views[table_name].order_by,
@@ -132,8 +148,21 @@ def _get_records(
 
 def _records_keyboard(table_name, keyboard, message: Message):
     pagination = telegram_users[message.chat.id].get_pagination(table_name)
+    search = telegram_users[message.chat.id].get_search(table_name)
 
-    records = _get_records(table_name=table_name, pagination=pagination)
+    if len(search[0]) > 0:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    callback_data="_CLEAR_SEARCH",
+                    text=f"Clear search: {search[0]}",
+                )
+            ]
+        )
+
+    records = _get_records(
+        table_name=table_name, pagination=pagination, search=search[1]
+    )
     for index, record in enumerate(records):
         keyboard.append(
             [
@@ -200,6 +229,9 @@ def _records_handle_pagination(table_name, update: Update, data):
         if pagination.offset < pagination.total - pagination.limit:
             options_changed = True
             pagination.offset = pagination.total - pagination.limit
+    elif data == "_CLEAR_SEARCH":
+        options_changed = True
+        telegram_users[update.callback_query.message.chat.id].search[table_name] = ("", set())
 
     return options_changed
 
@@ -234,12 +266,18 @@ class TelegramUser:
         self.records_data: dict = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
+        self.search: dict[str, tuple[str, set]] = dict()
         self.date_offset: int = 0
 
     def get_pagination(self, table_name):
         if table_name not in self.pagination:
             self.pagination[table_name] = Pagination()
         return self.pagination[table_name]
+
+    def get_search(self, table_name):
+        if table_name not in self.search:
+            self.search[table_name] = ("", set())
+        return self.search[table_name]
 
     def is_operational(self):
         return (
@@ -448,6 +486,7 @@ class View:
             or data == "_PAGE_BACKWARD"
             or data == "_PAGE_FORWARD"
             or data == "_PAGE_FASTFORWARD"
+            or data == "_CLEAR_SEARCH"
         ):
             return self.handle_pagination(update, data)
         elif (
@@ -575,7 +614,9 @@ class DatabaseView(View):
         database_views[state_name] = self
         self.columns = columns
         self.display_func: Callable[[dict[str, Any]], str] = display_func
-        self.fast_type_processor: Callable[[str], dict[str, Any]] | None = fast_type_processor
+        self.fast_type_processor: Callable[
+            [str], dict[str, Any]
+        ] | None = fast_type_processor
         if order_by == None:
             order_by = []
         self.order_by: list[tuple[str, bool, str | None]] = order_by
@@ -790,6 +831,23 @@ class ListRecordsView(View):
             "",
             True,
         )
+
+    def handle_typed(self, update: Update, data):
+        search = telegram_users[update.message.chat.id].get_search(self.table_name)
+        if search[0] != data:
+            telegram_users[update.message.chat.id].search[self.table_name] = (
+                data,
+                string_utils.sql_search(data),
+            )
+            pagination = telegram_users[update.message.chat.id].get_pagination(
+                self.table_name
+            )
+            pagination.offset = 0
+            return conversation_views[self.state_name].state(
+                update.message,
+                "",
+                True,
+            )
 
 
 class RecordView(View):

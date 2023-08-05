@@ -40,9 +40,12 @@ class SQLiteDatabase(Database):
     def get_records(
         self,
         table: str | None = None,
+        table_select: list[str] | None = None,
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
+        search: set | None = None,
+        search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         offset: int | None = None,
         limit: int | None = None,
@@ -63,7 +66,10 @@ class SQLiteDatabase(Database):
                         selects_external.append(f"{value} AS {key}")
                     else:
                         selects_external.append(f"NULL AS {key}")
-        if table:
+        if table and table_select:
+            for table_selectee in table_select:
+                selects.append(f"{table}.{table_selectee} AS {table_selectee}")
+        elif table:
             selects.append(f"{table}.*")
 
         if not external and len(selects) == 0:
@@ -97,6 +103,13 @@ class SQLiteDatabase(Database):
             offset = 0
             query += f" WHERE {table}.id = ?"
             values.append(record_id)
+        if search and search_columns:
+            wheres = []
+            for search_column in search_columns:
+                for searchee in search:
+                    wheres.append(f"{search_column} LIKE \"%{searchee}%\"")
+            if len(wheres) > 0:
+                query += f" WHERE {' OR '.join(wheres)}"
         if order_by and not record_id and not external:
             order_by_query = []
             for orderee in order_by:

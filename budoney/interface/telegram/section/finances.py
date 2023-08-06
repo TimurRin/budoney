@@ -79,7 +79,9 @@ def _display_full_expense(record):
 
     text_parts = []
 
-    text_parts.append(f"<b><u>EXPENSE</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}")
+    text_parts.append(
+        f"<b><u>EXPENSE</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
+    )
 
     organization_line = []
     if (
@@ -96,7 +98,7 @@ def _display_full_expense(record):
 
     if "description" in record and record["description"]:
         organization_line.append("(" + record["description"] + ")")
-    
+
     if len(organization_line):
         text_parts.append(" ".join(organization_line))
 
@@ -117,7 +119,10 @@ def _display_full_expense(record):
     if "financial_account__number" in record and record["financial_account__number"]:
         financial_account.append("*" + record["financial_account__number"])
 
-    if "financial_account__operator__name" in record and record["financial_account__operator__name"]:
+    if (
+        "financial_account__operator__name" in record
+        and record["financial_account__operator__name"]
+    ):
         financial_account.append(record["financial_account__operator__name"])
 
     if record.get("financial_account__credit", 0) == 1:
@@ -127,7 +132,9 @@ def _display_full_expense(record):
         method_line.append("💳")
         method_line.append("<b>*" + record.get("payment_card__number", "????") + "</b>")
 
-        method_line.append("<b>" + record.get("payment_card__payment_system", "????") + "</b>")
+        method_line.append(
+            "<b>" + record.get("payment_card__payment_system", "????") + "</b>"
+        )
 
         if record.get("payment_card__financial_account__credit", 0) == 1:
             method_line.append("<b>Credit</b>")
@@ -144,7 +151,7 @@ def _display_full_expense(record):
     if "date" in record and record["date"]:
         date_line.append("🗓")
         date = datetime.fromtimestamp(record["date"])
-        date_line.append("<b>" + date.strftime('%Y-%m-%d, %A') + "</b>")
+        date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
         date_line.append("(" + date_utils.get_relative_date(date) + ")")
 
     if len(date_line):
@@ -295,7 +302,10 @@ def init():
                 "type": "data",
                 "data_type": "payment_cards",
                 "set": [
-                    {"column": "financial_account", "from": "payment_card__financial_account"}
+                    {
+                        "column": "financial_account",
+                        "from": "payment_card__financial_account",
+                    }
                 ],
                 "skippable": "checking",
             },

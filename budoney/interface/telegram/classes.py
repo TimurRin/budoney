@@ -1366,10 +1366,9 @@ def check_record_params(state, telegram_user: TelegramUser):
         if column["column"] not in telegram_user.records[state.table_name]:
             if (
                 ("skippable" not in column)
-                or not column["skippable"]
-                or column["skippable"] == "checking"
+                or not column["skippable"] # column["skippable"] == "checking"
             ) or (
-                ("_ALL" not in telegram_user.ignore_fast[state.table_name])
+                ("_ALL" not in telegram_user.ignore_fast[state.table_name] or column["skippable"] == "checking")
                 and (
                     column["column"] not in telegram_user.ignore_fast[state.table_name]
                     or not telegram_user.ignore_fast[state.table_name][column["column"]]
@@ -1482,6 +1481,7 @@ def _get_records(
         query[0],
         query[1],
         offset=pagination and pagination.offset,
+        limit=pagination and pagination.limit,
     )
 
     return result

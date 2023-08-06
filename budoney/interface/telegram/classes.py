@@ -376,7 +376,8 @@ class DatabaseView(View):
         columns: list[dict],
         display_inline_func: Callable[[dict[str, Any]], str] | None = None,
         display_full_func: Callable[[dict[str, Any]], str] | None = None,
-        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]] | None = None,
+        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]]
+        | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
     ) -> None:
         super().__init__(state_name)
@@ -690,7 +691,11 @@ class RecordView(View):
         if data_split[0] == "jump" and len(data_split) == 3:
             telegram_users[update.callback_query.message.chat.id].records[
                 data_split[1]
-            ] = _get_records(table_name=data_split[1], record_id=int(data_split[2]), no_join=True)[0]
+            ] = _get_records(
+                table_name=data_split[1], record_id=int(data_split[2]), no_join=True
+            )[
+                0
+            ]
             telegram_users[update.callback_query.message.chat.id].records_data[
                 data_split[1]
             ] = _get_records(
@@ -732,8 +737,12 @@ class FastTypeRecordView(View):
             [
                 InlineKeyboardButton(
                     callback_data="_ALL",
-                    text="Enter all params",
-                )
+                    text="All params",
+                ),
+                InlineKeyboardButton(
+                    callback_data="_REQUIRED",
+                    text="Required params",
+                ),
             ]
         )
 
@@ -746,6 +755,13 @@ class FastTypeRecordView(View):
     def handle(self, update: Update, data: str):
         if data == "_ALL":
             pass
+        elif data == "_REQUIRED":
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                self.table_name
+            ] = {}
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                self.table_name
+            ]["_ALL"] = True
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.callback_query.message.chat.id],
@@ -770,7 +786,9 @@ class FastTypeRecordView(View):
             )[
                 0
             ]
-            telegram_users[update.message.chat.id].records_extra[self.table_name] = result[1]
+            telegram_users[update.message.chat.id].records_extra[
+                self.table_name
+            ] = result[1]
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.message.chat.id],
@@ -1316,6 +1334,7 @@ submit_button = InlineKeyboardButton(
     text=localization["states"].get("_SUBMIT", "_SUBMIT"),
 )
 
+
 def text_filters():
     return Filters.text & auth_filter() & conversation_filter()
 
@@ -1344,12 +1363,18 @@ def check_record_params(state, telegram_user: TelegramUser):
     if state.table_name not in telegram_user.ignore_fast:
         telegram_user.ignore_fast[state.table_name] = {}
     for column in database_views[state.table_name].columns:
-        if column["column"] not in telegram_user.records[state.table_name] and (
-            column["column"] not in telegram_user.ignore_fast[state.table_name]
-            or not telegram_user.ignore_fast[state.table_name][column["column"]]
-        ):
-            print(f"{column['column']} is not typed")
-            return conversation_views[f"{state.table_name}_PARAM_{column['column']}"]
+        if column["column"] not in telegram_user.records[state.table_name]:
+            if (("skippable" not in column) or not column["skippable"] or column["skippable"] == "checking") or (
+                ("_ALL" not in telegram_user.ignore_fast[state.table_name])
+                and (
+                    column["column"] not in telegram_user.ignore_fast[state.table_name]
+                    or not telegram_user.ignore_fast[state.table_name][column["column"]]
+                )
+            ):
+                print(f"{column['column']} is not typed")
+                return conversation_views[
+                    f"{state.table_name}_PARAM_{column['column']}"
+                ]
     print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
     return state
 

@@ -297,7 +297,7 @@ def init():
                 "set": [
                     {"column": "financial_account", "from": "payment_card__financial_account"}
                 ],
-                "skippable": True,
+                "skippable": "checking",
             },
             {
                 "column": "financial_account",

@@ -1,27 +1,39 @@
+import abc
+from typing import Any
+
 class Database:
     def __init__(self):
         pass
 
+    @abc.abstractmethod
     def get_records(
         self,
-        table=None,
-        external=None,
-        join=None,
-        join_select=None,
-        offset=None,
-        limit=None,
-        record_id=None,
-    ):
+        table: str | None = None,
+        table_select: list[str] | None = None,
+        external: dict[str, Any] | None = None,
+        join: list[dict[str, Any]] | None = None,
+        join_select: list[dict[str, Any]] | None = None,
+        search: set | None = None,
+        search_columns: list[str] | None = None,
+        order_by: list[tuple[str, bool, str | None]] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+        record_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         pass
 
-    def get_records_count(self, table):
+    @abc.abstractmethod
+    def get_records_count(self, table: str):
         pass
 
-    def replace_data(self, table, record_id, data):
+    @abc.abstractmethod
+    def replace_data(self, table: str, record_id, data: dict):
         pass
 
-    def append_data(self, table, data):
+    @abc.abstractmethod
+    def append_data(self, table: str, data: dict):
         pass
 
-    def create_table(self, table_name, columns):
+    @abc.abstractmethod
+    def create_table(self, table: str, columns: list[dict]):
         pass

@@ -49,7 +49,7 @@ class SQLiteDatabase(Database):
         order_by: list[tuple[str, bool, str | None]] | None = None,
         offset: int | None = None,
         limit: int | None = None,
-        record_id: str | None = None,
+        record_id: int | None = None,
     ) -> list[dict[str, Any]]:
         selects = []
         selects_external = []
@@ -128,13 +128,13 @@ class SQLiteDatabase(Database):
             records.append(dict(record))
         return records
 
-    def get_records_count(self, table):
+    def get_records_count(self, table: str):
         query = f"SELECT COUNT(*) FROM {table}"
         print("get_records_count", query)
         self.cursor.execute(query)
         return self.cursor.fetchone()[0]
 
-    def replace_data(self, table, record_id, data):
+    def replace_data(self, table: str, record_id, data: dict):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])
         values = tuple(data.values()) + (record_id,)
         query = f"UPDATE {table} SET {placeholders} WHERE id = ?"
@@ -142,7 +142,7 @@ class SQLiteDatabase(Database):
         self.cursor.execute(query, values)
         self.connection.commit()
 
-    def append_data(self, table, data):
+    def append_data(self, table: str, data: dict):
         parsed_data = {k: v for k, v in data.items() if not k.startswith("_")}
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
@@ -151,7 +151,7 @@ class SQLiteDatabase(Database):
         hehe = self.cursor.execute(query, list(parsed_data.values()))
         self.connection.commit()
 
-    def create_table(self, table_name, columns):
+    def create_table(self, table: str, columns: list[dict]):
         column_definitions = [
             f"{column['column']} {self.SQLITE_DATA_TYPES.get(column['type'], 'TEXT')}{not ('skippable' in column and column['skippable']) and ' NOT NULL' or ''}"
             for column in columns
@@ -163,7 +163,7 @@ class SQLiteDatabase(Database):
                     f"FOREIGN KEY ({column['column']}) REFERENCES {column['data_type']} (id) ON DELETE CASCADE"
                 )
 
-        query = f"CREATE TABLE IF NOT EXISTS {table_name} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join(column_definitions)});"
+        query = f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join(column_definitions)});"
         print("create_table", query)
 
         self.cursor.execute(query)

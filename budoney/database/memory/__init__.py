@@ -1,3 +1,4 @@
+from typing import Any
 from database.classes import Database
 import utils.yaml_manager as yaml_manager
 import configs
@@ -16,28 +17,32 @@ class MemoryDatabase(Database):
 
     def get_records(
         self,
-        table=None,
-        external=None,
-        join=None,
-        join_select=None,
-        offset=None,
-        limit=None,
-        record_id=None,
-    ):
+        table: str | None = None,
+        table_select: list[str] | None = None,
+        external: dict[str, Any] | None = None,
+        join: list[dict[str, Any]] | None = None,
+        join_select: list[dict[str, Any]] | None = None,
+        search: set | None = None,
+        search_columns: list[str] | None = None,
+        order_by: list[tuple[str, bool, str | None]] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+        record_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         self._check_table(table)
         return list(self.db["data"][table].values())
 
-    def get_records_count(self, table):
+    def get_records_count(self, table: str):
         self._check_table(table)
         return len(list(self.db["data"][table].values()))
 
-    def replace_data(self, table, record_id, data):
+    def replace_data(self, table: str, record_id, data: dict):
         self._check_table(table)
         data = self._check_data(dict(data))
         self.db["data"][table][data["id"]] = data
         yaml_manager.save(self.yaml_file, self.db)
 
-    def append_data(self, table, data):
+    def append_data(self, table: str, data: dict):
         self._check_table(table)
         data = self._check_data(dict(data))
         self.db["data"][table][data["id"]] = data
@@ -53,10 +58,10 @@ class MemoryDatabase(Database):
             self.db["internal"]["record_ids"] = self.db["internal"]["record_ids"] + 1
         return data
 
-    def create_table(self, table_name, columns):
-        self._check_table(table_name)
-        self.db["data"][table_name] = {}
-        self._create_columns(table_name, columns)
+    def create_table(self, table: str, columns: list[dict]):
+        self._check_table(table)
+        self.db["data"][table] = {}
+        self._create_columns(table, columns)
         yaml_manager.save(self.yaml_file, self.db)
 
     def _create_columns(self, table_name, columns):

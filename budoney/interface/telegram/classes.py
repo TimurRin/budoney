@@ -15,246 +15,6 @@ import math
 print_label: str = "[budoney :: Telegram Interface]"
 
 
-def text_filters():
-    return Filters.text & auth_filter() & conversation_filter()
-
-
-def auth_filter():
-    return Filters.user(user_id=configs.telegram["authorized"])
-
-
-def conversation_filter():
-    return Filters.chat(chat_id=configs.telegram["authorized"])
-
-
-def default_display(record) -> str:
-    return "id" in record and record["id"] or "?"
-
-
-def check_record_params(state, telegram_user):
-    if state.table_name not in telegram_user.records:
-        telegram_user.records[state.table_name] = {}
-    if state.table_name not in telegram_user.records_data:
-        telegram_user.records_data[state.table_name] = dict(
-            telegram_user.records[state.table_name]
-        )
-    if state.table_name not in telegram_user.ignore_fast:
-        telegram_user.ignore_fast[state.table_name] = {}
-    for column in database_views[state.table_name].columns:
-        if column["column"] not in telegram_user.records[state.table_name] and (
-            column["column"] not in telegram_user.ignore_fast[state.table_name]
-            or not telegram_user.ignore_fast[state.table_name][column["column"]]
-        ):
-            print(f"{column['column']} is not typed")
-            return conversation_views[f"{state.table_name}_PARAM_{column['column']}"]
-    print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
-    return state
-
-
-# records outer functions to reuse them
-
-
-def _records_state_text(table_name, telegram_user):
-    pagination = telegram_user.get_pagination(table_name)
-
-    pagination.total = DATABASE_DRIVER.get_records_count(table_name)
-    pagination.pages = math.ceil(pagination.total / pagination.limit)
-    text = (
-        pagination.total > 0
-        and (
-            pagination.total == 1
-            and (f"Displaying <b>1</b> record")
-            or (
-                pagination.total > pagination.limit
-                and (
-                    f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
-                )
-                or (f"Displaying <b>{pagination.total}</b> records")
-            )
-        )
-        or "No records found"
-    )
-    return text
-
-
-def link_tables(linked_tables, table_name, alias=None, record=None):
-    for column in database_views[table_name].columns:
-        if column["type"] == "data" and (not record or (column["column"] in record)):
-            prefix = alias
-            old_prefix = alias or table_name
-            if not prefix:
-                prefix = column["column"]
-            else:
-                prefix += "__" + column["column"]
-            linked_tables.append(
-                {
-                    "name": column["data_type"],
-                    "linkedBy": column["column"],
-                    "alias": prefix,
-                    "parent": old_prefix,
-                }
-            )
-            linked_tables = link_tables(
-                linked_tables, column["data_type"], alias=prefix
-            )
-
-    return linked_tables
-
-
-def _get_records(
-    table_name=None,
-    pagination=None,
-    search=None,
-    external=None,
-    record_id=None,
-    no_join=None,
-):
-    table_select = []
-    join_select = []
-    search_columns = []
-
-    if table_name:
-        if not external or ("id" in external and external["id"]):
-            table_select.append("id")
-        for column in database_views[table_name].columns:
-            if not external or (
-                column["column"] in external and external[column["column"]]
-            ):
-                if column["type"] == "text":
-                    search_columns.append(table_name + "." + column["column"])
-                table_select.append(column["column"])
-
-    linked_tables = not no_join and link_tables([], table_name, record=external) or []
-
-    for linked_table in linked_tables:
-        for column in database_views[linked_table["name"]].columns:
-            if column["type"] == "text":
-                search_columns.append(linked_table["alias"] + "." + column["column"])
-            join_select.append(
-                {"table": linked_table["alias"], "column": column["column"]}
-            )
-
-    result = DATABASE_DRIVER.get_records(
-        table=table_name,
-        table_select=table_select,
-        external=external,
-        join=linked_tables,
-        join_select=join_select,
-        search=search,
-        search_columns=search_columns,
-        offset=pagination and pagination.offset,
-        limit=pagination and pagination.limit,
-        order_by=table_name and database_views[table_name].order_by,
-        record_id=record_id,
-    )
-
-    return result
-
-
-def _records_keyboard(table_name, keyboard, message: Message):
-    pagination = telegram_users[message.chat.id].get_pagination(table_name)
-    search = telegram_users[message.chat.id].get_search(table_name)
-
-    if len(search[0]) > 0:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    callback_data="_CLEAR_SEARCH",
-                    text=f"Clear search: {search[0]}",
-                )
-            ]
-        )
-
-    records = _get_records(
-        table_name=table_name, pagination=pagination, search=search[1]
-    )
-    for index, record in enumerate(records):
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    callback_data=record["id"],
-                    text=database_views[table_name].display_inline_func(record)
-                    or str(record["id"]),
-                )
-            ]
-        )
-
-    if pagination.pages > 1:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    (pagination.offset > 0) and "⏪" or "🚫",
-                    callback_data="_PAGE_REWIND",
-                ),
-                InlineKeyboardButton(
-                    (pagination.offset > 0) and "◀️" or "🚫",
-                    callback_data="_PAGE_BACKWARD",
-                ),
-                InlineKeyboardButton(
-                    (pagination.offset < pagination.total - pagination.limit)
-                    and "▶️"
-                    or "🚫",
-                    callback_data="_PAGE_FORWARD",
-                ),
-                InlineKeyboardButton(
-                    (pagination.offset < pagination.total - pagination.limit)
-                    and "⏩"
-                    or "🚫",
-                    callback_data="_PAGE_FASTFORWARD",
-                ),
-            ]
-        )
-    return keyboard
-
-
-def _records_handle_pagination(table_name, update: Update, data: str):
-    pagination = telegram_users[update.callback_query.message.chat.id].get_pagination(
-        table_name
-    )
-
-    options_changed = False
-
-    if data == "_PAGE_REWIND":
-        if pagination.offset > 0:
-            options_changed = True
-            pagination.offset = 0
-    elif data == "_PAGE_BACKWARD":
-        if pagination.offset > 0:
-            options_changed = True
-            pagination.offset = max(pagination.offset - pagination.limit, 0)
-    elif data == "_PAGE_FORWARD":
-        if pagination.offset < pagination.total - pagination.limit:
-            options_changed = True
-            pagination.offset = min(
-                pagination.offset + pagination.limit,
-                pagination.total,
-                pagination.total - pagination.limit,
-            )
-    elif data == "_PAGE_FASTFORWARD":
-        if pagination.offset < pagination.total - pagination.limit:
-            options_changed = True
-            pagination.offset = pagination.total - pagination.limit
-    elif data == "_CLEAR_SEARCH":
-        options_changed = True
-        telegram_users[update.callback_query.message.chat.id].search[table_name] = (
-            "",
-            set(),
-        )
-
-    return options_changed
-
-
-def _records_handle_add(table_name, update: Update):
-    fast_type_processor = database_views[table_name].fast_type_processor
-    if fast_type_processor:
-        return conversation_views[f"{table_name}_FAST_TYPE"]
-    else:
-        return check_record_params(
-            conversation_views[f"{table_name}_EDIT"],
-            telegram_users[update.callback_query.message.chat.id],
-        )
-
-
 class Pagination:
     def __init__(self) -> None:
         self.offset: int = 0
@@ -272,6 +32,7 @@ class TelegramUser:
         self.operational_sequence.append(deque())
         self.records: dict = dict()
         self.records_data: dict = dict()
+        self.records_extra: dict = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
         self.search: dict[str, tuple[str, set]] = dict()
@@ -297,6 +58,8 @@ class TelegramUser:
             del self.records[table_name]
         if table_name in self.records_data:
             del self.records_data[table_name]
+        if table_name in self.records_extra:
+            del self.records_extra[table_name]
         if table_name in self.ignore_fast:
             del self.ignore_fast[table_name]
 
@@ -611,20 +374,22 @@ class DatabaseView(View):
         self,
         state_name: str,
         columns: list[dict],
-        display_inline_func: Callable[[dict[str, Any]], str] = default_display,
+        display_inline_func: Callable[[dict[str, Any]], str] | None = None,
         display_full_func: Callable[[dict[str, Any]], str] | None = None,
-        fast_type_processor: Callable[[str], dict[str, Any]] | None = None,
+        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
         self.columns = columns
+        if not display_inline_func:
+            display_inline_func = default_display
         self.display_inline_func: Callable[[dict[str, Any]], str] = display_inline_func
         self.display_full_func: Callable[[dict[str, Any]], str] = (
             display_full_func or display_inline_func
         )
         self.fast_type_processor: Callable[
-            [str], dict[str, Any]
+            [str], tuple[dict[str, Any], dict[str, Any]]
         ] | None = fast_type_processor
         if order_by == None:
             order_by = []
@@ -993,7 +758,8 @@ class FastTypeRecordView(View):
     def handle_typed(self, update: Update, data: str):
         proc = database_views[self.table_name].fast_type_processor
         if proc is not None:
-            telegram_users[update.message.chat.id].records[self.table_name] = proc(data)
+            result = proc(data)
+            telegram_users[update.message.chat.id].records[self.table_name] = result[0]
             telegram_users[update.message.chat.id].records_data[
                 self.table_name
             ] = _get_records(
@@ -1004,6 +770,7 @@ class FastTypeRecordView(View):
             )[
                 0
             ]
+            telegram_users[update.message.chat.id].records_extra[self.table_name] = result[1]
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.message.chat.id],
@@ -1548,3 +1315,244 @@ submit_button = InlineKeyboardButton(
     callback_data="_SUBMIT",
     text=localization["states"].get("_SUBMIT", "_SUBMIT"),
 )
+
+def text_filters():
+    return Filters.text & auth_filter() & conversation_filter()
+
+
+def auth_filter():
+    return Filters.user(user_id=configs.telegram["authorized"])
+
+
+def conversation_filter():
+    return Filters.chat(chat_id=configs.telegram["authorized"])
+
+
+def default_display(record) -> str:
+    return "id" in record and record["id"] or "?"
+
+
+def check_record_params(state, telegram_user: TelegramUser):
+    if state.table_name not in telegram_user.records:
+        telegram_user.records[state.table_name] = {}
+    if state.table_name not in telegram_user.records_data:
+        telegram_user.records_data[state.table_name] = dict(
+            telegram_user.records[state.table_name]
+        )
+    if state.table_name not in telegram_user.records_extra:
+        telegram_user.records_extra[state.table_name] = {}
+    if state.table_name not in telegram_user.ignore_fast:
+        telegram_user.ignore_fast[state.table_name] = {}
+    for column in database_views[state.table_name].columns:
+        if column["column"] not in telegram_user.records[state.table_name] and (
+            column["column"] not in telegram_user.ignore_fast[state.table_name]
+            or not telegram_user.ignore_fast[state.table_name][column["column"]]
+        ):
+            print(f"{column['column']} is not typed")
+            return conversation_views[f"{state.table_name}_PARAM_{column['column']}"]
+    print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
+    return state
+
+
+# records outer functions to reuse them
+
+
+def _records_state_text(table_name, telegram_user):
+    pagination = telegram_user.get_pagination(table_name)
+
+    pagination.total = DATABASE_DRIVER.get_records_count(table_name)
+    pagination.pages = math.ceil(pagination.total / pagination.limit)
+    text = (
+        pagination.total > 0
+        and (
+            pagination.total == 1
+            and (f"Displaying <b>1</b> record")
+            or (
+                pagination.total > pagination.limit
+                and (
+                    f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
+                )
+                or (f"Displaying <b>{pagination.total}</b> records")
+            )
+        )
+        or "No records found"
+    )
+    return text
+
+
+def link_tables(linked_tables, table_name, alias=None, record=None):
+    for column in database_views[table_name].columns:
+        if column["type"] == "data" and (not record or (column["column"] in record)):
+            prefix = alias
+            old_prefix = alias or table_name
+            if not prefix:
+                prefix = column["column"]
+            else:
+                prefix += "__" + column["column"]
+            linked_tables.append(
+                {
+                    "name": column["data_type"],
+                    "linkedBy": column["column"],
+                    "alias": prefix,
+                    "parent": old_prefix,
+                }
+            )
+            linked_tables = link_tables(
+                linked_tables, column["data_type"], alias=prefix
+            )
+
+    return linked_tables
+
+
+def _get_records(
+    table_name=None,
+    pagination=None,
+    search=None,
+    external=None,
+    record_id=None,
+    no_join=None,
+):
+    table_select = []
+    join_select = []
+    search_columns = []
+
+    if table_name:
+        if not external or ("id" in external and external["id"]):
+            table_select.append("id")
+        for column in database_views[table_name].columns:
+            if not external or (
+                column["column"] in external and external[column["column"]]
+            ):
+                if column["type"] == "text":
+                    search_columns.append(table_name + "." + column["column"])
+                table_select.append(column["column"])
+
+    linked_tables = not no_join and link_tables([], table_name, record=external) or []
+
+    for linked_table in linked_tables:
+        for column in database_views[linked_table["name"]].columns:
+            if column["type"] == "text":
+                search_columns.append(linked_table["alias"] + "." + column["column"])
+            join_select.append(
+                {"table": linked_table["alias"], "column": column["column"]}
+            )
+
+    result = DATABASE_DRIVER.get_records(
+        table=table_name,
+        table_select=table_select,
+        external=external,
+        join=linked_tables,
+        join_select=join_select,
+        search=search,
+        search_columns=search_columns,
+        offset=pagination and pagination.offset,
+        limit=pagination and pagination.limit,
+        order_by=table_name and database_views[table_name].order_by,
+        record_id=record_id,
+    )
+
+    return result
+
+
+def _records_keyboard(table_name, keyboard, message: Message):
+    pagination = telegram_users[message.chat.id].get_pagination(table_name)
+    search = telegram_users[message.chat.id].get_search(table_name)
+
+    if len(search[0]) > 0:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    callback_data="_CLEAR_SEARCH",
+                    text=f"Clear search: {search[0]}",
+                )
+            ]
+        )
+
+    records = _get_records(
+        table_name=table_name, pagination=pagination, search=search[1]
+    )
+    for index, record in enumerate(records):
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    callback_data=record["id"],
+                    text=database_views[table_name].display_inline_func(record)
+                    or str(record["id"]),
+                )
+            ]
+        )
+
+    if pagination.pages > 1:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    (pagination.offset > 0) and "⏪" or "🚫",
+                    callback_data="_PAGE_REWIND",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset > 0) and "◀️" or "🚫",
+                    callback_data="_PAGE_BACKWARD",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset < pagination.total - pagination.limit)
+                    and "▶️"
+                    or "🚫",
+                    callback_data="_PAGE_FORWARD",
+                ),
+                InlineKeyboardButton(
+                    (pagination.offset < pagination.total - pagination.limit)
+                    and "⏩"
+                    or "🚫",
+                    callback_data="_PAGE_FASTFORWARD",
+                ),
+            ]
+        )
+    return keyboard
+
+
+def _records_handle_pagination(table_name, update: Update, data: str):
+    pagination = telegram_users[update.callback_query.message.chat.id].get_pagination(
+        table_name
+    )
+
+    options_changed = False
+
+    if data == "_PAGE_REWIND":
+        if pagination.offset > 0:
+            options_changed = True
+            pagination.offset = 0
+    elif data == "_PAGE_BACKWARD":
+        if pagination.offset > 0:
+            options_changed = True
+            pagination.offset = max(pagination.offset - pagination.limit, 0)
+    elif data == "_PAGE_FORWARD":
+        if pagination.offset < pagination.total - pagination.limit:
+            options_changed = True
+            pagination.offset = min(
+                pagination.offset + pagination.limit,
+                pagination.total,
+                pagination.total - pagination.limit,
+            )
+    elif data == "_PAGE_FASTFORWARD":
+        if pagination.offset < pagination.total - pagination.limit:
+            options_changed = True
+            pagination.offset = pagination.total - pagination.limit
+    elif data == "_CLEAR_SEARCH":
+        options_changed = True
+        telegram_users[update.callback_query.message.chat.id].search[table_name] = (
+            "",
+            set(),
+        )
+
+    return options_changed
+
+
+def _records_handle_add(table_name, update: Update):
+    fast_type_processor = database_views[table_name].fast_type_processor
+    if fast_type_processor:
+        return conversation_views[f"{table_name}_FAST_TYPE"]
+    else:
+        return check_record_params(
+            conversation_views[f"{table_name}_EDIT"],
+            telegram_users[update.callback_query.message.chat.id],
+        )

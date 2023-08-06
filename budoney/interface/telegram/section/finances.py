@@ -153,11 +153,12 @@ def _display_full_expense(record):
     return "\n".join(text_parts)
 
 
-def _fast_type_expense(data: str) -> dict[str, Any]:
+def _fast_type_expense(data: str) -> tuple[dict[str, Any], dict[str, Any]]:
     record = {}
+    record_extra = {}
     record["sum"] = float(data)
-    # record["currency"] = configs.general["main_currency"]
-    return record
+    record_extra["currency"] = configs.general["main_currency"]
+    return (record, record_extra)
 
 
 def _display_inline_financial_account(record):

@@ -1364,7 +1364,11 @@ def check_record_params(state, telegram_user: TelegramUser):
         telegram_user.ignore_fast[state.table_name] = {}
     for column in database_views[state.table_name].columns:
         if column["column"] not in telegram_user.records[state.table_name]:
-            if (("skippable" not in column) or not column["skippable"] or column["skippable"] == "checking") or (
+            if (
+                ("skippable" not in column)
+                or not column["skippable"]
+                or column["skippable"] == "checking"
+            ) or (
                 ("_ALL" not in telegram_user.ignore_fast[state.table_name])
                 and (
                     column["column"] not in telegram_user.ignore_fast[state.table_name]
@@ -1462,7 +1466,7 @@ def _get_records(
                 {"table": linked_table["alias"], "column": column["column"]}
             )
 
-    result = DATABASE_DRIVER.get_records(
+    query = DATABASE_DRIVER.get_records_query(
         table=table_name,
         table_select=table_select,
         external=external,
@@ -1470,10 +1474,14 @@ def _get_records(
         join_select=join_select,
         search=search,
         search_columns=search_columns,
-        offset=pagination and pagination.offset,
-        limit=pagination and pagination.limit,
         order_by=table_name and database_views[table_name].order_by,
         record_id=record_id,
+    )
+
+    result = DATABASE_DRIVER.get_records(
+        query[0],
+        query[1],
+        offset=pagination and pagination.offset,
     )
 
     return result

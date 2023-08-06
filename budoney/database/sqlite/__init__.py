@@ -37,7 +37,7 @@ class SQLiteDatabase(Database):
         self._init_connection_and_cursor()
         return self._local.cursor
 
-    def get_records(
+    def get_records_query(
         self,
         table: str | None = None,
         table_select: list[str] | None = None,
@@ -47,15 +47,13 @@ class SQLiteDatabase(Database):
         search: set | None = None,
         search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
-        offset: int | None = None,
-        limit: int | None = None,
         record_id: int | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[str, list[Any]]:
         selects = []
         selects_external = []
         joins = []
         values = []
-        query = "SELECT"
+        query: str = "SELECT"
 
         if external:
             for key, value in external.items():
@@ -71,12 +69,6 @@ class SQLiteDatabase(Database):
                 selects.append(f"{table}.{table_selectee} AS {table_selectee}")
         elif table:
             selects.append(f"{table}.*")
-
-        if not external and len(selects) == 0:
-            return []
-
-        if external and len(selects_external) == 0:
-            return [external]
 
         if join_select:
             for join_selectee in join_select:
@@ -99,15 +91,13 @@ class SQLiteDatabase(Database):
         if join:
             query += f" {' '.join(joins)}"
         if record_id and not external and table:
-            limit = 1
-            offset = 0
             query += f" WHERE {table}.id = ?"
             values.append(record_id)
         if search and search_columns:
             wheres = []
             for search_column in search_columns:
                 for searchee in search:
-                    wheres.append(f"{search_column} LIKE \"%{searchee}%\"")
+                    wheres.append(f'{search_column} LIKE "%{searchee}%"')
             if len(wheres) > 0:
                 query += f" WHERE {' OR '.join(wheres)}"
         if order_by and not record_id and not external:
@@ -117,6 +107,15 @@ class SQLiteDatabase(Database):
                     order_by_query.append(f"{orderee[0]} {orderee[2]}")
                 order_by_query.append(f"{orderee[0]} {orderee[1] and 'DESC' or 'ASC'}")
             query += " ORDER BY " + ", ".join(order_by_query)
+        return (str(query), values)
+
+    def get_records(
+        self,
+        query: str,
+        values: list,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         if limit and limit > 0:
             query += " LIMIT " + str(limit)
         if offset and offset > 0:

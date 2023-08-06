@@ -6,7 +6,7 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def get_records(
+    def get_records_query(
         self,
         table: str | None = None,
         table_select: list[str] | None = None,
@@ -16,9 +16,17 @@ class Database:
         search: set | None = None,
         search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
+        record_id: int | None = None,
+    ) -> tuple[str, list[Any]]:
+        pass
+
+    @abc.abstractmethod
+    def get_records(
+        self,
+        query: str,
+        values: list,
         offset: int | None = None,
         limit: int | None = None,
-        record_id: int | None = None,
     ) -> list[dict[str, Any]]:
         pass
 

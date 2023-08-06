@@ -47,7 +47,7 @@ def command_start(update: Update, context: CallbackContext):
     elif update.message.chat.type != "private":
         print(
             print_label,
-            f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are using public chat or channel to do so",
+            f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are using {update.message.chat.type} ID {update.message.chat.id} to do so",
         )
         if configs.telegram["reveal_unauthorized"]:
             update.message.reply_text(

@@ -1,4 +1,5 @@
 from typing import Any
+from datetime import datetime
 import configs
 from interface.telegram.classes import (
     DefaultView,
@@ -66,6 +67,90 @@ def _display_inline_transaction(record):
         text_parts.append("*" + record.get("financial_account__number", "????"))
 
     return " ".join(text_parts)
+
+
+def _display_full_expense(record):
+    # EXPENSE — 765.43 RUB
+    # 🍔 Burger King (freckin' hot fish burgers)
+    # 👱🏻‍♂️🟥💳 *0160 VISA Credit (*8983 Credit Account) of Timur in Alfa-Bank
+
+    # 🍴 Catering expenses this month: 2145.81 RUB
+    # 💸 Money left: 6335.94 RUB
+
+    text_parts = []
+
+    text_parts.append(f"<b><u>EXPENSE</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}")
+
+    organization_line = []
+    if (
+        "organization__category__emoji" in record
+        and record["organization__category__emoji"]
+    ):
+        organization_line.append(record["organization__category__emoji"])
+
+    if "organization__emoji" in record and record["organization__emoji"]:
+        organization_line.append(record["organization__emoji"])
+
+    if "organization__name" in record and record["organization__name"]:
+        organization_line.append("<b>" + record["organization__name"] + "</b>")
+
+    if "description" in record and record["description"]:
+        organization_line.append("(" + record["description"] + ")")
+    
+    if len(organization_line):
+        text_parts.append(" ".join(organization_line))
+
+    method_line = []
+    if (
+        "financial_account__owner__emoji" in record
+        and record["financial_account__owner__emoji"]
+    ):
+        method_line.append(record["financial_account__owner__emoji"])
+
+    if (
+        "payment_card__financial_account__operator__emoji" in record
+        and record["payment_card__financial_account__operator__emoji"]
+    ):
+        method_line.append(record["payment_card__financial_account__operator__emoji"])
+
+    financial_account = []
+    if "financial_account__number" in record and record["financial_account__number"]:
+        financial_account.append("*" + record["financial_account__number"])
+
+    if "financial_account__operator__name" in record and record["financial_account__operator__name"]:
+        financial_account.append(record["financial_account__operator__name"])
+
+    if record.get("financial_account__credit", 0) == 1:
+        financial_account.append("Credit")
+
+    if "payment_card" in record and record["payment_card"]:
+        method_line.append("💳")
+        method_line.append("<b>*" + record.get("payment_card__number", "????") + "</b>")
+
+        method_line.append("<b>" + record.get("payment_card__payment_system", "????") + "</b>")
+
+        if record.get("payment_card__financial_account__credit", 0) == 1:
+            method_line.append("<b>Credit</b>")
+
+        if len(financial_account):
+            method_line.append("(" + (" ".join(financial_account)) + ")")
+    elif len(financial_account):
+        method_line.append("<b>" + (" ".join(financial_account)) + "</b>")
+
+    if len(method_line):
+        text_parts.append(" ".join(method_line))
+
+    date_line = []
+    if "date" in record and record["date"]:
+        date_line.append("🗓")
+        date = datetime.fromtimestamp(record["date"])
+        date_line.append("<b>" + date.strftime('%Y-%m-%d, %A') + "</b>")
+        date_line.append("(" + date_utils.get_relative_date(date) + ")")
+
+    if len(date_line):
+        text_parts.append(" ".join(date_line))
+
+    return "\n".join(text_parts)
 
 
 def _fast_type_expense(data: str) -> dict[str, Any]:
@@ -136,7 +221,7 @@ def _display_inline_payment_card(record):
 
     text_parts.append(record.get("payment_system", "???"))
 
-    if record.get("financial_account__credit", "0") == "1":
+    if record.get("financial_account__credit", 0) == 1:
         text_parts.append("Credit")
 
     if "financial_account__name" in record and record["financial_account__name"]:
@@ -229,6 +314,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_inline_func=_display_inline_transaction,
+        display_full_func=_display_full_expense,
         fast_type_processor=_fast_type_expense,
         order_by=[("date", True, None), ("organization__name", False, None)],
     )

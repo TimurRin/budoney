@@ -31,7 +31,7 @@ def send_info_message(message):
     print(print_label, "send_info_message:", message)
     if not configs.general["quiet_mode"]:
         for info_chat in configs.telegram["info_chats"]:
-            updater.bot.send_message(chat_id=info_chat, text=message)
+            updater.bot.send_message(chat_id=info_chat, text=message, parse_mode="html")
 
 
 print(print_label, "Starting Telegram updater...")

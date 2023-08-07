@@ -1,4 +1,5 @@
 from interface.telegram.classes import (
+    DatabaseLinkedReport,
     DatabaseView,
 )
 
@@ -12,4 +13,8 @@ def init():
         ],
         display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed user')}",
         order_by=[("name", False, None)],
+        report_links=[
+            DatabaseLinkedReport("income", "financial_account__owner"),
+            DatabaseLinkedReport("expenses", "financial_account__owner"),
+        ],
     )

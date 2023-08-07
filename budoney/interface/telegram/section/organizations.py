@@ -32,5 +32,8 @@ def init():
         ],
         display_inline_func=_display_inline_organization,
         order_by=[("category__name", False, None), ("name", False, None)],
-        linked_reports=[DatabaseLinkedReport("expenses", "organization")],
+        report_links=[
+            DatabaseLinkedReport("income", "organization"),
+            DatabaseLinkedReport("expenses", "organization"),
+        ],
     )

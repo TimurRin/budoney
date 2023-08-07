@@ -72,12 +72,16 @@ class DatabaseReport:
         order_by: list[tuple[str, bool, str | None]],
         display_record_func: Callable[[list[dict[str, Any]]], str],
         display_layer_func: Callable[..., str],
+        date: str | None = None,
     ) -> None:
         self.select: list[tuple[str, str | None]] = select
         self.group_by: list[str] = group_by
         self.order_by: list[tuple[str, bool, str | None]] = order_by
-        self.display_record_func: Callable[[list[dict[str, Any]]], str] = display_record_func
+        self.display_record_func: Callable[
+            [list[dict[str, Any]]], str
+        ] = display_record_func
         self.display_layer_func: Callable[..., str] = display_layer_func
+        self.date: str | None = date
 
 
 class DatabaseLinkedReport:
@@ -414,7 +418,7 @@ class DatabaseView(View):
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         report: DatabaseReport | None = None,
-        linked_reports: list[DatabaseLinkedReport] | None = None,
+        report_links: list[DatabaseLinkedReport] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
@@ -432,7 +436,7 @@ class DatabaseView(View):
             order_by = []
         self.order_by: list[tuple[str, bool, str | None]] = order_by
         self.report: DatabaseReport | None = report
-        self.linked_reports: list[DatabaseLinkedReport] | None = linked_reports
+        self.report_links: list[DatabaseLinkedReport] | None = report_links
 
         keyboard = []
 
@@ -572,24 +576,32 @@ class RecordView(View):
             self.record_display(record_data),
         ]
 
-        linked_reports = database_views[self.table_name].linked_reports
+        report_links = database_views[self.table_name].report_links
 
-        if "id" in record_data and linked_reports and len(linked_reports) > 0:
-            for linked_report in linked_reports:
+        if "id" in record_data and report_links and len(report_links) > 0:
+            for report_link in report_links:
                 linked_report_query: tuple[str, list[Any]] = _get_records_query(
-                    table_name=linked_report.table
+                    table_name=report_link.table
                 )
-                report = database_views[linked_report.table].report
+                report = database_views[report_link.table].report
                 if report:
+                    conditions = [f"{report_link.link_by} = {record_data['id']}"]
+                    if report.date:
+                        conditions.append(
+                            f"{report.date} >= {date_utils.get_today_month_timestamp()}"
+                        )
+
                     data = DATABASE_DRIVER.get_report(
                         linked_report_query[0],
                         linked_report_query[1],
                         report.select,
                         report.group_by,
                         report.order_by,
-                        [f"{linked_report.link_by} = {record_data['id']}"],
+                        conditions,
                     )
                     text.append(report.display_record_func(data))
+
+        print(text)
 
         return "\n\n".join(text)
 
@@ -1308,7 +1320,7 @@ def conversation_filter():
 
 
 def default_display(record) -> str:
-    return "id" in record and record["id"] or "?"
+    return str("id" in record and record["id"] or "?")
 
 
 def check_record_params(state, telegram_user: TelegramUser):
@@ -1530,14 +1542,14 @@ def _records_keyboard(table_name, keyboard, message: Message):
             ]
         )
 
-        linked_reports = database_views[table_name].linked_reports
+        report_links = database_views[table_name].report_links
 
-        # if linked_reports and len(linked_reports) > 0:
+        # if report_links and len(report_links) > 0:
         if False:
             keyboard.append(
                 [
                     InlineKeyboardButton(
-                        f"📊 Report layers ({len(linked_reports)})",
+                        f"📊 Report layers ({len(report_links)})",
                         callback_data="_REPORT_LAYERS",
                     ),
                 ]

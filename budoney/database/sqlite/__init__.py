@@ -44,7 +44,7 @@ class SQLiteDatabase(Database):
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
-        search: set | None = None,
+        search: tuple[str, list[str]] | None = None,
         search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         record_id: int | None = None,
@@ -96,7 +96,7 @@ class SQLiteDatabase(Database):
         if search and search_columns:
             wheres = []
             for search_column in search_columns:
-                for searchee in search:
+                for searchee in search[1]:
                     wheres.append(f'{search_column} LIKE "%{searchee}%"')
             if len(wheres) > 0:
                 query += f" WHERE {' OR '.join(wheres)}"
@@ -127,11 +127,49 @@ class SQLiteDatabase(Database):
             records.append(dict(record))
         return records
 
-    def get_records_count(self, table: str):
-        query = f"SELECT COUNT(*) FROM {table}"
-        print("get_records_count", query)
-        self.cursor.execute(query)
+    def get_records_count(self, table: str, query: str, values: list):
+        count_query = f"SELECT COUNT(*) FROM ({query})"
+        print("get_records_count", count_query)
+        self.cursor.execute(count_query, values)
         return self.cursor.fetchone()[0]
+
+    def get_report(
+        self,
+        query: str,
+        values: list,
+        select: list[tuple[str, str | None]],
+        group_by: list[str],
+        order_by: list[tuple[str, bool, str | None]],
+        conditions: list,
+    ):
+        select_query = []
+        for selectee in select:
+            if selectee[1]:
+                select_query.append(f"{selectee[1]} AS {selectee[0]}")
+            else:
+                select_query.append(selectee[0])
+
+        report_query = f"SELECT {', '.join(select_query)} FROM ({query})"
+
+        if len(conditions) > 0:
+            report_query += f" WHERE ({') AND ('.join(conditions)})"
+
+        if len(group_by) > 0:
+            report_query += f" GROUP BY {', '.join(group_by)}"
+
+        order_by_query = []
+        for orderee in order_by:
+            if orderee[2]:
+                order_by_query.append(f"{orderee[0]} {orderee[2]}")
+            order_by_query.append(f"{orderee[0]} {orderee[1] and 'DESC' or 'ASC'}")
+        report_query += " ORDER BY " + ", ".join(order_by_query)
+
+        print("get_report", report_query)
+        self.cursor.execute(report_query, values)
+        records = list()
+        for record in self.cursor.fetchall():
+            records.append(dict(record))
+        return records
 
     def replace_data(self, table: str, record_id, data: dict):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])

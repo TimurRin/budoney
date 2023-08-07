@@ -32,7 +32,7 @@ class MemoryDatabase(Database):
         self._check_table(table)
         return list(self.db["data"][table].values())
 
-    def get_records_count(self, table: str):
+    def get_records_count(self, table: str, query: str, values: list):
         self._check_table(table)
         return len(list(self.db["data"][table].values()))
 

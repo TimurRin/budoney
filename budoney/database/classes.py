@@ -31,7 +31,18 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def get_records_count(self, table: str):
+    def get_records_count(self, table: str, query: str, values: list):
+        pass
+
+    @abc.abstractmethod
+    def get_report(
+        self,
+        query: str,
+        values: list,
+        select: list[str],
+        group_by: list[str],
+        order_by: list[tuple[str, bool]],
+    ):
         pass
 
     @abc.abstractmethod

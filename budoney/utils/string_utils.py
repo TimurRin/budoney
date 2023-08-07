@@ -9,10 +9,10 @@ def edits1(word: str) -> "set[str]":
     return set(deletes + transposes + replaces + inserts)
 
 
-def sql_search(word: str) -> "set[str]":
+def sql_search(word: str) -> "list[str]":
     print(word)
     if len(word) == 1:
-        return set(word)
+        return list(word)
     original = [word]
     splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
     print("splits", splits)
@@ -32,9 +32,16 @@ def sql_search(word: str) -> "set[str]":
 
     inserts2 = [L + "__" + R for L, R in splits]
     print("inserts2", inserts2)
-    total = set(
-        original + deletes + transposes + replaces + inserts
-        # + replaces2 + replaces3 + inserts2
-    )
+
+    total = list(set(
+        original
+        + deletes
+        + transposes
+        + replaces
+        + inserts
+        + replaces2
+        + replaces3
+        + inserts2
+    ))
     print(total)
     return total

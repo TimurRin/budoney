@@ -19,7 +19,7 @@ class Pagination:
     def __init__(self) -> None:
         self.offset: int = 0
         self.limit: int = 5
-        self.total: int = 0
+        self.total: int = -1
         self.pages: int = 0
 
 
@@ -35,7 +35,7 @@ class TelegramUser:
         self.records_extra: dict = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
-        self.search: dict[str, tuple[str, set]] = dict()
+        self.search: dict[str, tuple[str, list[str]]] = dict()
         self.date_offset: int = 0
 
     def get_pagination(self, table_name):
@@ -43,9 +43,9 @@ class TelegramUser:
             self.pagination[table_name] = Pagination()
         return self.pagination[table_name]
 
-    def get_search(self, table_name):
+    def get_search(self, table_name) -> tuple[str, list[str]]:
         if table_name not in self.search:
-            self.search[table_name] = ("", set())
+            self.search[table_name] = ("", list())
         return self.search[table_name]
 
     def is_operational(self):
@@ -62,6 +62,32 @@ class TelegramUser:
             del self.records_extra[table_name]
         if table_name in self.ignore_fast:
             del self.ignore_fast[table_name]
+
+
+class DatabaseReport:
+    def __init__(
+        self,
+        select: list[tuple[str, str | None]],
+        group_by: list[str],
+        order_by: list[tuple[str, bool, str | None]],
+        display_record_func: Callable[[list[dict[str, Any]]], str],
+        display_layer_func: Callable[..., str],
+    ) -> None:
+        self.select: list[tuple[str, str | None]] = select
+        self.group_by: list[str] = group_by
+        self.order_by: list[tuple[str, bool, str | None]] = order_by
+        self.display_record_func: Callable[[list[dict[str, Any]]], str] = display_record_func
+        self.display_layer_func: Callable[..., str] = display_layer_func
+
+
+class DatabaseLinkedReport:
+    def __init__(
+        self,
+        table: str,
+        link_by: str,
+    ) -> None:
+        self.table: str = table
+        self.link_by: str = link_by
 
 
 class View:
@@ -178,6 +204,12 @@ class View:
         print(
             print_label,
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_remove",
+        )
+
+    def handle_report_layers(self, update: Update):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_report_layers",
         )
 
     def handle_next(self, update: Update):
@@ -299,6 +331,8 @@ class View:
             return self.handle_edit(update)
         elif data == "_REMOVE":
             return self.handle_remove(update)
+        elif data == "_REPORT_LAYERS":
+            return self.handle_report_layers(update)
         else:
             if data in conversation_views and conversation_views[data].skip_to_records:
                 data = f"{data}_RECORDS"
@@ -379,6 +413,8 @@ class DatabaseView(View):
         fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
+        report: DatabaseReport | None = None,
+        linked_reports: list[DatabaseLinkedReport] | None = None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
@@ -395,33 +431,14 @@ class DatabaseView(View):
         if order_by == None:
             order_by = []
         self.order_by: list[tuple[str, bool, str | None]] = order_by
+        self.report: DatabaseReport | None = report
+        self.linked_reports: list[DatabaseLinkedReport] | None = linked_reports
 
         keyboard = []
 
-        aggregated_columns = []
-
         DATABASE_DRIVER.create_table(state_name, columns)
 
-        skip_to_records = True
-
-        for column in columns:
-            if "aggregate" in column:
-                # if skip_to_records:
-                #     skip_to_records = False
-                aggregated_columns.append(column["column"])
-                code = f"{state_name}_STATS_{column['column']}"
-                stats_view = DatabaseStatsView(code, state_name, column, columns)
-
-                keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            callback_data=code,
-                            text=stats_view.state_name_text_short(),
-                        )
-                    ]
-                )
-
-        self.skip_to_records = skip_to_records
+        self.skip_to_records = True
 
         special_handlers = {
             "get_records": ListRecordsView(f"{state_name}_RECORDS", state_name),
@@ -463,89 +480,6 @@ class DatabaseView(View):
             "",
             True,
         )
-
-
-class DatabaseStatsView(View):
-    def __init__(
-        self, state_name: str, parent_state_name, agg_column, columns: list[dict]
-    ) -> None:
-        super().__init__(state_name)
-        operational_states[state_name] = self
-        self.parent_state_name = parent_state_name
-        self.agg_column = agg_column
-        self.columns = columns
-
-    def state_name_text(self):
-        return "Report: " + localization["states"].get(
-            f"{self.parent_state_name}_PARAM_{self.agg_column['column']}",
-            self.state_name,
-        )
-
-    def state_name_text_short(self):
-        return "Report: " + localization["states"].get(
-            f"{self.parent_state_name}_PARAM_SHORT_{self.agg_column['column']}",
-            self.state_name,
-        )
-
-    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        keyboard = []
-
-        for column in self.columns:
-            if column["type"] == "data" or column["type"] == "date":
-                code = f"{self.state_name}_GROUPBY_{column['column']}"
-                info_view = InfoView(
-                    code, column, self.state_name, self.parent_state_name
-                )
-                keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            callback_data=code,
-                            text=info_view.state_name_text_short(),
-                        )
-                    ]
-                )
-
-        keyboard.append([back_button])
-
-        return InlineKeyboardMarkup(keyboard)
-
-
-class InfoView(View):
-    def __init__(
-        self, state_name: str, groupby_column, parent_state_name, grandparent_state_name
-    ) -> None:
-        super().__init__(state_name)
-        operational_states[state_name] = self
-
-        self.groupby_column = groupby_column
-        self.parent_state_name = parent_state_name
-        self.grandparent_state_name = grandparent_state_name
-
-        keyboard = []
-
-        keyboard.append([back_button])
-
-        self._keyboard = InlineKeyboardMarkup(keyboard)
-
-    def state_name_text(self):
-        return (
-            f"{conversation_views[self.parent_state_name].state_name_text()} by "
-            + localization["states"].get(
-                f"{self.grandparent_state_name}_PARAM_{self.groupby_column['column']}",
-                self.state_name,
-            )
-        )
-
-    def state_name_text_short(self):
-        return f"{conversation_views[self.parent_state_name].state_name_text_short()} by " + localization[
-            "states"
-        ].get(
-            f"{self.grandparent_state_name}_PARAM_SHORT_{self.groupby_column['column']}",
-            self.state_name,
-        )
-
-    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        return self._keyboard
 
 
 class ListRecordsView(View):
@@ -608,21 +542,13 @@ class ListRecordsView(View):
         )
 
     def handle_typed(self, update: Update, data: str):
-        search = telegram_users[update.message.chat.id].get_search(self.table_name)
-        if search[0] != data:
-            telegram_users[update.message.chat.id].search[self.table_name] = (
-                data,
-                string_utils.sql_search(data),
-            )
-            pagination = telegram_users[update.message.chat.id].get_pagination(
-                self.table_name
-            )
-            pagination.offset = 0
-            return conversation_views[self.state_name].state(
-                update.message,
-                "",
-                True,
-            )
+        return _records_handle_typed(
+            self.state_name,
+            self.table_name,
+            update,
+            telegram_users[update.message.chat.id],
+            data,
+        )
 
 
 class RecordView(View):
@@ -640,7 +566,32 @@ class RecordView(View):
 
     def state_text(self, telegram_user):
         record_data = telegram_user.records_data[self.table_name]
-        return f"<i>{'id' in record_data and ('ID ' + str(record_data['id'])) or 'Unknown'}</i>\n{self.record_display(record_data)}"
+
+        text = [
+            f"<i>{'id' in record_data and ('ID ' + str(record_data['id'])) or 'Unknown'}</i>",
+            self.record_display(record_data),
+        ]
+
+        linked_reports = database_views[self.table_name].linked_reports
+
+        if "id" in record_data and linked_reports and len(linked_reports) > 0:
+            for linked_report in linked_reports:
+                linked_report_query: tuple[str, list[Any]] = _get_records_query(
+                    table_name=linked_report.table
+                )
+                report = database_views[linked_report.table].report
+                if report:
+                    data = DATABASE_DRIVER.get_report(
+                        linked_report_query[0],
+                        linked_report_query[1],
+                        report.select,
+                        report.group_by,
+                        report.order_by,
+                        [f"{linked_report.link_by} = {record_data['id']}"],
+                    )
+                    text.append(report.display_record_func(data))
+
+        return "\n\n".join(text)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -977,7 +928,7 @@ class EditRecordValueView(View):
                 controls.append(skip_button)
         return controls
 
-    def verify_next(self, message: Message, data: str):
+    def verify_next(self, message: Message, data: str, edit: bool):
         check_record_params(
             conversation_views[self.parent_state_name],
             telegram_users[message.chat.id],
@@ -1026,11 +977,11 @@ class EditRecordValueView(View):
         return state.state(
             message,
             f"✅ Successfully added <b>{data}</b> ({self.column['type']}) for column <b>{self.column['column']}</b>",
-            True,
+            edit,
         )
 
     def handle(self, update: Update, data: str):
-        return self.verify_next(update.callback_query.message, data)
+        return self.verify_next(update.callback_query.message, data, True)
 
     def handle_remove(self, update: Update):
         check_record_params(
@@ -1078,7 +1029,16 @@ class EditRecordValueView(View):
         )
 
     def handle_typed(self, update: Update, data: str):
-        return self.verify_next(update.message, data)
+        if self.column["type"] == "data":
+            return _records_handle_typed(
+                self.state_name,
+                self.table_name,
+                update,
+                telegram_users[update.message.chat.id],
+                data,
+            )
+        else:
+            return self.verify_next(update.message, data, False)
 
 
 class EditTextRecordValueView(EditRecordValueView):
@@ -1285,7 +1245,7 @@ class EditDateRecordValueView(EditRecordValueView):
                 True,
             )
         elif date_button:
-            return self.verify_next(update.callback_query.message, data)
+            return self.verify_next(update.callback_query.message, data, True)
 
 
 telegram_users: "dict[Any, TelegramUser]" = {}
@@ -1366,9 +1326,12 @@ def check_record_params(state, telegram_user: TelegramUser):
         if column["column"] not in telegram_user.records[state.table_name]:
             if (
                 ("skippable" not in column)
-                or not column["skippable"] # column["skippable"] == "checking"
+                or not column["skippable"]  # column["skippable"] == "checking"
             ) or (
-                ("_ALL" not in telegram_user.ignore_fast[state.table_name] or column["skippable"] == "checking")
+                (
+                    "_ALL" not in telegram_user.ignore_fast[state.table_name]
+                    or column["skippable"] == "checking"
+                )
                 and (
                     column["column"] not in telegram_user.ignore_fast[state.table_name]
                     or not telegram_user.ignore_fast[state.table_name][column["column"]]
@@ -1385,10 +1348,18 @@ def check_record_params(state, telegram_user: TelegramUser):
 # records outer functions to reuse them
 
 
-def _records_state_text(table_name, telegram_user):
+def _records_state_text(table_name, telegram_user: TelegramUser):
     pagination = telegram_user.get_pagination(table_name)
+    search: tuple[str, list[str]] = telegram_user.get_search(table_name)
 
-    pagination.total = DATABASE_DRIVER.get_records_count(table_name)
+    query: tuple[str, list[Any]] = _get_records_query(
+        table_name=table_name, search=search
+    )
+
+    if pagination.total == -1:
+        pagination.total = DATABASE_DRIVER.get_records_count(
+            table_name, query[0], query[1]
+        )
     pagination.pages = math.ceil(pagination.total / pagination.limit)
     text = (
         pagination.total > 0
@@ -1432,10 +1403,9 @@ def link_tables(linked_tables, table_name, alias=None, record=None):
     return linked_tables
 
 
-def _get_records(
+def _get_records_query(
     table_name=None,
-    pagination=None,
-    search=None,
+    search: tuple[str, list[str]] | None = None,
     external=None,
     record_id=None,
     no_join=None,
@@ -1477,6 +1447,25 @@ def _get_records(
         record_id=record_id,
     )
 
+    return query
+
+
+def _get_records(
+    table_name=None,
+    pagination=None,
+    search: tuple[str, list[str]] | None = None,
+    external=None,
+    record_id=None,
+    no_join=None,
+):
+    query = _get_records_query(
+        table_name=table_name,
+        search=search,
+        external=external,
+        record_id=record_id,
+        no_join=no_join,
+    )
+
     result = DATABASE_DRIVER.get_records(
         query[0],
         query[1],
@@ -1491,6 +1480,8 @@ def _records_keyboard(table_name, keyboard, message: Message):
     pagination = telegram_users[message.chat.id].get_pagination(table_name)
     search = telegram_users[message.chat.id].get_search(table_name)
 
+    print("_records_keyboard", "search", search)
+
     if len(search[0]) > 0:
         keyboard.append(
             [
@@ -1501,9 +1492,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
             ]
         )
 
-    records = _get_records(
-        table_name=table_name, pagination=pagination, search=search[1]
-    )
+    records = _get_records(table_name=table_name, pagination=pagination, search=search)
     for index, record in enumerate(records):
         keyboard.append(
             [
@@ -1540,6 +1529,19 @@ def _records_keyboard(table_name, keyboard, message: Message):
                 ),
             ]
         )
+
+        linked_reports = database_views[table_name].linked_reports
+
+        # if linked_reports and len(linked_reports) > 0:
+        if False:
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        f"📊 Report layers ({len(linked_reports)})",
+                        callback_data="_REPORT_LAYERS",
+                    ),
+                ]
+            )
     return keyboard
 
 
@@ -1572,9 +1574,10 @@ def _records_handle_pagination(table_name, update: Update, data: str):
             pagination.offset = pagination.total - pagination.limit
     elif data == "_CLEAR_SEARCH":
         options_changed = True
+        pagination.total = -1
         telegram_users[update.callback_query.message.chat.id].search[table_name] = (
             "",
-            set(),
+            list(),
         )
 
     return options_changed
@@ -1588,4 +1591,23 @@ def _records_handle_add(table_name, update: Update):
         return check_record_params(
             conversation_views[f"{table_name}_EDIT"],
             telegram_users[update.callback_query.message.chat.id],
+        )
+
+
+def _records_handle_typed(
+    state_name, table_name, update: Update, telegram_user: TelegramUser, data
+):
+    search = telegram_user.get_search(table_name)
+    if search[0] != data:
+        telegram_user.search[table_name] = (
+            data,
+            string_utils.sql_search(data),
+        )
+        pagination = telegram_user.get_pagination(table_name)
+        pagination.offset = 0
+        pagination.total = -1
+        return conversation_views[state_name].state(
+            update.message,
+            "",
+            False,
         )

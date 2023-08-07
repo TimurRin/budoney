@@ -1,7 +1,11 @@
 from typing import Any
 from datetime import datetime
+
+from regex import D
 import configs
 from interface.telegram.classes import (
+    DatabaseLinkedReport,
+    DatabaseReport,
     DefaultView,
     DatabaseView,
 )
@@ -70,13 +74,6 @@ def _display_inline_transaction(record):
 
 
 def _display_full_expense(record):
-    # EXPENSE — 765.43 RUB
-    # 🍔 Burger King (freckin' hot fish burgers)
-    # 👱🏻‍♂️🟥💳 *0160 VISA Credit (*8983 Credit Account) of Timur in Alfa-Bank
-
-    # 🍴 Catering expenses this month: 2145.81 RUB
-    # 💸 Money left: 6335.94 RUB
-
     text_parts = []
 
     text_parts.append(
@@ -168,6 +165,17 @@ def _fast_type_expense(data: str) -> tuple[dict[str, Any], dict[str, Any]]:
     return (record, record_extra)
 
 
+def display_record_expense(data: list[dict[str, Any]]) -> str:
+    if not data:
+        return "No expenses to show"
+    lines = ["<b>Expenses report</b>"]
+    for row in data:
+        lines.append(
+            f"{row['sum']} {row['financial_account__currency__code']} ({row['financial_account__type']})"
+        )
+    return "\n".join(lines)
+
+
 def _display_inline_financial_account(record):
     text_parts = []
 
@@ -234,6 +242,19 @@ def _display_inline_payment_card(record):
 
     if "financial_account__name" in record and record["financial_account__name"]:
         text_parts.append("(" + record["financial_account__name"] + ")")
+    elif (
+        "financial_account__number" in record
+        and record["financial_account__number"]
+        and "financial_account__operator__name" in record
+        and record["financial_account__operator__name"]
+    ):
+        text_parts.append(
+            "(*"
+            + record["financial_account__number"]
+            + " "
+            + record["financial_account__operator__name"]
+            + ")"
+        )
     elif "financial_account__number" in record and record["financial_account__number"]:
         text_parts.append("(*" + record["financial_account__number"] + ")")
     elif (
@@ -273,7 +294,7 @@ def init():
         "income",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum", "type": "float", "aggregate": True},
+            {"column": "sum", "type": "float"},
             {
                 "column": "financial_account",
                 "type": "data",
@@ -321,25 +342,39 @@ def init():
                     }
                 ],
             },
-            {"column": "sum", "type": "float", "aggregate": True},
+            {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
         display_inline_func=_display_inline_transaction,
         display_full_func=_display_full_expense,
         fast_type_processor=_fast_type_expense,
         order_by=[("date", True, None), ("organization__name", False, None)],
+        report=DatabaseReport(
+            select=[
+                ("sum", "ROUND(SUM(sum))"),
+                ("financial_account__type", None),
+                ("financial_account__currency__code", None),
+            ],
+            group_by=["financial_account__currency", "financial_account__type"],
+            order_by=[
+                ("financial_account__currency", False, None),
+                ("sum", True, None),
+            ],
+            display_record_func=display_record_expense,
+            display_layer_func=lambda x: x,
+        ),
     )
     DatabaseView(
         "transfers",
         [
             {"column": "date", "type": "date"},
-            {"column": "sum_source", "type": "float", "aggregate": True},
+            {"column": "sum_source", "type": "float"},
             {
                 "column": "account_source",
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "sum_target", "type": "float", "aggregate": True},
+            {"column": "sum_target", "type": "float"},
             {
                 "column": "account_target",
                 "type": "data",
@@ -358,6 +393,7 @@ def init():
         ],
         display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=[("name", False, None)],
+        linked_reports=[DatabaseLinkedReport("expenses", "organization__category")],
     )
     DatabaseView(
         "financial_accounts",

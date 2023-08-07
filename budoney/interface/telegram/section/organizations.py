@@ -1,4 +1,5 @@
 from interface.telegram.classes import (
+    DatabaseLinkedReport,
     DatabaseView,
 )
 
@@ -31,4 +32,5 @@ def init():
         ],
         display_inline_func=_display_inline_organization,
         order_by=[("category__name", False, None), ("name", False, None)],
+        linked_reports=[DatabaseLinkedReport("expenses", "organization")],
     )

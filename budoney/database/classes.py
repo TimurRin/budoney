@@ -1,6 +1,7 @@
 import abc
 from typing import Any
 
+
 class Database:
     def __init__(self):
         pass
@@ -13,9 +14,10 @@ class Database:
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
-        search: set | None = None,
+        search: tuple[str, list[str]] | None = None,
         search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
+        conditions: list | None = None,
         record_id: int | None = None,
     ) -> tuple[str, list[Any]]:
         pass
@@ -31,7 +33,7 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def get_records_count(self, table: str, query: str, values: list):
+    def get_records_count(self, table: str, query: str, values: list) -> int:
         pass
 
     @abc.abstractmethod
@@ -39,10 +41,15 @@ class Database:
         self,
         query: str,
         values: list,
-        select: list[str],
+        select: list[tuple[str, str | None]],
         group_by: list[str],
-        order_by: list[tuple[str, bool]],
-    ):
+        order_by: list[tuple[str, bool, str | None]],
+        conditions: list,
+    ) -> list[Any]:
+        pass
+
+    @abc.abstractmethod
+    def get_data(self, query: str, values: list) -> list[dict[str, Any]]:
         pass
 
     @abc.abstractmethod

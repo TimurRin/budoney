@@ -47,11 +47,13 @@ class SQLiteDatabase(Database):
         search: tuple[str, list[str]] | None = None,
         search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
+        conditions: list | None = None,
         record_id: int | None = None,
     ) -> tuple[str, list[Any]]:
         selects = []
         selects_external = []
         joins = []
+        wheres = []
         values = []
         query: str = "SELECT"
 
@@ -94,12 +96,14 @@ class SQLiteDatabase(Database):
             query += f" WHERE {table}.id = ?"
             values.append(record_id)
         if search and search_columns:
-            wheres = []
             for search_column in search_columns:
                 for searchee in search[1]:
                     wheres.append(f'{search_column} LIKE "%{searchee}%"')
-            if len(wheres) > 0:
-                query += f" WHERE {' OR '.join(wheres)}"
+        if conditions:
+            for condition in conditions:
+                wheres.append(condition)
+        if len(wheres) > 0:
+            query += f" WHERE {' OR '.join(wheres)}"
         if order_by and not record_id and not external:
             order_by_query = []
             for orderee in order_by:
@@ -127,7 +131,7 @@ class SQLiteDatabase(Database):
             records.append(dict(record))
         return records
 
-    def get_records_count(self, table: str, query: str, values: list):
+    def get_records_count(self, table: str, query: str, values: list) -> int:
         count_query = f"SELECT COUNT(*) FROM ({query})"
         print("get_records_count", count_query)
         self.cursor.execute(count_query, values)
@@ -141,7 +145,7 @@ class SQLiteDatabase(Database):
         group_by: list[str],
         order_by: list[tuple[str, bool, str | None]],
         conditions: list,
-    ):
+    ) -> list[Any]:
         select_query = []
         for selectee in select:
             if selectee[1]:
@@ -166,6 +170,18 @@ class SQLiteDatabase(Database):
 
         print("get_report", report_query)
         self.cursor.execute(report_query, values)
+        records = list()
+        for record in self.cursor.fetchall():
+            records.append(dict(record))
+        return records
+
+    def get_data(
+        self,
+        query: str,
+        values: list
+    ) -> list[dict[str, Any]]:
+        print("get_data", query, values)
+        self.cursor.execute(query, values)
         records = list()
         for record in self.cursor.fetchall():
             records.append(dict(record))

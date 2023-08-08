@@ -12,6 +12,7 @@ def get_today_transaction_code() -> str:
 def get_today_text() -> str:
     return datetime.today().strftime("%Y-%m-%d")
 
+
 def get_relative_date(date, today=None):
     if not today:
         today = datetime.today()
@@ -23,16 +24,18 @@ def get_relative_date(date, today=None):
     elif days_ago == -1:
         return "tomorrow"
     elif days_ago < 0:
-        return f"in {days_ago}d"
+        return f"in {abs(days_ago)}d"
     else:
         return f"{days_ago}d ago"
+
 
 def get_relative_timestamp(timestamp, today=None):
     return get_relative_date(datetime.fromtimestamp(timestamp), today=today)
 
+
 def get_today_month_timestamp():
     today = datetime.today()
-    return int(datetime(today.year,today.month,1).timestamp())
+    return int(datetime(today.year, today.month, 1).timestamp())
 
 
 def monthly_codes_range(start_date: datetime, end_date: datetime):

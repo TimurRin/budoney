@@ -20,11 +20,11 @@ def init():
             #     "clothes",
             #     "storage",
             # ],
-            # [
-            #     "health",
-            #     "food",
-            #     "plants",
-            # ],
+            [
+                # "health",
+                # "food",
+                "plants",
+            ],
             ["organizations", "people"],
         ],
     )

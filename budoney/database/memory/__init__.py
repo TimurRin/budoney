@@ -42,7 +42,7 @@ class MemoryDatabase(Database):
         self.db["data"][table][data["id"]] = data
         yaml_manager.save(self.yaml_file, self.db)
 
-    def append_data(self, table: str, data: dict):
+    def append_data(self, table: str, data: dict) -> int | None:
         self._check_table(table)
         data = self._check_data(dict(data))
         self.db["data"][table][data["id"]] = data

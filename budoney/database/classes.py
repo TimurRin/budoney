@@ -57,7 +57,7 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def append_data(self, table: str, data: dict):
+    def append_data(self, table: str, data: dict) -> int | None:
         pass
 
     @abc.abstractmethod

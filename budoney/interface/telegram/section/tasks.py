@@ -22,7 +22,7 @@ def _display_inline_current_task(record):
             )
 
         if "important" in record and record["important"]:
-            text_parts.append("❗️")
+            text_parts.append("‼️")
 
     if "recurring" in record and record["recurring"]:
         text_parts.append("🔁")
@@ -43,7 +43,11 @@ def _display_inline_scheduled_task(record):
         if "important" in record and record["important"]:
             text_parts.append("‼️")
 
-        if "urgent" in record and record["urgent"] is not None and record["urgent"] >= 0:
+        if (
+            "urgent" in record
+            and record["urgent"] is not None
+            and record["urgent"] >= 0
+        ):
             text_parts.append("⚡️")
 
     text_parts.append(str(record.get("name", "???")))
@@ -106,7 +110,7 @@ def init():
             {"column": "weekdays", "type": "text", "skippable": True},
             {"column": "schedule_to_the_day", "type": "boolean"},
             {"column": "schedule_since_created", "type": "boolean"},
-            {"column": "paused", "type": "boolean"},
+            {"column": "paused", "type": "boolean", "skippable": True},
         ],
         display_inline_func=_display_inline_scheduled_task,
         order_by=[

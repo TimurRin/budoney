@@ -28,12 +28,12 @@ class SQLiteDatabase(Database):
             self._local.cursor = self._local.connection.cursor()
 
     @property
-    def connection(self):
+    def connection(self) -> sqlite3.Connection:
         self._init_connection_and_cursor()
         return self._local.connection
 
     @property
-    def cursor(self):
+    def cursor(self) -> sqlite3.Cursor:
         self._init_connection_and_cursor()
         return self._local.cursor
 
@@ -195,14 +195,17 @@ class SQLiteDatabase(Database):
         self.cursor.execute(query, values)
         self.connection.commit()
 
-    def append_data(self, table: str, data: dict):
+    def append_data(self, table: str, data: dict) -> int | None:
         parsed_data = {k: v for k, v in data.items() if not k.startswith("_")}
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         print("append_data", query, list(parsed_data.values()))
-        hehe = self.cursor.execute(query, list(parsed_data.values()))
+        self.cursor.execute(query, list(parsed_data.values()))
+        last_id = self.cursor.lastrowid
         self.connection.commit()
+        return last_id
+
 
     def create_table(self, table: str, columns: list[dict]):
         column_definitions = [

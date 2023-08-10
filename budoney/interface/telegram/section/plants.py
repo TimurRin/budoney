@@ -8,8 +8,8 @@ def init():
     DefaultView(
         "plants",
         [
-            ["plant_species", "plant_lots"],
-            ["plant_registry", "plant_replants"],
+            ["plant_lots", "plant_species"],
+            ["plant_registry", "plant_stages", "plant_replants"],
         ],
     )
     DatabaseView(
@@ -25,6 +25,26 @@ def init():
         "plant_lots",
         [
             {"column": "name", "type": "text"},
+            {"column": "task", "type": "data", "data_type": "tasks_recurring", "skippable": True},
+        ],
+    )
+    DatabaseView(
+        "plant_stages",
+        [
+            {"column": "plant", "type": "data", "data_type": "plant_registry"},
+            {"column": "date_occurence", "type": "date"},
+            {
+                "column": "stage",
+                "type": "select",
+                "select": [
+                    "SPROUT",
+                    "SEEDLING",
+                    "PLANT",
+                    "FLOWERS",
+                    "PREMATURE_FRUITS",
+                    "MATURE_FRUITS",
+                ],
+            },
         ],
     )
     DatabaseView(
@@ -32,7 +52,12 @@ def init():
         [
             {"column": "plant", "type": "data", "data_type": "plant_registry"},
             {"column": "date_replanted", "type": "date"},
-            {"column": "lot", "type": "text", "skippable": True},
+            {
+                "column": "lot",
+                "type": "data",
+                "data_type": "plant_lots",
+                "skippable": True,
+            },
             {"column": "note", "type": "text", "skippable": True},
         ],
     )

@@ -117,7 +117,10 @@ class View:
         if text:
             result_text = result_text + text + "\n\n"
 
-        result_text = result_text + f"<b>{self.state_name_text()}</b>"
+        result_text = (
+            result_text
+            + f"<b>{self.state_name_text(telegram_users[message.chat.id])}</b>"
+        )
 
         state_text = self.state_text(telegram_users[message.chat.id])
         if state_text:
@@ -138,11 +141,8 @@ class View:
             )
         return self.state_name
 
-    def state_name_text(self):
+    def state_name_text(self, telegram_user: TelegramUser):
         return localization["states"].get(self.state_name, self.state_name)
-
-    def state_name_text_short(self):
-        return self.state_name_text()
 
     def debug_text(self, user: TelegramUser):
         if configs.general["production_mode"]:
@@ -492,6 +492,9 @@ class ListRecordsView(View):
         self.table_name = table_name
         self.handle_anything = True
 
+    def state_name_text(self, telegram_user: TelegramUser):
+        return f"{localization['states'].get(self.table_name, self.table_name)} > {localization['states'].get('_HEADER_RECORDS', '_HEADER_RECORDS')}"
+
     def state_text(self, telegram_user):
         return _records_state_text(self.table_name, telegram_user)
 
@@ -562,8 +565,12 @@ class RecordView(View):
         self.table_name = table_name
         self.handle_anything = True
 
+    def state_name_text(self, telegram_user: TelegramUser):
+        record_data = telegram_user.records_data[self.table_name]
+
+        return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and ('ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
+
     def record_display(self, record):
-        print(self.table_name, str(record.get("id", "?")))
         return database_views[self.table_name].display_full_func(record) or str(
             record.get("id", "?")
         )
@@ -572,7 +579,6 @@ class RecordView(View):
         record_data = telegram_user.records_data[self.table_name]
 
         text = [
-            f"<i>{'id' in record_data and ('ID ' + str(record_data['id'])) or 'Unknown'}</i>",
             self.record_display(record_data),
         ]
 
@@ -610,7 +616,7 @@ class RecordView(View):
 
         for column in database_views[self.table_name].columns:
             code = None
-            code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
+            code_text = f"{self.table_name}_PARAM_{column['column']}"
             text = localization["states"].get(code_text, column["column"])
             if (
                 column["column"]
@@ -689,6 +695,9 @@ class FastTypeRecordView(View):
         operational_states[state_name] = self
         self.table_name = table_name
         self.handle_anything = True
+
+    def state_name_text(self, telegram_user: TelegramUser):
+        return f"{localization['states'].get(self.table_name, self.table_name)} > {localization['states'].get('_HEADER_FAST_TYPE', '_HEADER_FAST_TYPE')}"
 
     def state_text(self, telegram_user) -> str:
         return "Select an appropriate template or type data to work with"
@@ -781,6 +790,11 @@ class EditRecordView(View):
             else:
                 EditTextRecordValueView(code, state_name, table_name, column)
 
+    def state_name_text(self, telegram_user: TelegramUser):
+        record_data = telegram_user.records_data[self.table_name]
+
+        return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
+
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
         return database_views[self.table_name].display_full_func(record) or str(
@@ -796,7 +810,7 @@ class EditRecordView(View):
 
         for column in database_views[self.table_name].columns:
             code = f"{self.table_name}_PARAM_{column['column']}"
-            code_text = f"{self.table_name}_PARAM_SHORT_{column['column']}"
+            code_text = f"{self.table_name}_PARAM_{column['column']}"
             text = localization["states"].get(code_text, column["column"])
             if (
                 column["column"]
@@ -907,21 +921,20 @@ class EditRecordValueView(View):
         self.handle_anything = True
         self._help_text = "Set your value below"
 
+    def state_name_text(self, telegram_user: TelegramUser):
+        record_data = telegram_user.records_data[self.table_name]
+
+        return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
+
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
         return database_views[self.table_name].display_full_func(record) or str(
             record.get("id", "?")
         )
 
-    def state_name_text_short(self):
-        return localization["states"].get(
-            f"{self.table_name}_PARAM_SHORT_{self.column['column']}",
-            super().state_name_text(),
-        )
-
     def state_text(self, telegram_user):
-        record_data = telegram_user.records_data[self.table_name]
-        return f"<i>{'id' in record_data and ('ID ' + str(record_data['id'])) or 'New'}</i>\n{self.record_display(record_data)}\n\n<b><u>{self.state_name_text_short()}</u></b>: {self._help_text}"
+        param = f"{self.table_name}_PARAM_{self.column['column']}"
+        return f"<b><u>{localization['states'].get(param, self.column['column'])}</u></b>: {self._help_text}"
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []

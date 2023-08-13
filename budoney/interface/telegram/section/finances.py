@@ -1,5 +1,6 @@
 from typing import Any
 from datetime import datetime
+from database import DATABASE_DRIVER
 import configs
 from interface.telegram.classes import (
     DatabaseLinkedReport,
@@ -11,15 +12,32 @@ from loc import localization
 import utils.date_utils as date_utils
 
 
+financial_account_types = ["BANK", "CASH"]
 select_emoji = {
     "financial_accounts": {
         "type": {
             "CASH": "💵",
             "BANK": "🏦",
-            "SIM": "📱",
         }
     }
 }
+
+
+def get_balance():
+    query = "SELECT COALESCE(i.financial_account__type, e.financial_account__type, tf.account_source__type, tt.account_target__type) AS financial_account_type, GROUP_CONCAT(CAST((COALESCE(income__sum, 0) - COALESCE(expenses__sum, 0) - COALESCE(transfers__sum_source, 0) + COALESCE(transfers__sum_target, 0)) + COALESCE(correction__sum, 0) AS TEXT) || ' ' || c.code, ', ') AS balances FROM currencies c LEFT JOIN ( SELECT 'BANK' AS operation_type UNION ALL SELECT 'CASH' AS operation_type ) AS operation_types LEFT JOIN ( SELECT ROUND(SUM(income.sum)) AS income__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account GROUP BY financial_account__currency, financial_account__type ) i ON i.financial_account__currency = c.id AND i.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(expenses.sum)) AS expenses__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account GROUP BY financial_account__currency, financial_account__type ) e ON e.financial_account__currency = c.id AND e.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(transfers.sum_source)) AS transfers__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source GROUP BY account_source__currency, account_source__type ) tf ON tf.account_source__currency = c.id AND tf.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(transfers.sum_target)) AS transfers__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target GROUP BY account_target__currency, account_target__type ) tt ON tt.account_target__currency = c.id AND tt.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(sum)) AS correction__sum, corrections.account_type AS correction__account_type, corrections.currency AS correction__currency FROM corrections GROUP BY correction__currency, correction__account_type ) cor ON cor.correction__currency = c.id AND cor.correction__account_type = operation_types.operation_type WHERE financial_account_type IS NOT NULL AND (COALESCE(income__sum, 0) - COALESCE(expenses__sum, 0) - COALESCE(transfers__sum_source, 0) + COALESCE(transfers__sum_target, 0)) + COALESCE(correction__sum, 0) > 0 GROUP BY financial_account_type"
+    return DATABASE_DRIVER.get_data(query, [])
+
+
+def _extra_info_balance():
+    balance = get_balance()
+    if not balance:
+        return ""
+    lines = ["<b><u>Money balance</u></b>"]
+    for row in balance:
+        lines.append(
+            f"{select_emoji['financial_accounts']['type'][row['financial_account_type']]} {row['financial_account_type']}: <b>{row['balances']}</b>"
+        )
+    return "\n".join(lines)
 
 
 def _display_inline_transaction(record):
@@ -235,8 +253,8 @@ def _fast_type_expense(data: str) -> tuple[dict[str, Any], dict[str, Any]]:
 
 def _display_record_income(data: list[dict[str, Any]]) -> str:
     if not data:
-        return "No income to show"
-    lines = ["<b>Income report</b>"]
+        return ""
+    lines = ["<b>Income</b> this month:"]
     for row in data:
         lines.append(
             f"<b>{row['sum']}</b> {row['financial_account__currency__code']} ({row['financial_account__type']})"
@@ -246,8 +264,8 @@ def _display_record_income(data: list[dict[str, Any]]) -> str:
 
 def _display_record_expense(data: list[dict[str, Any]]) -> str:
     if not data:
-        return "No expenses to show"
-    lines = ["<b>Expenses report</b>"]
+        return ""
+    lines = ["<b>Expenses</b> this month:"]
     for row in data:
         lines.append(
             f"<b>{row['sum']}</b> {row['financial_account__currency__code']} ({row['financial_account__type']})"
@@ -357,8 +375,10 @@ def init():
                 "financial_accounts",
                 "payment_cards",
             ],
-            ["income", "expenses", "transfers"],
+            ["income", "expenses"],
+            ["corrections", "transfers"],
         ],
+        extra_info=[_extra_info_balance],
     )
     DatabaseView(
         "currencies",
@@ -494,7 +514,8 @@ def init():
             {
                 "column": "account_type",
                 "type": "select",
-                "select": ["CASH", "BANK", "SIM"],
+                "select": financial_account_types,
+                "select_key": "account_type"
             },
             {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
@@ -529,7 +550,8 @@ def init():
             {
                 "column": "type",
                 "type": "select",
-                "select": ["CASH", "BANK", "SIM"],
+                "select": financial_account_types,
+                "select_key": "account_type"
             },
             {"column": "credit", "type": "boolean"},
             {

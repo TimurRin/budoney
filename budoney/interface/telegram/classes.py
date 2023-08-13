@@ -375,8 +375,10 @@ class DefaultView(View):
         self,
         state_name: str,
         forks: "list[list[str]]",
+        extra_info=None
     ) -> None:
         super().__init__(state_name)
+        self.extra_info = extra_info
 
         keyboard = []
 
@@ -395,6 +397,15 @@ class DefaultView(View):
             keyboard.append([back_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
+
+    def state_text(self, telegram_user):
+        if self.extra_info:
+            lines = []
+            for row in self.extra_info:
+                lines.append(row())
+            print(lines)
+            return "\n".join(lines)    
+        return ""
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -1131,7 +1142,7 @@ class EditSelectRecordValueView(EditRecordValueView):
                 [
                     InlineKeyboardButton(
                         callback_data=selectee,
-                        text=selectee,
+                        text=("select_key" in self.column and localization["states"].get(f"SELECT_{self.column['select_key']}_{selectee}", selectee) or selectee),
                     )
                 ]
             )

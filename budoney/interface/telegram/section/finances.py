@@ -410,7 +410,7 @@ def init():
             ],
             display_record_func=_display_record_income,
             display_layer_func=lambda x: x,
-            # date="date",
+            date="date",
         ),
     )
     DatabaseView(
@@ -462,7 +462,7 @@ def init():
             ],
             display_record_func=_display_record_expense,
             display_layer_func=lambda x: x,
-            # date="date",
+            date="date",
         ),
     )
     DatabaseView(
@@ -482,6 +482,21 @@ def init():
             },
             {"column": "sum_target", "type": "float"},
             {"column": "comission", "type": "float"},
+            {"column": "description", "type": "text", "skippable": True},
+        ],
+        order_by=[("date", True, None)],
+    )
+    DatabaseView(
+        "corrections",
+        [
+            {"column": "date", "type": "date"},
+            {"column": "currency", "type": "data", "data_type": "currencies"},
+            {
+                "column": "account_type",
+                "type": "select",
+                "select": ["CASH", "BANK", "SIM"],
+            },
+            {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
         order_by=[("date", True, None)],
@@ -510,12 +525,12 @@ def init():
                 "data_type": "organizations",
                 "skippable": True,
             },
+            {"column": "currency", "type": "data", "data_type": "currencies"},
             {
                 "column": "type",
                 "type": "select",
                 "select": ["CASH", "BANK", "SIM"],
             },
-            {"column": "currency", "type": "data", "data_type": "currencies"},
             {"column": "credit", "type": "boolean"},
             {
                 "column": "owner",

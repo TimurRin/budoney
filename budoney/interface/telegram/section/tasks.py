@@ -92,7 +92,7 @@ def init():
             {"column": "date_due", "type": "date", "skippable": True},
             {"column": "date_completed", "type": "date", "skippable": True},
         ],
-        display_inline_func=_display_inline_current_task,
+        inline_display=_display_inline_current_task,
         order_by=[
             ("date_completed", True, "IS NOT NULL"),
             ("date_due", False, "IS NULL"),
@@ -112,7 +112,7 @@ def init():
             {"column": "schedule_since_created", "type": "boolean"},
             {"column": "paused", "type": "boolean", "skippable": True},
         ],
-        display_inline_func=_display_inline_scheduled_task,
+        inline_display=_display_inline_scheduled_task,
         order_by=[
             ("paused", False, None),
             ("urgent", False, "IS NULL"),

@@ -70,17 +70,17 @@ class DatabaseReport:
         select: list[tuple[str, str | None]],
         group_by: list[str],
         order_by: list[tuple[str, bool, str | None]],
-        display_record_func: Callable[[list[dict[str, Any]]], str],
-        display_layer_func: Callable[..., str],
+        record_display: Callable[[list[dict[str, Any]]], str],
+        layer_display: Callable[..., str],
         date: str | None = None,
     ) -> None:
         self.select: list[tuple[str, str | None]] = select
         self.group_by: list[str] = group_by
         self.order_by: list[tuple[str, bool, str | None]] = order_by
-        self.display_record_func: Callable[
+        self.record_display: Callable[
             [list[dict[str, Any]]], str
-        ] = display_record_func
-        self.display_layer_func: Callable[..., str] = display_layer_func
+        ] = record_display
+        self.layer_display: Callable[..., str] = layer_display
         self.date: str | None = date
 
 
@@ -423,8 +423,8 @@ class DatabaseView(View):
         self,
         state_name: str,
         columns: list[dict],
-        display_inline_func: Callable[[dict[str, Any]], str] | None = None,
-        display_full_func: Callable[[dict[str, Any]], str] | None = None,
+        inline_display: Callable[[dict[str, Any]], str] | None = None,
+        extended_display: Callable[[dict[str, Any]], str] | None = None,
         fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
@@ -434,11 +434,11 @@ class DatabaseView(View):
         super().__init__(state_name)
         database_views[state_name] = self
         self.columns = columns
-        if not display_inline_func:
-            display_inline_func = default_display
-        self.display_inline_func: Callable[[dict[str, Any]], str] = display_inline_func
-        self.display_full_func: Callable[[dict[str, Any]], str] = (
-            display_full_func or display_inline_func
+        if not inline_display:
+            inline_display = default_display
+        self.inline_display: Callable[[dict[str, Any]], str] = inline_display
+        self.extended_display: Callable[[dict[str, Any]], str] = (
+            extended_display or inline_display
         )
         self.fast_type_processor: Callable[
             [str], tuple[dict[str, Any], dict[str, Any]]
@@ -582,7 +582,7 @@ class RecordView(View):
         return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and ('ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
 
     def record_display(self, record):
-        return database_views[self.table_name].display_full_func(record) or str(
+        return database_views[self.table_name].extended_display(record) or str(
             record.get("id", "?")
         )
 
@@ -616,7 +616,7 @@ class RecordView(View):
                         report.order_by,
                         conditions,
                     )
-                    text.append(report.display_record_func(data))
+                    text.append(report.record_display(data))
 
         print(text)
 
@@ -647,7 +647,7 @@ class RecordView(View):
                     }
                     text_value = database_views[
                         column["data_type"]
-                    ].display_inline_func(relevant)
+                    ].inline_display(relevant)
                     if text_value:
                         text = f"Go to: {text} [{text_value}]"
             if code:
@@ -808,7 +808,7 @@ class EditRecordView(View):
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
-        return database_views[self.table_name].display_full_func(record) or str(
+        return database_views[self.table_name].extended_display(record) or str(
             record.get("id", "?")
         )
 
@@ -847,7 +847,7 @@ class EditRecordView(View):
                     }
                     text_value = database_views[
                         column["data_type"]
-                    ].display_inline_func(relevant)
+                    ].inline_display(relevant)
                     if text_value:
                         text = f"{text} [{text_value}]"
                 else:
@@ -901,9 +901,9 @@ class EditRecordView(View):
                 self.table_name,
                 record,
             )
-            if database_views[self.table_name].display_full_func:
+            if database_views[self.table_name].extended_display:
                 send_info_message(
-                    database_views[self.table_name].display_full_func(
+                    database_views[self.table_name].extended_display(
                         telegram_users[
                             update.callback_query.message.chat.id
                         ].records_data[self.table_name]
@@ -939,7 +939,7 @@ class EditRecordValueView(View):
 
     def record_display(self, record):
         print(self.table_name, str(record.get("id", "?")))
-        return database_views[self.table_name].display_full_func(record) or str(
+        return database_views[self.table_name].extended_display(record) or str(
             record.get("id", "?")
         )
 
@@ -1534,7 +1534,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
             [
                 InlineKeyboardButton(
                     callback_data=record["id"],
-                    text=database_views[table_name].display_inline_func(record)
+                    text=database_views[table_name].inline_display(record)
                     or str(record["id"]),
                 )
             ]

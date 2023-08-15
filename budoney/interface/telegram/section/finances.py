@@ -28,7 +28,7 @@ def get_balance():
     return DATABASE_DRIVER.get_data(query, [])
 
 
-def _extra_info_balance():
+def _finances_balance_extra_info():
     balance = get_balance()
     if not balance:
         return ""
@@ -40,7 +40,153 @@ def _extra_info_balance():
     return "\n".join(lines)
 
 
-def _display_inline_transaction(record):
+def _sub_organization_extended_display(record):
+    organization_line = []
+    if (
+        "organization__category__emoji" in record
+        and record["organization__category__emoji"]
+    ):
+        organization_line.append(record["organization__category__emoji"])
+
+    if "organization__emoji" in record and record["organization__emoji"]:
+        organization_line.append(record["organization__emoji"])
+
+    if "organization__name" in record and record["organization__name"]:
+        organization_line.append("<b>" + record["organization__name"] + "</b>")
+
+    if "description" in record and record["description"]:
+        organization_line.append("(" + record["description"] + ")")
+
+    if len(organization_line):
+        return " ".join(organization_line)
+
+
+def _sub_method_inline_display(record, account_prefix="", payment_card_prefix=""):
+    if account_prefix:
+        account_prefix = account_prefix + "__"
+
+    method_line = []
+    if (
+        f"{account_prefix}owner__emoji" in record
+        and record[f"{account_prefix}owner__emoji"]
+    ):
+        method_line.append(record[f"{account_prefix}owner__emoji"])
+
+    if (
+        f"{account_prefix}operator__emoji" in record
+        and record[f"{account_prefix}operator__emoji"]
+    ):
+        method_line.append(record[f"{account_prefix}operator__emoji"])
+
+    financial_account = []
+    if f"{account_prefix}number" in record and record[f"{account_prefix}number"]:
+        financial_account.append("*" + record[f"{account_prefix}number"])
+
+    if f"{account_prefix}type" in record and record[f"{account_prefix}type"] == "CASH":
+        financial_account.append("💵")
+        financial_account.append(
+            localization["states"].get(f"SELECT_account_type_CASH", "CASH")
+        )
+
+    if record.get(f"{account_prefix}credit", 0) == 1:
+        financial_account.append("Credit")
+
+    if payment_card_prefix and (
+        payment_card_prefix in record and record[payment_card_prefix]
+    ):
+        if payment_card_prefix:
+            payment_card_prefix = payment_card_prefix + "__"
+        method_line.append("💳")
+        method_line.append("*" + record.get(f"{payment_card_prefix}number", "????"))
+
+        method_line.append(record.get(f"{payment_card_prefix}payment_system", "????"))
+
+        if record.get(f"{payment_card_prefix}credit", 0) == 1:
+            method_line.append("Credit")
+    elif len(financial_account):
+        method_line.append((" ".join(financial_account)))
+
+    if len(method_line):
+        return " ".join(method_line)
+
+
+def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=""):
+    if account_prefix:
+        account_prefix = account_prefix + "__"
+
+    method_line = []
+    if (
+        f"{account_prefix}owner__emoji" in record
+        and record[f"{account_prefix}owner__emoji"]
+    ):
+        method_line.append(record[f"{account_prefix}owner__emoji"])
+
+    if (
+        f"{account_prefix}operator__emoji" in record
+        and record[f"{account_prefix}operator__emoji"]
+    ):
+        method_line.append(record[f"{account_prefix}operator__emoji"])
+
+    if f"{account_prefix}type" in record and record[f"{account_prefix}type"] == "CASH":
+        method_line.append("💵")
+
+    financial_account = []
+    if f"{account_prefix}number" in record and record[f"{account_prefix}number"]:
+        financial_account.append("*" + record[f"{account_prefix}number"])
+
+    if (
+        f"{account_prefix}operator__name" in record
+        and record[f"{account_prefix}operator__name"]
+    ):
+        financial_account.append(record[f"{account_prefix}operator__name"])
+
+    if not len(financial_account):
+        financial_account.append(
+            localization["states"].get(f"SELECT_account_type_CASH", "CASH")
+        )
+
+    if record.get(f"{account_prefix}credit", 0) == 1:
+        financial_account.append("Credit")
+
+    if payment_card_prefix and (
+        payment_card_prefix in record and record[payment_card_prefix]
+    ):
+        if payment_card_prefix:
+            payment_card_prefix = payment_card_prefix + "__"
+        method_line.append("💳")
+        method_line.append(
+            "<b>*" + record.get(f"{payment_card_prefix}number", "????") + "</b>"
+        )
+
+        method_line.append(
+            "<b>" + record.get(f"{payment_card_prefix}payment_system", "????") + "</b>"
+        )
+
+        if record.get(f"{payment_card_prefix}credit", 0) == 1:
+            method_line.append("<b>Credit</b>")
+
+        if len(financial_account):
+            method_line.append("(" + (" ".join(financial_account)) + ")")
+    elif len(financial_account):
+        method_line.append("<b>" + (" ".join(financial_account)) + "</b>")
+
+    if len(method_line):
+        return " ".join(method_line)
+
+
+def _sub_date_extended_display(record):
+    date_line = []
+    if "date" in record and record["date"]:
+        date_line.append("🗓")
+        date = datetime.fromtimestamp(record["date"])
+        date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
+        date_line.append("(" + date_utils.get_relative_date(date) + ")")
+
+    if len(date_line):
+        return " ".join(date_line)
+
+
+def _db_transactions_inline_display(record):
     text_parts = []
 
     if "date" in record and record["date"]:
@@ -66,192 +212,38 @@ def _display_inline_transaction(record):
 
     text_parts.append("—")
 
-    if (
-        "financial_account__owner__emoji" in record
-        and record["financial_account__owner__emoji"]
-    ):
-        text_parts.append(record["financial_account__owner__emoji"])
-
-    if (
-        "payment_card__financial_account__operator__emoji" in record
-        and record["payment_card__financial_account__operator__emoji"]
-    ):
-        text_parts.append(record["payment_card__financial_account__operator__emoji"])
-
-    if "payment_card" in record and record["payment_card"]:
-        text_parts.append("💳")
-        if "payment_card__number" in record and record["payment_card__number"]:
-            text_parts.append("*" + record.get("payment_card__number", "????"))
-    elif "financial_account__number" in record and record["financial_account__number"]:
-        text_parts.append("*" + record.get("financial_account__number", "????"))
+    method_part = _sub_method_inline_display(
+        record, "financial_account", "payment_card"
+    )
+    if method_part:
+        text_parts.append(method_part)
 
     return " ".join(text_parts)
 
 
-def _display_full_income(record):
+def _db_income_extended_display(record):
     text_parts = []
 
     text_parts.append(
         f"<b><u>INCOME</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
     )
 
-    organization_line = []
-    if (
-        "organization__category__emoji" in record
-        and record["organization__category__emoji"]
-    ):
-        organization_line.append(record["organization__category__emoji"])
+    organization_line = _sub_organization_extended_display(record)
+    if organization_line:
+        text_parts.append(organization_line)
 
-    if "organization__emoji" in record and record["organization__emoji"]:
-        organization_line.append(record["organization__emoji"])
+    method_line = _sub_method_extended_display(record, "financial_account")
+    if method_line:
+        text_parts.append(method_line)
 
-    if "organization__name" in record and record["organization__name"]:
-        organization_line.append("<b>" + record["organization__name"] + "</b>")
-
-    if "description" in record and record["description"]:
-        organization_line.append("(" + record["description"] + ")")
-
-    if len(organization_line):
-        text_parts.append(" ".join(organization_line))
-
-    method_line = []
-    if (
-        "financial_account__owner__emoji" in record
-        and record["financial_account__owner__emoji"]
-    ):
-        method_line.append(record["financial_account__owner__emoji"])
-
-    if (
-        "financial_account__operator__emoji" in record
-        and record["financial_account__operator__emoji"]
-    ):
-        method_line.append(record["financial_account__operator__emoji"])
-
-    financial_account = []
-    if "financial_account__number" in record and record["financial_account__number"]:
-        financial_account.append("*" + record["financial_account__number"])
-
-    if (
-        "financial_account__operator__name" in record
-        and record["financial_account__operator__name"]
-    ):
-        financial_account.append(record["financial_account__operator__name"])
-
-    if record.get("financial_account__credit", 0) == 1:
-        financial_account.append("Credit")
-
-    if len(financial_account):
-        method_line.append("<b>" + (" ".join(financial_account)) + "</b>")
-
-    if len(method_line):
-        text_parts.append(" ".join(method_line))
-
-    date_line = []
-    if "date" in record and record["date"]:
-        date_line.append("🗓")
-        date = datetime.fromtimestamp(record["date"])
-        date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
-        date_line.append("(" + date_utils.get_relative_date(date) + ")")
-
-    if len(date_line):
-        text_parts.append(" ".join(date_line))
+    date_line = _sub_date_extended_display(record)
+    if date_line:
+        text_parts.append(date_line)
 
     return "\n".join(text_parts)
 
 
-def _display_full_expense(record):
-    text_parts = []
-
-    text_parts.append(
-        f"<b><u>EXPENSE</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
-    )
-
-    organization_line = []
-    if (
-        "organization__category__emoji" in record
-        and record["organization__category__emoji"]
-    ):
-        organization_line.append(record["organization__category__emoji"])
-
-    if "organization__emoji" in record and record["organization__emoji"]:
-        organization_line.append(record["organization__emoji"])
-
-    if "organization__name" in record and record["organization__name"]:
-        organization_line.append("<b>" + record["organization__name"] + "</b>")
-
-    if "description" in record and record["description"]:
-        organization_line.append("(" + record["description"] + ")")
-
-    if len(organization_line):
-        text_parts.append(" ".join(organization_line))
-
-    method_line = []
-    if (
-        "financial_account__owner__emoji" in record
-        and record["financial_account__owner__emoji"]
-    ):
-        method_line.append(record["financial_account__owner__emoji"])
-
-    if (
-        "payment_card__financial_account__operator__emoji" in record
-        and record["payment_card__financial_account__operator__emoji"]
-    ):
-        method_line.append(record["payment_card__financial_account__operator__emoji"])
-
-    financial_account = []
-    if "financial_account__number" in record and record["financial_account__number"]:
-        financial_account.append("*" + record["financial_account__number"])
-
-    if (
-        "financial_account__operator__name" in record
-        and record["financial_account__operator__name"]
-    ):
-        financial_account.append(record["financial_account__operator__name"])
-
-    if record.get("financial_account__credit", 0) == 1:
-        financial_account.append("Credit")
-
-    if "payment_card" in record and record["payment_card"]:
-        method_line.append("💳")
-        method_line.append("<b>*" + record.get("payment_card__number", "????") + "</b>")
-
-        method_line.append(
-            "<b>" + record.get("payment_card__payment_system", "????") + "</b>"
-        )
-
-        if record.get("payment_card__financial_account__credit", 0) == 1:
-            method_line.append("<b>Credit</b>")
-
-        if len(financial_account):
-            method_line.append("(" + (" ".join(financial_account)) + ")")
-    elif len(financial_account):
-        method_line.append("<b>" + (" ".join(financial_account)) + "</b>")
-
-    if len(method_line):
-        text_parts.append(" ".join(method_line))
-
-    date_line = []
-    if "date" in record and record["date"]:
-        date_line.append("🗓")
-        date = datetime.fromtimestamp(record["date"])
-        date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
-        date_line.append("(" + date_utils.get_relative_date(date) + ")")
-
-    if len(date_line):
-        text_parts.append(" ".join(date_line))
-
-    return "\n".join(text_parts)
-
-
-def _fast_type_expense(data: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    record = {}
-    record_extra = {}
-    record["sum"] = float(data)
-    record_extra["currency"] = configs.general["main_currency"]
-    return (record, record_extra)
-
-
-def _display_record_income(data: list[dict[str, Any]]) -> str:
+def _db_income_report_record_display(data: list[dict[str, Any]]) -> str:
     if not data:
         return ""
     lines = ["<b>Income</b> this month:"]
@@ -262,7 +254,41 @@ def _display_record_income(data: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _display_record_expense(data: list[dict[str, Any]]) -> str:
+def _db_expenses_extended_display(record):
+    text_parts = []
+
+    text_parts.append(
+        f"<b><u>EXPENSE</u></b> — <b>{str(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
+    )
+
+    organization_line = _sub_organization_extended_display(record)
+    if organization_line:
+        text_parts.append(organization_line)
+
+    method_line = _sub_method_extended_display(
+        record, "financial_account", "payment_card"
+    )
+    if method_line:
+        text_parts.append(method_line)
+
+    date_line = _sub_date_extended_display(record)
+    if date_line:
+        text_parts.append(date_line)
+
+    return "\n".join(text_parts)
+
+
+def _db_expenses_fast_type_processor(
+    data: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    record = {}
+    record_extra = {}
+    record["sum"] = float(data)
+    record_extra["currency"] = configs.general["main_currency"]
+    return (record, record_extra)
+
+
+def _db_expenses_report_record_display(data: list[dict[str, Any]]) -> str:
     if not data:
         return ""
     lines = ["<b>Expenses</b> this month:"]
@@ -273,7 +299,24 @@ def _display_record_expense(data: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _display_inline_financial_account(record):
+def _db_transfers_extended_display(record):
+    text_parts = []
+
+    text_parts.append(f"<b><u>TRANSFER</u></b>")
+
+    for account in ["account_source", "account_target"]:
+        method_line = _sub_method_extended_display(record, account)
+        if method_line:
+            text_parts.append(method_line)
+
+    date_line = _sub_date_extended_display(record)
+    if date_line:
+        text_parts.append(date_line)
+
+    return "\n".join(text_parts)
+
+
+def _db_financial_accounts_inline_display(record):
     text_parts = []
 
     name = "name" in record and record["name"]
@@ -313,7 +356,7 @@ def _display_inline_financial_account(record):
     return " ".join(text_parts)
 
 
-def _display_inline_payment_card(record):
+def _db_payment_cards_inline_display(record):
     text_parts = []
 
     if (
@@ -378,7 +421,7 @@ def init():
             ["income", "expenses"],
             ["corrections", "transfers"],
         ],
-        extra_info=[_extra_info_balance],
+        extra_info=[_finances_balance_extra_info],
     )
     DatabaseView(
         "currencies",
@@ -387,7 +430,7 @@ def init():
             {"column": "code", "type": "text"},
             {"column": "emoji", "type": "text"},
         ],
-        display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
+        inline_display=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
         report_links=[
             DatabaseLinkedReport("income", "financial_account__currency"),
             DatabaseLinkedReport("expenses", "financial_account__currency"),
@@ -413,9 +456,9 @@ def init():
             {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        display_inline_func=_display_inline_transaction,
-        display_full_func=_display_full_income,
-        fast_type_processor=_fast_type_expense,
+        inline_display=_db_transactions_inline_display,
+        extended_display=_db_income_extended_display,
+        fast_type_processor=_db_expenses_fast_type_processor,
         order_by=[("date", True, None), ("organization__name", False, None)],
         report=DatabaseReport(
             select=[
@@ -428,8 +471,8 @@ def init():
                 ("financial_account__currency", False, None),
                 ("sum", True, None),
             ],
-            display_record_func=_display_record_income,
-            display_layer_func=lambda x: x,
+            record_display=_db_income_report_record_display,
+            layer_display=lambda x: x,
             date="date",
         ),
     )
@@ -465,9 +508,9 @@ def init():
             {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
         ],
-        display_inline_func=_display_inline_transaction,
-        display_full_func=_display_full_expense,
-        fast_type_processor=_fast_type_expense,
+        inline_display=_db_transactions_inline_display,
+        extended_display=_db_expenses_extended_display,
+        fast_type_processor=_db_expenses_fast_type_processor,
         order_by=[("date", True, None), ("organization__name", False, None)],
         report=DatabaseReport(
             select=[
@@ -480,8 +523,8 @@ def init():
                 ("financial_account__currency", False, None),
                 ("sum", True, None),
             ],
-            display_record_func=_display_record_expense,
-            display_layer_func=lambda x: x,
+            record_display=_db_expenses_report_record_display,
+            layer_display=lambda x: x,
             date="date",
         ),
     )
@@ -505,6 +548,7 @@ def init():
             {"column": "description", "type": "text", "skippable": True},
         ],
         order_by=[("date", True, None)],
+        extended_display=_db_transfers_extended_display,
     )
     DatabaseView(
         "corrections",
@@ -515,7 +559,7 @@ def init():
                 "column": "account_type",
                 "type": "select",
                 "select": financial_account_types,
-                "select_key": "account_type"
+                "select_key": "account_type",
             },
             {"column": "sum", "type": "float"},
             {"column": "description", "type": "text", "skippable": True},
@@ -528,7 +572,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        display_inline_func=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
+        inline_display=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=[("name", False, None)],
         report_links=[
             DatabaseLinkedReport("income", "organization__category"),
@@ -551,7 +595,7 @@ def init():
                 "column": "type",
                 "type": "select",
                 "select": financial_account_types,
-                "select_key": "account_type"
+                "select_key": "account_type",
             },
             {"column": "credit", "type": "boolean"},
             {
@@ -561,7 +605,7 @@ def init():
                 "skippable": True,
             },
         ],
-        display_inline_func=_display_inline_financial_account,
+        inline_display=_db_financial_accounts_inline_display,
         order_by=[
             ("type", False, None),
             ("operator__name", False, None),
@@ -597,7 +641,7 @@ def init():
                 ],
             },
         ],
-        display_inline_func=_display_inline_payment_card,
+        inline_display=_db_payment_cards_inline_display,
         order_by=[
             ("financial_account__operator__name", False, None),
             ("financial_account__owner__name", False, None),

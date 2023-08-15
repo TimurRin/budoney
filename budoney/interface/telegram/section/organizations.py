@@ -30,7 +30,7 @@ def init():
             {"column": "category", "type": "data", "data_type": "financial_categories"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        display_inline_func=_display_inline_organization,
+        inline_display=_display_inline_organization,
         order_by=[("category__name", False, None), ("name", False, None)],
         report_links=[
             DatabaseLinkedReport("income", "organization"),

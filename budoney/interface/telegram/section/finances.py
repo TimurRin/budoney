@@ -459,7 +459,7 @@ def init():
         inline_display=_db_transactions_inline_display,
         extended_display=_db_income_extended_display,
         fast_type_processor=_db_expenses_fast_type_processor,
-        order_by=[("date", True, None), ("organization__name", False, None)],
+        order_by=[("date", True, None)],
         report=DatabaseReport(
             select=[
                 ("sum", "ROUND(SUM(sum))"),
@@ -511,7 +511,7 @@ def init():
         inline_display=_db_transactions_inline_display,
         extended_display=_db_expenses_extended_display,
         fast_type_processor=_db_expenses_fast_type_processor,
-        order_by=[("date", True, None), ("organization__name", False, None)],
+        order_by=[("date", True, None)],
         report=DatabaseReport(
             select=[
                 ("sum", "ROUND(SUM(sum))"),

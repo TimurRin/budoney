@@ -31,7 +31,7 @@ def init():
             {"column": "emoji", "type": "text", "skippable": True},
         ],
         inline_display=_display_inline_organization,
-        order_by=[("category__name", False, None), ("name", False, None)],
+        order_by=[("name", False, None)],
         report_links=[
             DatabaseLinkedReport("income", "organization"),
             DatabaseLinkedReport("expenses", "organization"),

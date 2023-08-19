@@ -47,7 +47,7 @@ def check_for_tasks():
                 "tasks_current",
                 record,
             )
-            text = database_views["tasks_current"].display_inline_func(record)[:4096]
+            text = database_views["tasks_current"].inline_display(record)[:4096]
             text_len = len(text)
             text_len_added = message_threshold + text_len
             if not new_messages:

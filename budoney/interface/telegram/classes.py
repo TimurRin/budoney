@@ -683,7 +683,9 @@ class RecordView(View):
                         report.order_by,
                         conditions,
                     )
-                    text.append(report.foreign_display(data))
+                    report_text = report.foreign_display(data)
+                    if report_text:
+                        text.append(report_text)
 
         print(text)
 

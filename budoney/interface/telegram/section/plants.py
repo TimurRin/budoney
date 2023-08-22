@@ -20,6 +20,7 @@ def init():
             {"column": "date_died", "type": "date", "skippable": True},
             {"column": "note", "type": "text", "skippable": True},
         ],
+        inline_display=lambda record: f"{record.get('name', 'Unnamed plant')}",
     )
     DatabaseView(
         "plant_lots",
@@ -27,6 +28,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "task", "type": "data", "data_type": "tasks_recurring", "skippable": True},
         ],
+        inline_display=lambda record: f"{record.get('name', 'Unnamed lot')}",
     )
     DatabaseView(
         "plant_stages",
@@ -69,4 +71,5 @@ def init():
             {"column": "latin", "type": "text", "skippable": True},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
+        inline_display=lambda record: f"{record.get('emoji', '🌳')} {record.get('name', 'Variation')} ({record.get('kind', 'Species')})",
     )

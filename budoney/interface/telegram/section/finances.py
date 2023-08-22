@@ -25,7 +25,7 @@ select_emoji = {
 
 
 def get_balance():
-    query = "SELECT financial_account_type, GROUP_CONCAT( printf('%,d %s', balance, code), ', ' ) AS balances FROM ( SELECT COALESCE(i.financial_account__type, e.financial_account__type, tf.account_source__type, tt.account_target__type) AS financial_account_type, (COALESCE(income__sum, 0) - COALESCE(expenses__sum, 0) - COALESCE(transfers__sum_source, 0) + COALESCE(transfers__sum_target, 0)) + COALESCE(correction__sum, 0) AS balance, c.code FROM currencies c LEFT JOIN ( SELECT 'BANK' AS operation_type UNION ALL SELECT 'CASH' AS operation_type ) AS operation_types LEFT JOIN ( SELECT ROUND(SUM(income.sum)) AS income__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account GROUP BY financial_account__currency, financial_account__type ) i ON i.financial_account__currency = c.id AND i.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(expenses.sum)) AS expenses__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account GROUP BY financial_account__currency, financial_account__type ) e ON e.financial_account__currency = c.id AND e.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(transfers.sum_source)) AS transfers__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source GROUP BY account_source__currency, account_source__type ) tf ON tf.account_source__currency = c.id AND tf.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(transfers.sum_target)) AS transfers__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target GROUP BY account_target__currency, account_target__type ) tt ON tt.account_target__currency = c.id AND tt.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT ROUND(SUM(sum)) AS correction__sum, corrections.account_type AS correction__account_type, corrections.currency AS correction__currency FROM corrections GROUP BY correction__currency, correction__account_type ) cor ON cor.correction__currency = c.id AND cor.correction__account_type = operation_types.operation_type WHERE financial_account_type IS NOT NULL AND (balance) != 0 ) AS subquery GROUP BY financial_account_type"
+    query = "SELECT financial_account_type, GROUP_CONCAT( printf('%,d %s', balance, code), ', ' ) AS balances FROM ( SELECT COALESCE(i.financial_account__type, e.financial_account__type, tf.account_source__type, tt.account_target__type) AS financial_account_type, (COALESCE(income__sum, 0) - COALESCE(expenses__sum, 0) - COALESCE(transfers__sum_source, 0) + COALESCE(transfers__sum_target, 0)) + COALESCE(correction__sum, 0) AS balance, c.code FROM currencies c LEFT JOIN ( SELECT 'BANK' AS operation_type UNION ALL SELECT 'CASH' AS operation_type ) AS operation_types LEFT JOIN ( SELECT SUM(income.sum) AS income__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account GROUP BY financial_account__currency, financial_account__type ) i ON i.financial_account__currency = c.id AND i.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(expenses.sum) AS expenses__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account GROUP BY financial_account__currency, financial_account__type ) e ON e.financial_account__currency = c.id AND e.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_source) AS transfers__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source GROUP BY account_source__currency, account_source__type ) tf ON tf.account_source__currency = c.id AND tf.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_target) AS transfers__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target GROUP BY account_target__currency, account_target__type ) tt ON tt.account_target__currency = c.id AND tt.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(sum) AS correction__sum, corrections.account_type AS correction__account_type, corrections.currency AS correction__currency FROM corrections GROUP BY correction__currency, correction__account_type ) cor ON cor.correction__currency = c.id AND cor.correction__account_type = operation_types.operation_type WHERE financial_account_type IS NOT NULL AND (balance) != 0 ) AS subquery GROUP BY financial_account_type"
     return DATABASE_DRIVER.get_data(query, [])
 
 
@@ -39,6 +39,20 @@ def _finances_balance_extra_info():
             f"{select_emoji['financial_accounts']['type'][row['financial_account_type']]} {row['financial_account_type']}: <b>{row['balances']}</b>"
         )
     return "\n".join(lines)
+
+
+def _sub_currency_display(sum, currency_code):
+    if currency_code == "USD":
+        return f"${sum}"
+    elif currency_code == "EUR":
+        return f"€{sum}"
+    elif currency_code == "GBP":
+        return f"£{sum}"
+    elif currency_code == "RUB":
+        return f"{sum} ₽"
+    elif currency_code == "KZT":
+        return f"₸{sum}"
+    return f"{sum} {currency_code}"
 
 
 def _sub_organization_extended_display(record):
@@ -89,7 +103,7 @@ def _sub_method_inline_display(record, account_prefix="", payment_card_prefix=""
             localization["states"].get(f"SELECT_account_type_CASH", "CASH")
         )
 
-    if record.get(f"{account_prefix}credit", 0) == 1:
+    if record.get(f"{account_prefix}credit_limit", 0) > 0:
         financial_account.append("Credit")
 
     if payment_card_prefix and (
@@ -102,7 +116,7 @@ def _sub_method_inline_display(record, account_prefix="", payment_card_prefix=""
 
         method_line.append(record.get(f"{payment_card_prefix}payment_system", "????"))
 
-        if record.get(f"{payment_card_prefix}credit", 0) == 1:
+        if record.get(f"{payment_card_prefix}credit_limit", 0) > 0:
             method_line.append("Credit")
     elif len(financial_account):
         method_line.append((" ".join(financial_account)))
@@ -146,7 +160,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
             localization["states"].get(f"SELECT_account_type_CASH", "CASH")
         )
 
-    if record.get(f"{account_prefix}credit", 0) == 1:
+    if record.get(f"{account_prefix}credit_limit", 0) > 0:
         financial_account.append("Credit")
 
     if payment_card_prefix and (
@@ -163,7 +177,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
             "<b>" + record.get(f"{payment_card_prefix}payment_system", "????") + "</b>"
         )
 
-        if record.get(f"{payment_card_prefix}credit", 0) == 1:
+        if record.get(f"{payment_card_prefix}credit_limit", 0) > 0:
             method_line.append("<b>Credit</b>")
 
         if len(financial_account):
@@ -194,8 +208,12 @@ def _db_transactions_inline_display(record):
         text_parts.append(date_utils.get_relative_timestamp(record["date"]))
         text_parts.append("—")
 
-    text_parts.append(finance_format.format(record.get("sum", 0)))
-    text_parts.append(record.get("financial_account__currency__code", "XXX"))
+    text_parts.append(
+        _sub_currency_display(
+            finance_format.format(record.get("sum", 0)),
+            record.get("financial_account__currency__code", "XXX"),
+        )
+    )
 
     text_parts.append("—")
 
@@ -226,7 +244,7 @@ def _db_income_extended_display(record):
     text_parts = []
 
     text_parts.append(
-        f"<b><u>INCOME</u></b> — <b>{finance_format.format(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
+        f"<b><u>INCOME</u></b> — <b>{_sub_currency_display(finance_format.format(record.get('sum', 0)), record.get('financial_account__currency__code', 'XXX'))}</b>"
     )
 
     organization_line = _sub_organization_extended_display(record)
@@ -244,33 +262,31 @@ def _db_income_extended_display(record):
     return "\n".join(text_parts)
 
 
-def _db_income_report_local_display(data: list[dict[str, Any]]) -> str:
+def _db_income_report_display(text, data: list[dict[str, Any]]) -> str:
     if not data:
         return ""
-    lines = ["<b>Income</b> in this query:"]
+    lines = [text]
     for row in data:
-        lines.append(
-            f"<b>{finance_format.format(row['sum'])}</b> {row['financial_account__currency__code']}"
-        )
+        line_text = f"<b>{_sub_currency_display(finance_format.format(row['received']), row['financial_account__currency__code'])}</b>"
+        if row["proxy"]:
+            line_text = f"{line_text} + {_sub_currency_display(finance_format.format(row['proxy']), row['financial_account__currency__code'])} proxy"
+        lines.append(line_text)
     return "\n".join(lines)
+
+
+def _db_income_report_local_display(data: list[dict[str, Any]]) -> str:
+    return _db_income_report_display("<b>Income</b> in this query:", data)
 
 
 def _db_income_report_foreign_display(data: list[dict[str, Any]]) -> str:
-    if not data:
-        return ""
-    lines = ["<b>Income</b> this month:"]
-    for row in data:
-        lines.append(
-            f"<b>{finance_format.format(row['sum'])}</b> {row['financial_account__currency__code']}"
-        )
-    return "\n".join(lines)
+    return _db_income_report_display("<b>Income</b> this month:", data)
 
 
 def _db_expenses_extended_display(record):
     text_parts = []
 
     text_parts.append(
-        f"<b><u>EXPENSE</u></b> — <b>{finance_format.format(record.get('sum', 0))}</b> {record.get('financial_account__currency__code', 'XXX')}"
+        f"<b><u>EXPENSE</u></b> — <b>{_sub_currency_display(finance_format.format(record.get('sum', 0)), record.get('financial_account__currency__code', 'XXX'))}</b>"
     )
 
     organization_line = _sub_organization_extended_display(record)
@@ -300,26 +316,24 @@ def _db_expenses_fast_type_processor(
     return (record, record_extra)
 
 
-def _db_expenses_report_local_display(data: list[dict[str, Any]]) -> str:
+def _db_expenses_report_display(text, data: list[dict[str, Any]]) -> str:
     if not data:
         return ""
-    lines = ["<b>Expenses</b> in this query:"]
+    lines = [text]
     for row in data:
-        lines.append(
-            f"<b>{finance_format.format(row['sum'])}</b> {row['financial_account__currency__code']}"
-        )
+        line_text = f"<b>{_sub_currency_display(finance_format.format(row['spent']), row['financial_account__currency__code'])}</b>"
+        if row["proxy"]:
+            line_text = f"{line_text} + {_sub_currency_display(finance_format.format(row['proxy']), row['financial_account__currency__code'])} proxy"
+        lines.append(line_text)
     return "\n".join(lines)
+
+
+def _db_expenses_report_local_display(data: list[dict[str, Any]]) -> str:
+    return _db_expenses_report_display("<b>Expenses</b> in this query:", data)
 
 
 def _db_expenses_report_foreign_display(data: list[dict[str, Any]]) -> str:
-    if not data:
-        return ""
-    lines = ["<b>Expenses</b> this month:"]
-    for row in data:
-        lines.append(
-            f"<b>{finance_format.format(row['sum'])}</b> {row['financial_account__currency__code']}"
-        )
-    return "\n".join(lines)
+    return _db_expenses_report_display("<b>Expenses</b> this month:", data)
 
 
 def _db_transfers_extended_display(record):
@@ -365,7 +379,7 @@ def _db_financial_accounts_inline_display(record):
     if "operator__name" in record and record["operator__name"]:
         text_parts_account.append(record["operator__name"])
 
-    if record.get("credit", 0) == 1:
+    if record.get("credit_limit", 0) > 0:
         text_parts_account.append("Credit")
 
     text_parts_account.append(record.get("currency__code", "XXX"))
@@ -400,7 +414,7 @@ def _db_payment_cards_inline_display(record):
 
     text_parts.append(record.get("payment_system", "???"))
 
-    if record.get("financial_account__credit", 0) == 1:
+    if record.get("financial_account__credit_limit", 0) > 0:
         text_parts.append("Credit")
 
     if "financial_account__name" in record and record["financial_account__name"]:
@@ -468,15 +482,9 @@ def init():
                 "column": "financial_account",
                 "type": "data",
                 "data_type": "financial_accounts",
-                "conditions": [
-                    {
-                        "type": "equals",
-                        "our_column": "currency",
-                        "their_column": "currency",
-                    }
-                ],
             },
             {"column": "sum", "type": "float"},
+            {"column": "proxy", "type": "float", "skippable": True},
             {"column": "description", "type": "text", "skippable": True},
         ],
         inline_display=_db_transactions_inline_display,
@@ -485,13 +493,14 @@ def init():
         order_by=[("date", True, None)],
         report=DatabaseReport(
             select=[
-                ("sum", "ROUND(SUM(sum))"),
+                ("received", "SUM(sum)-COALESCE(SUM(proxy), 0)"),
+                ("proxy", "COALESCE(SUM(proxy), 0)"),
                 ("financial_account__currency__code", None),
             ],
             group_by=["financial_account__currency"],
             order_by=[
                 ("financial_account__currency", False, None),
-                ("sum", True, None),
+                ("received", True, None),
             ],
             local_display=_db_income_report_local_display,
             foreign_display=_db_income_report_foreign_display,
@@ -529,6 +538,7 @@ def init():
                 ],
             },
             {"column": "sum", "type": "float"},
+            {"column": "proxy", "type": "float", "skippable": True},
             {"column": "description", "type": "text", "skippable": True},
         ],
         inline_display=_db_transactions_inline_display,
@@ -537,13 +547,14 @@ def init():
         order_by=[("date", True, None)],
         report=DatabaseReport(
             select=[
-                ("sum", "ROUND(SUM(sum))"),
+                ("spent", "SUM(sum)-COALESCE(SUM(proxy), 0)"),
+                ("proxy", "COALESCE(SUM(proxy), 0)"),
                 ("financial_account__currency__code", None),
             ],
             group_by=["financial_account__currency"],
             order_by=[
                 ("financial_account__currency", False, None),
-                ("sum", True, None),
+                ("spent", True, None),
             ],
             local_display=_db_expenses_report_local_display,
             foreign_display=_db_expenses_report_foreign_display,
@@ -620,7 +631,7 @@ def init():
                 "select": financial_account_types,
                 "select_key": "account_type",
             },
-            {"column": "credit", "type": "boolean"},
+            {"column": "credit_limit", "type": "float"},
             {
                 "column": "owner",
                 "type": "data",

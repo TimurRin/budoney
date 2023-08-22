@@ -59,7 +59,7 @@ states:
     financial_accounts_PARAM_operator: "Operator",
     financial_accounts_PARAM_type: "Type",
     financial_accounts_PARAM_currency: "Currency",
-    financial_accounts_PARAM_credit: "Is credit?",
+    financial_accounts_PARAM_credit_limit: "Credit limit",
     financial_accounts_PARAM_owner: "Owner",
     financial_accounts_SELECT_type_BANK: "Bank Account",
     financial_accounts_SELECT_type_SIM: "SIM Account",

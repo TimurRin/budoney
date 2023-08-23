@@ -575,7 +575,7 @@ class ListRecordsView(View):
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
         ] = _get_records(
-            _get_records_query(table_name=self.table_name, record_id=data, no_join=True)
+            _get_records_query(table_name=self.table_name, record_ids=[data], no_join=True)
         )[
             0
         ]
@@ -736,7 +736,7 @@ class RecordView(View):
                 data_split[1]
             ] = _get_records(
                 _get_records_query(
-                    table_name=data_split[1], record_id=int(data_split[2]), no_join=True
+                    table_name=data_split[1], record_ids=[int(data_split[2])], no_join=True
                 )
             )[
                 0
@@ -1485,8 +1485,12 @@ def _records_state_text(table_name, telegram_user: TelegramUser, full_mode=False
     pagination: Pagination = telegram_user.get_pagination(table_name, temp_mode)
     search: tuple[str, list[str]] = telegram_user.get_search(table_name)
 
+    search_result = search[0] and DATABASE_DRIVER.search([table_name], search[0]) or []
+
+    record_ids = [v['entry_id'] for v in search_result]
+
     query: tuple[str, list[Any]] = _get_records_query(
-        table_name=table_name, search=search, conditions=filters
+        table_name=table_name, record_ids=record_ids, conditions=filters
     )
     telegram_user.last_query = query
 
@@ -1541,9 +1545,8 @@ def link_tables(linked_tables, table_name, alias=None, record=None):
 
 def _get_records_query(
     table_name=None,
-    search: tuple[str, list[str]] | None = None,
     external=None,
-    record_id=None,
+    record_ids=None,
     no_join=None,
     conditions=None,
 ):
@@ -1578,11 +1581,9 @@ def _get_records_query(
         external=external,
         join=linked_tables,
         join_select=join_select,
-        search=search,
-        search_columns=search_columns,
         order_by=table_name and database_views[table_name].order_by,
         conditions=conditions,
-        record_id=record_id,
+        record_ids=record_ids,
     )
 
     return query
@@ -1769,7 +1770,7 @@ def _records_handle_typed(
     if search[0] != data:
         telegram_user.search[table_name] = (
             data,
-            string_utils.sql_search(data),
+            [], # string_utils.sql_search(data)
         )
         pagination = telegram_user.get_pagination(table_name, temp_mode)
         pagination.offset = 0

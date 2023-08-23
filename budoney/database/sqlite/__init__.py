@@ -2,6 +2,7 @@ import sqlite3
 import threading
 from typing import Any
 from database.classes import Database
+from utils.transliterate import russian_to_latin
 
 
 class SQLiteDatabase(Database):
@@ -19,6 +20,7 @@ class SQLiteDatabase(Database):
         self.db_path = database_path
         self._local = threading.local()
         self._init_connection_and_cursor()
+        self._create_search_table()
 
     def _init_connection_and_cursor(self):
         if not hasattr(self._local, "connection"):
@@ -44,11 +46,9 @@ class SQLiteDatabase(Database):
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
-        search: tuple[str, list[str]] | None = None,
-        search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         conditions: list | None = None,
-        record_id: int | None = None,
+        record_ids: list[int] | None = None,
     ) -> tuple[str, list[Any]]:
         selects = []
         selects_external = []
@@ -92,19 +92,20 @@ class SQLiteDatabase(Database):
             query += f" FROM {table}"
         if join:
             query += f" {' '.join(joins)}"
-        if record_id and not external and table:
-            query += f" WHERE {table}.id = ?"
-            values.append(record_id)
-        if search and search_columns:
-            for search_column in search_columns:
-                for searchee in search[1]:
-                    wheres.append(f'{search_column} LIKE "%{searchee}%"')
+        if record_ids and not external and table:
+            record_ids_set = set(record_ids)
+            if len(record_ids_set) > 1:
+                query += f" WHERE {table}.id IN ({('?, ' * len(record_ids_set))[:-2]})"
+                values.extend(record_ids_set)
+            else:
+                query += f" WHERE {table}.id = ?"
+                values.append(record_ids[0])
         if conditions:
             for condition in conditions:
                 wheres.append(condition)
         if len(wheres) > 0:
             query += f" WHERE {' OR '.join(wheres)}"
-        if order_by and not record_id and not external:
+        if order_by and not record_ids and not external:
             order_by_query = []
             for orderee in order_by:
                 if orderee[2]:
@@ -175,11 +176,7 @@ class SQLiteDatabase(Database):
             records.append(dict(record))
         return records
 
-    def get_data(
-        self,
-        query: str,
-        values: list
-    ) -> list[dict[str, Any]]:
+    def get_data(self, query: str, values: list) -> list[dict[str, Any]]:
         print("get_data", query, values)
         self.cursor.execute(query, values)
         records = list()
@@ -187,25 +184,61 @@ class SQLiteDatabase(Database):
             records.append(dict(record))
         return records
 
-    def replace_data(self, table: str, record_id, data: dict):
+    def commit(self) -> None:
+        self.connection.commit()
+
+    def replace_data(self, table: str, record_id, data: dict, commit=True):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])
         values = tuple(data.values()) + (record_id,)
         query = f"UPDATE {table} SET {placeholders} WHERE id = ?"
         print("replace_data", query, values)
         self.cursor.execute(query, values)
-        self.connection.commit()
+        if commit:
+            self.connection.commit()
 
-    def append_data(self, table: str, data: dict) -> int | None:
-        parsed_data = {k: v for k, v in data.items() if not k.startswith("_")}
+    def append_data(self, table: str, data: dict, commit=True) -> int | None:
+        parsed_data = {
+            k: v for k, v in data.items() if not k.startswith("_") and v or v == 0
+        }
+        parsed_data_search = {
+            k: v.lower()
+            for k, v in data.items()
+            if not k.startswith("_") and isinstance(v, str) and v
+        }
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         print("append_data", query, list(parsed_data.values()))
         self.cursor.execute(query, list(parsed_data.values()))
         last_id = self.cursor.lastrowid
-        self.connection.commit()
+        if parsed_data_search:
+            print(parsed_data_search)
+            values = []
+            values_placeholders = []
+            for key in parsed_data_search:
+                text = parsed_data_search[key]
+                values.append(table)
+                values.append(last_id)
+                values.append(key)
+                values.append(parsed_data_search[key])
+                text_translit = russian_to_latin(text)
+                if text != text_translit:
+                    values.append(text_translit)
+                else:
+                    values.append(None)
+                values_placeholders.append("?, ?, ?, ?, ?")
+            query_search = f"INSERT INTO search_compound (table_name, entry_id, entry_field, field_data, field_data_translit) VALUES ({'), ('.join(values_placeholders)})"
+            print("append_data", "search", query_search, values)
+            self.cursor.execute(query_search, values)
+        if commit:
+            self.connection.commit()
         return last_id
 
+    def _create_search_table(self):
+        query = f"CREATE TABLE IF NOT EXISTS search_compound (table_name TEXT, entry_id INTEGER, entry_field TEXT, field_data TEXT, field_data_translit TEXT, PRIMARY KEY(table_name, entry_id, entry_field))"
+        print("_create_search_table", query)
+        self.cursor.execute(query)
+        self.connection.commit()
 
     def create_table(self, table: str, columns: list[dict]):
         column_definitions = [
@@ -223,4 +256,20 @@ class SQLiteDatabase(Database):
         print("create_table", query)
 
         self.cursor.execute(query)
+
         self.connection.commit()
+
+    def search(self, tables: list[str], text_input: str) -> list[dict]:
+        text_input = text_input.lower()
+        search_results = []
+
+        for table in tables:
+            query = "SELECT table_name, entry_id FROM search_compound WHERE table_name = ? AND (field_data LIKE ? OR field_data_translit LIKE ? OR field_data LIKE ?)"
+            values = (table, f"%{text_input}%", f"%{russian_to_latin(text_input)}%", f"%{russian_to_latin(text_input)}%")
+            print("search", table, query, values)
+            self.cursor.execute(query, values)
+            results = self.cursor.fetchall()
+
+            search_results.extend(results)
+
+        return search_results

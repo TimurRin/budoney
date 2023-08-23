@@ -14,11 +14,9 @@ class Database:
         external: dict[str, Any] | None = None,
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
-        search: tuple[str, list[str]] | None = None,
-        search_columns: list[str] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         conditions: list | None = None,
-        record_id: int | None = None,
+        record_ids: list[int] | None = None,
     ) -> tuple[str, list[Any]]:
         pass
 
@@ -49,6 +47,10 @@ class Database:
         pass
 
     @abc.abstractmethod
+    def commit(self) -> None:
+        pass
+
+    @abc.abstractmethod
     def get_data(self, query: str, values: list) -> list[dict[str, Any]]:
         pass
 
@@ -57,9 +59,13 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def append_data(self, table: str, data: dict) -> int | None:
+    def append_data(self, table: str, data: dict, commit=True) -> int | None:
         pass
 
     @abc.abstractmethod
     def create_table(self, table: str, columns: list[dict]):
+        pass
+
+    @abc.abstractmethod
+    def search(self, tables: list[str], text_input: str) -> list[dict]:
         pass

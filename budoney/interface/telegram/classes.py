@@ -471,7 +471,7 @@ class DatabaseView(View):
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         report: DatabaseReport | None = None,
-        report_links: list[DatabaseLinkedReport] | None = None,
+        report_links: list[DatabaseLinkedReport] | None = None, extra_info=None
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
@@ -490,6 +490,7 @@ class DatabaseView(View):
         self.order_by: list[tuple[str, bool, str | None]] = order_by
         self.report: DatabaseReport | None = report
         self.report_links: list[DatabaseLinkedReport] | None = report_links
+        self.extra_info = extra_info
 
         keyboard = []
 
@@ -687,7 +688,11 @@ class RecordView(View):
                     if report_text:
                         text.append(report_text)
 
-        print(text)
+
+        extra_info = database_views[self.table_name].extra_info
+        if extra_info:
+            for row in extra_info:
+                text.append(row(record_data))
 
         return "\n\n".join(text)
 

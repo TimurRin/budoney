@@ -13,31 +13,44 @@ import utils.date_utils as date_utils
 
 finance_format = "{:,.2f}"
 
-financial_account_types = ["BANK", "CASH"]
+financial_account_types = ["BANK", "CASH", "OTHER"]
 select_emoji = {
     "financial_accounts": {
         "type": {
             "CASH": "💵",
             "BANK": "🏦",
+            "OTHER": "💲",
         }
     }
 }
 
 
-def get_balance():
-    query = "SELECT financial_account_type, GROUP_CONCAT( printf('%,d %s', balance, code), ', ' ) AS balances FROM ( SELECT COALESCE(i.financial_account__type, e.financial_account__type, tf.account_source__type, tt.account_target__type) AS financial_account_type, (COALESCE(income__sum, 0) - COALESCE(expenses__sum, 0) - COALESCE(transfers__sum_source, 0) + COALESCE(transfers__sum_target, 0)) + COALESCE(correction__sum, 0) AS balance, c.code FROM currencies c LEFT JOIN ( SELECT 'BANK' AS operation_type UNION ALL SELECT 'CASH' AS operation_type ) AS operation_types LEFT JOIN ( SELECT SUM(income.sum) AS income__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account GROUP BY financial_account__currency, financial_account__type ) i ON i.financial_account__currency = c.id AND i.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(expenses.sum) AS expenses__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account GROUP BY financial_account__currency, financial_account__type ) e ON e.financial_account__currency = c.id AND e.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_source) AS transfers__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source GROUP BY account_source__currency, account_source__type ) tf ON tf.account_source__currency = c.id AND tf.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_target) AS transfers__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target GROUP BY account_target__currency, account_target__type ) tt ON tt.account_target__currency = c.id AND tt.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(sum) AS correction__sum, corrections.account_type AS correction__account_type, corrections.currency AS correction__currency FROM corrections GROUP BY correction__currency, correction__account_type ) cor ON cor.correction__currency = c.id AND cor.correction__account_type = operation_types.operation_type WHERE financial_account_type IS NOT NULL AND (balance) != 0 ) AS subquery GROUP BY financial_account_type"
-    return DATABASE_DRIVER.get_data(query, [])
+def get_balance(account_id=None):
+    query = f"SELECT c.code, COALESCE(ind.financial_account__type, inc.financial_account__type, ed.financial_account__type, ec.financial_account__type, tfd.account_source__type, tfc.account_source__type, ttd.account_target__type, ttc.account_target__type) AS type, ROUND(COALESCE(income_debit__sum, 0) - COALESCE(expenses_debit__sum, 0) - COALESCE(transfers_debit__sum_source, 0) + COALESCE(transfers_debit__sum_target, 0) + COALESCE(financial_accounts_debit_correction, 0), 2) AS balance, ROUND(COALESCE(income_credit__sum, 0) - COALESCE(expenses_credit__sum, 0) - COALESCE(transfers_credit__sum_source, 0) + COALESCE(transfers_credit__sum_target, 0) + COALESCE(financial_accounts_credit_correction, 0), 2) AS credit, ROUND(income_debit__sum, 2) AS income_debit, ROUND(income_credit__sum, 2) AS income_credit, ROUND(expenses_debit__sum, 2) AS expense_debit, ROUND(expenses_credit__sum, 2) AS expense_credit, ROUND(transfers_debit__sum_source, 2) AS transfer_debit_source, ROUND(transfers_credit__sum_source, 2) AS transfer_credit_source, ROUND(transfers_debit__sum_target, 2) AS transfer_debit_target, ROUND(transfers_credit__sum_target, 2) AS transfer_credit_target, ROUND(financial_accounts_debit_correction, 2) AS correction_debit, ROUND(financial_accounts_credit_correction, 2) AS correction_credit FROM currencies c LEFT JOIN ( SELECT 'BANK' AS operation_type UNION ALL SELECT 'CASH' AS operation_type UNION ALL SELECT 'OTHER' AS operation_type ) AS operation_types LEFT JOIN ( SELECT SUM(income.sum) AS income_debit__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account WHERE financial_account.credit_limit = 0{account_id and ' AND financial_account.id = ?' or ''} GROUP BY financial_account__currency, financial_account__type ) ind ON ind.financial_account__currency = c.id AND ind.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(income.sum) AS income_credit__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM income LEFT JOIN financial_accounts AS financial_account ON financial_account.id = income.financial_account WHERE financial_account.credit_limit != 0{account_id and ' AND financial_account.id = ?' or ''} GROUP BY financial_account__currency, financial_account__type ) inc ON inc.financial_account__currency = c.id AND inc.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(expenses.sum) AS expenses_debit__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account WHERE financial_account.credit_limit = 0{account_id and ' AND financial_account.id = ?' or ''} GROUP BY financial_account__currency, financial_account__type ) ed ON ed.financial_account__currency = c.id AND ed.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(expenses.sum) AS expenses_credit__sum, financial_account.type AS financial_account__type, financial_account.currency AS financial_account__currency FROM expenses LEFT JOIN financial_accounts AS financial_account ON financial_account.id = expenses.financial_account WHERE financial_account.credit_limit != 0{account_id and ' AND financial_account.id = ?' or ''} GROUP BY financial_account__currency, financial_account__type ) ec ON ec.financial_account__currency = c.id AND ec.financial_account__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_source) AS transfers_debit__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source WHERE account_source.credit_limit = 0{account_id and ' AND account_source.id = ?' or ''} GROUP BY account_source__currency, account_source__type ) tfd ON tfd.account_source__currency = c.id AND tfd.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_source) AS transfers_credit__sum_source, account_source.type AS account_source__type, account_source.currency AS account_source__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_source ON account_source.id = transfers.account_source WHERE account_source.credit_limit != 0{account_id and ' AND account_source.id = ?' or ''} GROUP BY account_source__currency, account_source__type ) tfc ON tfc.account_source__currency = c.id AND tfc.account_source__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_target) AS transfers_debit__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target WHERE account_target.credit_limit = 0{account_id and ' AND account_target.id = ?' or ''} GROUP BY account_target__currency, account_target__type ) ttd ON ttd.account_target__currency = c.id AND ttd.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(transfers.sum_target) AS transfers_credit__sum_target, account_target.type AS account_target__type, account_target.currency AS account_target__currency, comission FROM transfers LEFT JOIN financial_accounts AS account_target ON account_target.id = transfers.account_target WHERE account_target.credit_limit != 0{account_id and ' AND account_target.id = ?' or ''} GROUP BY account_target__currency, account_target__type ) ttc ON ttc.account_target__currency = c.id AND ttc.account_target__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(financial_accounts.correction) AS financial_accounts_debit_correction, financial_accounts.type AS financial_accounts__type, financial_accounts.currency AS financial_accounts__currency FROM financial_accounts WHERE financial_accounts.credit_limit = 0{account_id and ' AND financial_accounts.id = ?' or ''} GROUP BY financial_accounts__currency, financial_accounts__type ) fad ON fad.financial_accounts__currency = c.id AND fad.financial_accounts__type = operation_types.operation_type LEFT JOIN ( SELECT SUM(financial_accounts.correction) AS financial_accounts_credit_correction, financial_accounts.type AS financial_accounts__type, financial_accounts.currency AS financial_accounts__currency FROM financial_accounts WHERE financial_accounts.credit_limit != 0{account_id and ' AND financial_accounts.id = ?' or ''} GROUP BY financial_accounts__currency, financial_accounts__type ) fac ON fac.financial_accounts__currency = c.id AND fac.financial_accounts__type = operation_types.operation_type WHERE type IS NOT NULL AND ((balance) != 0 OR (credit) != 0) ORDER BY type, balance DESC"
+    return DATABASE_DRIVER.get_data(
+        query,
+        account_id and ([account_id] * 10) or [],
+    )
 
 
-def _finances_balance_extra_info():
-    balance = get_balance()
+def _finances_balance_extra_info(record=None):
+    balance = get_balance(account_id=(record and "id" in record and record["id"] or None))
     if not balance:
         return ""
-    lines = ["<b><u>Money balance</u></b>"]
+    lines = ["<b>Money balance</b>:"]
+    last_type = ""
+    
+    money = []
+
     for row in balance:
-        lines.append(
-            f"{select_emoji['financial_accounts']['type'][row['financial_account_type']]} {row['financial_account_type']}: <b>{row['balances']}</b>"
-        )
+        if row["type"] != last_type:
+            last_type = row["type"]
+            lines.append(f"{select_emoji['financial_accounts']['type'][row['type']]} {row['type']}")
+            money = []
+        money.append(_sub_currency_display(finance_format.format(row['balance']), row['code']))
+        # lines.append(
+        #     f"{select_emoji['financial_accounts']['type'][row['type']]} {row['type']}: <b>{finance_format.format(row['balance'])}</b> {finance_format.format(row['credit'])}"
+        # )
     return "\n".join(lines)
 
 
@@ -456,7 +469,7 @@ def init():
                 "payment_cards",
             ],
             ["income", "expenses"],
-            ["corrections", "transfers"],
+            ["transfers"],
         ],
         extra_info=[_finances_balance_extra_info],
     )
@@ -529,13 +542,6 @@ def init():
                 "column": "financial_account",
                 "type": "data",
                 "data_type": "financial_accounts",
-                "conditions": [
-                    {
-                        "type": "equals_if_set",
-                        "column": "currency",
-                        "extra": "currency",
-                    }
-                ],
             },
             {"column": "sum", "type": "float"},
             {"column": "proxy", "type": "float", "skippable": True},
@@ -585,22 +591,6 @@ def init():
         extended_display=_db_transfers_extended_display,
     )
     DatabaseView(
-        "corrections",
-        [
-            {"column": "date", "type": "date"},
-            {"column": "currency", "type": "data", "data_type": "currencies"},
-            {
-                "column": "account_type",
-                "type": "select",
-                "select": financial_account_types,
-                "select_key": "account_type",
-            },
-            {"column": "sum", "type": "float"},
-            {"column": "description", "type": "text", "skippable": True},
-        ],
-        order_by=[("date", True, None)],
-    )
-    DatabaseView(
         "financial_categories",
         [
             {"column": "name", "type": "text"},
@@ -638,6 +628,11 @@ def init():
                 "data_type": "people",
                 "skippable": True,
             },
+            {
+                "column": "correction",
+                "type": "float",
+                "skippable": True,
+            },
         ],
         inline_display=_db_financial_accounts_inline_display,
         order_by=[
@@ -651,6 +646,7 @@ def init():
             DatabaseLinkedReport("income", "financial_account"),
             DatabaseLinkedReport("expenses", "financial_account"),
         ],
+        extra_info=[_finances_balance_extra_info],
     )
     DatabaseView(
         "payment_cards",

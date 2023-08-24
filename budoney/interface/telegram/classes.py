@@ -924,7 +924,7 @@ class EditRecordView(View):
                 ]
                 if column["type"] == "date":
                     date_timestamp = datetime.fromtimestamp(value)
-                    date_string = f"{date_timestamp.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp(value)}"
+                    date_string = f"{date_timestamp.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp_text(value)}"
                     text = f"{text} [{date_string}]"
                 elif column["type"] == "data":
                     relevant = {
@@ -1320,7 +1320,7 @@ class EditDateRecordValueView(EditRecordValueView):
         )
 
         for date in dates:
-            date_string = f"{date.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp(date.timestamp(), today=today)}"
+            date_string = f"{date.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp_text(date.timestamp(), today=today)}"
             keyboard.append(
                 [
                     InlineKeyboardButton(

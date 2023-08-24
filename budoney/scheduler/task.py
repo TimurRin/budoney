@@ -36,12 +36,13 @@ def check_for_tasks():
                     )
 
         recurring = DATABASE_DRIVER.get_data(
-            "SELECT r.id AS recurring, r.name, r.important, CAST(strftime('%s', 'now') AS INTEGER) AS date_created, (CAST(strftime('%s', 'now') AS INTEGER) + r.urgent * 86400) AS date_due FROM tasks_recurring r LEFT JOIN (SELECT COALESCE(date_completed, CAST(strftime('%s', 'now') AS INTEGER)) AS date_completed, recurring FROM tasks_current) c ON r.id = c.recurring WHERE r.paused = 0 GROUP BY r.id HAVING c.date_completed IS NULL OR CAST(strftime('%s', 'now') AS INTEGER) > (MAX(c.date_completed) + (r.rest_days + 1) * 86400)",
+            "SELECT r.id AS recurring, r.name, r.category, r.important, CAST(strftime('%s', 'now') AS INTEGER) AS date_created, (CAST(strftime('%s', 'now') AS INTEGER) + r.urgent * 86400) AS date_due FROM tasks_recurring r LEFT JOIN (SELECT COALESCE(date_completed, CAST(strftime('%s', 'now') AS INTEGER)) AS date_completed, recurring FROM tasks_current) c ON r.id = c.recurring WHERE r.paused = 0 GROUP BY r.id HAVING c.date_completed IS NULL OR CAST(strftime('%s', 'now') AS INTEGER) > (MAX(c.date_completed) + (r.rest_days + 1) * 86400) ORDER BY r.category, r.urgent DESC, r.important DESC, r.name",
             [],
         )
-        new_tasks_start = f"<b><u>SCHEDULED RECURRING TASKS</u></b> ({len(recurring)}):"
+        new_tasks_start = f"<b>NEW TASKS</b> ({len(recurring)}):"
         new_messages = []
         message_threshold = len(new_tasks_start)
+        category = ""
         for record in recurring:
             DATABASE_DRIVER.append_data(
                 "tasks_current",
@@ -52,7 +53,11 @@ def check_for_tasks():
             text_len_added = message_threshold + text_len
             if not new_messages:
                 new_messages.append([new_tasks_start])
-            elif text_len_added <= 4096:
+            if "category" not in record or (category != record["category"]):
+                category = record["category"]
+                new_messages[-1].append("")
+                new_messages[-1].append(f"<b>{category}</b>")
+            if text_len_added <= 4096:
                 message_threshold += text_len
                 new_messages[-1].append(text)
             else:

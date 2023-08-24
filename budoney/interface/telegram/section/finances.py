@@ -232,7 +232,7 @@ def _sub_date_extended_display(record):
         date_line.append("🗓")
         date = datetime.fromtimestamp(record["date"])
         date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
-        date_line.append("(" + date_utils.get_relative_date(date) + ")")
+        date_line.append("(" + date_utils.get_relative_date_text(date) + ")")
 
     if len(date_line):
         return " ".join(date_line)
@@ -242,7 +242,7 @@ def _db_transactions_inline_display(record):
     text_parts = []
 
     if "date" in record and record["date"]:
-        text_parts.append(date_utils.get_relative_timestamp(record["date"]))
+        text_parts.append(date_utils.get_relative_timestamp_text(record["date"]))
         text_parts.append("—")
 
     text_parts.append(
@@ -377,7 +377,7 @@ def _db_transfers_inline_display(record):
     text_parts = []
 
     if "date" in record and record["date"]:
-        text_parts.append(date_utils.get_relative_timestamp(record["date"]))
+        text_parts.append(date_utils.get_relative_timestamp_text(record["date"]))
         text_parts.append("—")
 
     sum_present = (

@@ -11,14 +11,19 @@ def _display_inline_current_task(record):
     if "date_completed" in record and record["date_completed"]:
         text_parts.append("[☑️")
         text_parts.append(
-            date_utils.get_relative_timestamp(record["date_completed"]) + "]"
+            date_utils.get_relative_timestamp_text(record["date_completed"]) + "]"
         )
     else:
         if "date_due" in record and record["date_due"]:
-            # text_parts.append("[🗓")
-            text_parts.append("[⚠️")
+            days = date_utils.get_relative_timestamp(record["date_due"])
+            text_parts.append((days < -3 and "⏳") or (days < 0 and "⌛️") or "⚠️⌛️")
             text_parts.append(
-                date_utils.get_relative_timestamp(record["date_due"]) + "]"
+                date_utils.get_relative_timestamp_text(record["date_due"])
+            )
+        elif "date_created" in record and record["date_created"]:
+            text_parts.append("🗓")
+            text_parts.append(
+                date_utils.get_relative_timestamp_text(record["date_created"])
             )
 
         if "important" in record and record["important"]:
@@ -81,6 +86,7 @@ def init():
         "tasks_current",
         [
             {"column": "name", "type": "text"},
+            {"column": "category", "type": "text", "skippable": True},
             {"column": "important", "type": "boolean"},
             {
                 "column": "recurring",
@@ -103,6 +109,7 @@ def init():
         "tasks_recurring",
         [
             {"column": "name", "type": "text"},
+            {"column": "category", "type": "text"},
             {"column": "important", "type": "boolean"},
             {"column": "urgent", "type": "int", "skippable": True},
             {"column": "work_days", "type": "int", "min": 1},

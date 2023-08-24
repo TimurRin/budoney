@@ -16,6 +16,16 @@ def get_today_text() -> str:
 def get_relative_date(date, today=None):
     if not today:
         today = datetime.today()
+    return (today - date).days
+
+
+def get_relative_timestamp(timestamp, today=None):
+    return get_relative_date(datetime.fromtimestamp(timestamp), today=today)
+
+
+def get_relative_date_text(date, today=None):
+    if not today:
+        today = datetime.today()
     days_ago = (today - date).days
     if days_ago == 0:
         return "today"
@@ -29,8 +39,8 @@ def get_relative_date(date, today=None):
         return f"{days_ago}d ago"
 
 
-def get_relative_timestamp(timestamp, today=None):
-    return get_relative_date(datetime.fromtimestamp(timestamp), today=today)
+def get_relative_timestamp_text(timestamp, today=None):
+    return get_relative_date_text(datetime.fromtimestamp(timestamp), today=today)
 
 
 def get_today_month_timestamp():

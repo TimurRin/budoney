@@ -1751,6 +1751,7 @@ def _records_handle_pagination(table_name, update: Update, data: str, full_mode=
 
 
 def _records_handle_add(table_name, update: Update):
+    telegram_users[update.callback_query.message.chat.id].clear_edits(table_name)
     fast_type_processor = database_views[table_name].fast_type_processor
     if fast_type_processor:
         return conversation_views[f"{table_name}_FAST_TYPE"]

@@ -15,8 +15,9 @@ def check_for_tasks():
         for plant_lot in plant_lots:
             if not plant_lot["task"]:
                 record = {
-                    "name": f"💧 Water {plant_lot['emoji_pack']} {plant_lot['name']}",
+                    "name": f"💧 Полить {plant_lot['emoji_pack']} {plant_lot['name']}",
                     "important": 1,
+                    "category": "Огород",
                     "urgent": 0,
                     "work_days": 1,
                     "rest_days": 2,

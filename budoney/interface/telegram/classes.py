@@ -302,7 +302,10 @@ class View:
             or data == "_CLEAR_FILTERS"
         )
 
-        if telegram_users[update.callback_query.message.chat.id].temp_mode and not data_pagination:
+        if (
+            telegram_users[update.callback_query.message.chat.id].temp_mode
+            and not data_pagination
+        ):
             telegram_users[update.callback_query.message.chat.id].temp_mode = False
             telegram_users[update.callback_query.message.chat.id].temp_filters = list()
             telegram_users[
@@ -471,7 +474,9 @@ class DatabaseView(View):
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         report: DatabaseReport | None = None,
-        report_links: list[DatabaseLinkedReport] | None = None, extra_info=None
+        report_links: list[DatabaseLinkedReport] | None = None,
+        extra_info=None,
+        actions=None,
     ) -> None:
         super().__init__(state_name)
         database_views[state_name] = self
@@ -491,6 +496,7 @@ class DatabaseView(View):
         self.report: DatabaseReport | None = report
         self.report_links: list[DatabaseLinkedReport] | None = report_links
         self.extra_info = extra_info
+        self.actions = actions
 
         keyboard = []
 
@@ -576,7 +582,9 @@ class ListRecordsView(View):
         telegram_users[update.callback_query.message.chat.id].records[
             self.table_name
         ] = _get_records(
-            _get_records_query(table_name=self.table_name, record_ids=[data], no_join=True)
+            _get_records_query(
+                table_name=self.table_name, record_ids=[data], no_join=True
+            )
         )[
             0
         ]
@@ -688,7 +696,6 @@ class RecordView(View):
                     if report_text:
                         text.append(report_text)
 
-
         extra_info = database_views[self.table_name].extra_info
         if extra_info:
             for row in extra_info:
@@ -728,6 +735,28 @@ class RecordView(View):
             if len(line):
                 keyboard.append(line)
 
+        actions = database_views[self.table_name].actions
+        if actions:
+            for index, action in enumerate(actions):
+                if (
+                    "conditions" in action
+                    and action["conditions"]
+                    and action["conditions"](
+                        telegram_users[message.chat.id].records_data[self.table_name]
+                    )
+                ):
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                callback_data=f"action__{index}",
+                                text=localization["states"].get(
+                                    f"{self.table_name}_ACTION_{action['name']}",
+                                    action["name"],
+                                ),
+                            )
+                        ]
+                    )
+
         controls = [back_button, edit_button]
 
         keyboard.append(controls)
@@ -741,7 +770,9 @@ class RecordView(View):
                 data_split[1]
             ] = _get_records(
                 _get_records_query(
-                    table_name=data_split[1], record_ids=[int(data_split[2])], no_join=True
+                    table_name=data_split[1],
+                    record_ids=[int(data_split[2])],
+                    no_join=True,
                 )
             )[
                 0
@@ -778,6 +809,20 @@ class RecordView(View):
                 "",
                 True,
             )
+        elif data_split[0] == "action" and len(data_split) == 2:
+            actions = database_views[self.table_name].actions
+            if actions:
+                action = actions[int(data_split[1])]
+                action["process"](
+                    telegram_users[update.callback_query.message.chat.id].records_data[
+                        self.table_name
+                    ]
+                )
+                return conversation_views[self.table_name + "_RECORDS"].state(
+                    update.callback_query.message,
+                    "",
+                    True,
+                )
 
     def handle_edit(self, update: Update):
         return conversation_views[self.table_name + "_EDIT"].state(
@@ -1492,7 +1537,7 @@ def _records_state_text(table_name, telegram_user: TelegramUser, full_mode=False
 
     search_result = search[0] and DATABASE_DRIVER.search([table_name], search[0]) or []
 
-    record_ids = [v['entry_id'] for v in search_result]
+    record_ids = [v["entry_id"] for v in search_result]
 
     query: tuple[str, list[Any]] = _get_records_query(
         table_name=table_name, record_ids=record_ids, conditions=filters
@@ -1776,7 +1821,7 @@ def _records_handle_typed(
     if search[0] != data:
         telegram_user.search[table_name] = (
             data,
-            [], # string_utils.sql_search(data)
+            [],  # string_utils.sql_search(data)
         )
         pagination = telegram_user.get_pagination(table_name, temp_mode)
         pagination.offset = 0

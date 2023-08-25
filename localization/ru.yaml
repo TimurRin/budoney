@@ -63,6 +63,7 @@ states:
     currencies_PARAM_code: "Код (ISO 4217)",
     currencies_PARAM_emoji: "Эмодзи",
     tasks_current: "🗒 Текущие задачи",
+    tasks_current_ACTION_done: "Отметить сделанным",
     tasks_recurring: "🔁 Повторяющиеся задачи",
     SELECT_account_type_CASH: "Наличные",
     SELECT_account_type_BANK: "Банковский счёт",

@@ -3,6 +3,9 @@ from interface.telegram.classes import (
     DefaultView,
 )
 import utils.date_utils as date_utils
+from database import DATABASE_DRIVER
+from datetime import datetime
+from dispatcher.telegram import send_info_message
 
 
 def _display_inline_current_task(record):
@@ -72,6 +75,20 @@ def _display_inline_scheduled_task(record):
     return " ".join(text_parts)
 
 
+def _action_conditions_done_current_task(record):
+    return "date_completed" not in record or not record["date_completed"]
+
+
+def _action_process_done_current_task(record):
+    update = {"date_completed": datetime.today().timestamp()}
+    DATABASE_DRIVER.replace_data(
+        "tasks_current",
+        record["id"],
+        update,
+    )
+    send_info_message("✅ 🗒 Task completed: " + record["name"])
+
+
 def init():
     DefaultView(
         "tasks",
@@ -103,6 +120,15 @@ def init():
             ("date_completed", True, "IS NOT NULL"),
             ("date_due", False, "IS NULL"),
             ("important", True, None),
+            ("date_created", False, None),
+        ],
+        actions=[
+            {
+                "name": "done",
+                "conditions": _action_conditions_done_current_task,
+                "params": ["date_completed"],
+                "process": _action_process_done_current_task,
+            }
         ],
     )
     DatabaseView(

@@ -1,3 +1,4 @@
+from typing import Any
 from interface.telegram.classes import (
     DatabaseView,
     DefaultView,
@@ -89,6 +90,18 @@ def _action_process_done_current_task(record):
     send_info_message("✅ 🗒 Task completed: " + record["name"])
 
 
+def _db_current_task_fast_type_processor(
+    data: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    record = {}
+    record_filters: dict[str, str] = {}
+
+    if data:
+        record["name"] = data
+
+    return (record, record_filters)
+
+
 def init():
     DefaultView(
         "tasks",
@@ -110,12 +123,19 @@ def init():
                 "type": "data",
                 "data_type": "tasks_recurring",
                 "skippable": True,
+                "hidden": True,
             },
-            {"column": "date_created", "type": "date"},
+            {
+                "column": "date_created",
+                "type": "date",
+                "autoset": lambda: datetime.today().timestamp(),
+            },
             {"column": "date_due", "type": "date", "skippable": True},
             {"column": "date_completed", "type": "date", "skippable": True},
         ],
         inline_display=_display_inline_current_task,
+        fast_type="required",
+        fast_type_processor=_db_current_task_fast_type_processor,
         order_by=[
             ("date_completed", True, "IS NOT NULL"),
             ("date_due", False, "IS NULL"),

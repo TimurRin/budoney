@@ -9,10 +9,11 @@ def init():
         [
             ["tasks_current_ADD", "expenses_ADD"],
             [
+                "tasks",
                 "finances",
             ],
             [
-                "tasks",
+                # "tasks",
                 # "reminders",
             ],
             # [
@@ -20,11 +21,11 @@ def init():
             #     "clothes",
             #     "storage",
             # ],
-            [
-                # "health",
-                # "food",
-                "plants",
-            ],
+            # [
+            # "health",
+            # "food",
+            # "plants",
+            # ],
             ["organizations", "people"],
         ],
     )

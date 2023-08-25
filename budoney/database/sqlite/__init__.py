@@ -259,13 +259,27 @@ class SQLiteDatabase(Database):
 
         self.connection.commit()
 
-    def search(self, tables: list[str], text_input: str) -> list[dict]:
-        text_input = text_input.lower()
+    def search(self, tables: list[str], text_inputs: list[str]) -> list[dict]:
         search_results = []
 
         for table in tables:
-            query = "SELECT table_name, entry_id FROM search_compound WHERE table_name = ? AND (field_data LIKE ? OR field_data_translit LIKE ? OR field_data LIKE ?)"
-            values = (table, f"%{text_input}%", f"%{russian_to_latin(text_input)}%", f"%{russian_to_latin(text_input)}%")
+            wheres = []
+            values = [table]
+
+            for text_input in text_inputs:
+                text_input = text_input.lower()
+                wheres.append(
+                    "(field_data LIKE ? OR field_data_translit LIKE ? OR field_data LIKE ?)"
+                )
+                values.extend(
+                    (
+                        f"%{text_input}%",
+                        f"%{russian_to_latin(text_input)}%",
+                        f"%{russian_to_latin(text_input)}%",
+                    )
+                )
+
+            query = f"SELECT table_name, entry_id, entry_field, field_data FROM search_compound WHERE table_name = ? AND ({' OR '.join(wheres)})"
             print("search", table, query, values)
             self.cursor.execute(query, values)
             results = self.cursor.fetchall()

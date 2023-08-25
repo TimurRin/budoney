@@ -67,5 +67,5 @@ class Database:
         pass
 
     @abc.abstractmethod
-    def search(self, tables: list[str], text_input: str) -> list[dict]:
+    def search(self, tables: list[str], text_inputs: list[str]) -> list[dict]:
         pass

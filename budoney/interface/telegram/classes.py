@@ -470,6 +470,7 @@ class DatabaseView(View):
         columns: list[dict],
         inline_display: Callable[[dict[str, Any]], str] | None = None,
         extended_display: Callable[[dict[str, Any]], str] | None = None,
+        fast_type: str | None = None,
         fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
@@ -487,6 +488,7 @@ class DatabaseView(View):
         self.extended_display: Callable[[dict[str, Any]], str] = (
             extended_display or inline_display
         )
+        self.fast_type: str | None = fast_type
         self.fast_type_processor: Callable[
             [str], tuple[dict[str, Any], dict[str, Any]]
         ] | None = fast_type_processor
@@ -852,11 +854,15 @@ class FastTypeRecordView(View):
             [
                 InlineKeyboardButton(
                     callback_data="_ALL",
-                    text="All params",
+                    text="All",
                 ),
                 InlineKeyboardButton(
                     callback_data="_REQUIRED",
-                    text="Required params",
+                    text="Required",
+                ),
+                InlineKeyboardButton(
+                    callback_data="_NONE",
+                    text="None",
                 ),
             ]
         )
@@ -876,7 +882,14 @@ class FastTypeRecordView(View):
             ] = {}
             telegram_users[update.callback_query.message.chat.id].ignore_fast[
                 self.table_name
-            ]["_ALL"] = True
+            ]["_NON_REQUIRED"] = True
+        elif data == "_NONE":
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                self.table_name
+            ] = {}
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                self.table_name
+            ]["_EVERYTHING"] = True
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.callback_query.message.chat.id],
@@ -887,25 +900,43 @@ class FastTypeRecordView(View):
         )
 
     def handle_typed(self, update: Update, data: str):
+        if (
+            database_views[self.table_name].fast_type
+            and database_views[self.table_name].fast_type == "required"
+        ):
+            telegram_users[update.message.chat.id].ignore_fast[self.table_name] = {}
+            telegram_users[update.message.chat.id].ignore_fast[self.table_name][
+                "_NON_REQUIRED"
+            ] = True
         proc = database_views[self.table_name].fast_type_processor
         if proc is not None:
             result = proc(data)
-            telegram_users[update.message.chat.id].records[self.table_name] = result[0]
-            telegram_users[update.message.chat.id].records_data[
-                self.table_name
-            ] = _get_records(
-                _get_records_query(
-                    table_name=self.table_name,
-                    external=telegram_users[update.message.chat.id].records[
+            print(result)
+            if result[0]:
+                if self.table_name in telegram_users[update.message.chat.id].records:
+                    telegram_users[update.message.chat.id].records[
                         self.table_name
-                    ],
-                )
-            )[
-                0
-            ]
-            telegram_users[update.message.chat.id].records_extra[
-                self.table_name
-            ] = result[1]
+                    ].update(result[0])
+                else:
+                    telegram_users[update.message.chat.id].records[
+                        self.table_name
+                    ] = result[0]
+                telegram_users[update.message.chat.id].records_data[
+                    self.table_name
+                ] = _get_records(
+                    _get_records_query(
+                        table_name=self.table_name,
+                        external=telegram_users[update.message.chat.id].records[
+                            self.table_name
+                        ],
+                    )
+                )[
+                    0
+                ]
+            if result[1]:
+                telegram_users[update.message.chat.id].records_extra[
+                    self.table_name
+                ] = result[1]
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.message.chat.id],
@@ -953,6 +984,8 @@ class EditRecordView(View):
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
+        display_submit = True
+
         for column in database_views[self.table_name].columns:
             code = f"{self.table_name}_PARAM_{column['column']}"
             code_text = f"{self.table_name}_PARAM_{column['column']}"
@@ -988,6 +1021,9 @@ class EditRecordView(View):
                     text_value = str(value)
                     if value:
                         text = f"{text} [{text_value}]"
+            elif "skippable" not in column or not column["skippable"]:
+                display_submit = False
+
             keyboard.append(
                 [
                     InlineKeyboardButton(
@@ -1001,7 +1037,8 @@ class EditRecordView(View):
         if telegram_users[message.chat.id].is_operational():
             controls.append(back_button)
         controls.append(cancel_button)
-        controls.append(submit_button)
+        if display_submit:
+            controls.append(submit_button)
 
         keyboard.append(controls)
 
@@ -1503,25 +1540,35 @@ def check_record_params(state, telegram_user: TelegramUser):
         telegram_user.records_extra[state.table_name] = {}
     if state.table_name not in telegram_user.ignore_fast:
         telegram_user.ignore_fast[state.table_name] = {}
-    for column in database_views[state.table_name].columns:
-        if column["column"] not in telegram_user.records[state.table_name]:
-            if (
-                ("skippable" not in column)
-                or not column["skippable"]  # column["skippable"] == "checking"
-            ) or (
-                (
-                    "_ALL" not in telegram_user.ignore_fast[state.table_name]
-                    or column["skippable"] == "checking"
-                )
-                and (
-                    column["column"] not in telegram_user.ignore_fast[state.table_name]
-                    or not telegram_user.ignore_fast[state.table_name][column["column"]]
-                )
-            ):
-                print(f"{column['column']} is not typed")
-                return conversation_views[
-                    f"{state.table_name}_PARAM_{column['column']}"
-                ]
+
+    pagination = telegram_user.get_pagination(state.table_name, temp_mode=True)
+    pagination.total = -1
+    pagination.offset = 0
+
+    if "_EVERYTHING" not in telegram_user.ignore_fast[state.table_name]:
+        for column in database_views[state.table_name].columns:
+            if column["column"] not in telegram_user.records[state.table_name]:
+                if (
+                    ("skippable" not in column)
+                    or not column["skippable"]  # column["skippable"] == "checking"
+                ) or (
+                    (
+                        "_NON_REQUIRED"
+                        not in telegram_user.ignore_fast[state.table_name]
+                        or column["skippable"] == "checking"
+                    )
+                    and (
+                        column["column"]
+                        not in telegram_user.ignore_fast[state.table_name]
+                        or not telegram_user.ignore_fast[state.table_name][
+                            column["column"]
+                        ]
+                    )
+                ):
+                    print(f"{column['column']} is not typed")
+                    return conversation_views[
+                        f"{state.table_name}_PARAM_{column['column']}"
+                    ]
     print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
     return state
 
@@ -1535,7 +1582,9 @@ def _records_state_text(table_name, telegram_user: TelegramUser, full_mode=False
     pagination: Pagination = telegram_user.get_pagination(table_name, temp_mode)
     search: tuple[str, list[str]] = telegram_user.get_search(table_name)
 
-    search_result = search[0] and DATABASE_DRIVER.search([table_name], search[0]) or []
+    search_result = (
+        search[0] and DATABASE_DRIVER.search([table_name], [search[0]]) or []
+    )
 
     record_ids = [v["entry_id"] for v in search_result]
 
@@ -1797,6 +1846,19 @@ def _records_handle_pagination(table_name, update: Update, data: str, full_mode=
 
 def _records_handle_add(table_name, update: Update):
     telegram_users[update.callback_query.message.chat.id].clear_edits(table_name)
+    for column in database_views[table_name].columns:
+        if "autoset" in column and column["autoset"]:
+            if (
+                table_name
+                not in telegram_users[update.callback_query.message.chat.id].records
+            ):
+                telegram_users[update.callback_query.message.chat.id].records[
+                    table_name
+                ] = {}
+
+            telegram_users[update.callback_query.message.chat.id].records[table_name][
+                column["column"]
+            ] = column["autoset"]()
     fast_type_processor = database_views[table_name].fast_type_processor
     if fast_type_processor:
         return conversation_views[f"{table_name}_FAST_TYPE"]

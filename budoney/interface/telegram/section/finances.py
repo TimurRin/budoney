@@ -1,5 +1,6 @@
 from typing import Any
 from datetime import datetime
+from utils.simple_math import calculate
 from database import DATABASE_DRIVER
 import configs
 from interface.telegram.classes import (
@@ -347,10 +348,39 @@ def _db_expenses_fast_type_processor(
     data: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     record = {}
-    record_extra = {}
-    record["sum"] = float(data)
-    record_extra["currency"] = configs.general["main_currency"]
-    return (record, record_extra)
+    record_filters_pre: dict[str, list[str]] = {}
+    record_filters: dict[str, str] = {}
+
+    pairs = {
+        "organizations": "organization",
+        "payment_cards": "payment_card",
+        "financial_accounts": "financial_account",
+    }
+
+    splitted_data = data.split(", ")
+    record["sum"] = calculate(splitted_data[0])
+    record["proxy"] = 0
+
+    if len(splitted_data) > 1:
+        splitted_data = splitted_data[1:]
+        rows = DATABASE_DRIVER.search(
+            ["organizations", "payment_cards", "financial_accounts"], splitted_data
+        )
+        for row in rows:
+            if row["table_name"] not in record_filters_pre:
+                record_filters_pre[pairs[row["table_name"]]] = []
+            record_filters_pre[pairs[row["table_name"]]].append(row["entry_id"])
+
+        for record_filter in record_filters_pre:
+            if len(record_filters_pre[record_filter]) > 1:
+                record_filters[
+                    record_filter
+                ] = f"{record_filter} IN ({', '.join(record_filters_pre[record_filter])})"
+                print(record_filter, record_filters[record_filter])
+            else:
+                record[record_filter] = int(record_filters_pre[record_filter][0])
+
+    return (record, record_filters)
 
 
 def _db_expenses_report_display(text, data: list[dict[str, Any]]) -> str:

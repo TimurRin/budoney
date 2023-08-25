@@ -175,7 +175,7 @@ class View:
             + f"- operational_sequence: <code>{str(user.operational_sequence)}</code>\n"
         )
         text = text + f"- state: <code>{str(user.state)}</code>\n"
-        text = text + f"- records: <code>{str(user.records)}</code>\n"
+        # text = text + f"- records: <code>{str(user.records)}</code>\n"
         # text = text + f"- records_data: <code>{str(user.records_data)}</code>\n"
 
         return text + "\n"
@@ -1387,6 +1387,7 @@ class EditDateRecordValueView(EditRecordValueView):
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
+        self.future: bool = column and "future" in column and column["future"] and True or False
         self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
@@ -1417,10 +1418,10 @@ class EditDateRecordValueView(EditRecordValueView):
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
                 InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
-                    date_offset > 0 and "Last 3d" or "🚫", callback_data="_DATE_TODAY"
+                    (date_offset > 0 or (self.future and date_offset < 0)) and "Last 3d" or "🚫", callback_data="_DATE_TODAY"
                 ),
                 InlineKeyboardButton(
-                    date_offset > 0 and "▶️" or "🚫", callback_data="_DATE_FORWARD"
+                    (date_offset > 0 or self.future) and "▶️" or "🚫", callback_data="_DATE_FORWARD"
                 ),
                 # InlineKeyboardButton(date_offset > 2 and "⏩" or "🚫", callback_data="_DATE_REWIND_FORWARD"),
             ]
@@ -1436,23 +1437,24 @@ class EditDateRecordValueView(EditRecordValueView):
         date_button = False
 
         if data == "_DATE_TODAY":
-            if telegram_users[update.callback_query.message.chat.id].date_offset > 0:
+            if telegram_users[update.callback_query.message.chat.id].date_offset != 0:
                 options_changed = True
                 telegram_users[update.callback_query.message.chat.id].date_offset = 0
         elif data == "_DATE_BACKWARD":
             options_changed = True
             telegram_users[update.callback_query.message.chat.id].date_offset += 1
         elif data == "_DATE_FORWARD":
-            if telegram_users[update.callback_query.message.chat.id].date_offset > 0:
-                options_changed = True
+            if telegram_users[update.callback_query.message.chat.id].date_offset > 0 or self.future:
                 telegram_users[update.callback_query.message.chat.id].date_offset -= 1
                 if (
                     telegram_users[update.callback_query.message.chat.id].date_offset
-                    < 0
+                    < 0 and not self.future
                 ):
                     telegram_users[
                         update.callback_query.message.chat.id
                     ].date_offset = 0
+                else:
+                    options_changed = True
         else:
             date_button = True
 

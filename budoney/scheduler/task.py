@@ -21,8 +21,6 @@ def check_for_tasks():
                     "urgent": 0,
                     "work_days": 1,
                     "rest_days": 2,
-                    "schedule_to_the_day": 1,
-                    "schedule_since_created": 0,
                     "paused": 0,
                 }
                 last_id = DATABASE_DRIVER.append_data(

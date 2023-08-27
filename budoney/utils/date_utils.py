@@ -43,6 +43,11 @@ def get_relative_timestamp_text(timestamp, today=None):
     return get_relative_date_text(datetime.fromtimestamp(timestamp), today=today)
 
 
+def get_today_day_timestamp():
+    today = datetime.today()
+    return int(datetime(today.year, today.month, today.day).timestamp())
+
+
 def get_today_month_timestamp():
     today = datetime.today()
     return int(datetime(today.year, today.month, 1).timestamp())

@@ -81,7 +81,7 @@ def _action_conditions_done_current_task(record):
 
 
 def _action_process_done_current_task(record):
-    update = {"date_completed": datetime.today().timestamp()}
+    update = {"date_completed": date_utils.get_today_day_timestamp()}
     DATABASE_DRIVER.replace_data(
         "tasks_current",
         record["id"],

@@ -77,6 +77,10 @@ class TelegramUser:
         if table_name in self.ignore_fast:
             del self.ignore_fast[table_name]
 
+        if table_name in self.pagination and self.pagination[table_name]:
+            self.pagination[table_name].total = -1
+        self.temp_pagination = Pagination()
+
 
 class DatabaseReport:
     def __init__(
@@ -990,12 +994,20 @@ class EditRecordView(View):
             code = f"{self.table_name}_PARAM_{column['column']}"
             code_text = f"{self.table_name}_PARAM_{column['column']}"
             text = localization["states"].get(code_text, column["column"])
-            if (
-                column["column"]
-                in telegram_users[message.chat.id].records[self.table_name]
-                and telegram_users[message.chat.id].records[self.table_name][
+            if column["column"] in telegram_users[message.chat.id].records[
+                self.table_name
+            ] and (
+                telegram_users[message.chat.id].records[self.table_name][
                     column["column"]
                 ]
+                or telegram_users[message.chat.id].records[self.table_name][
+                    column["column"]
+                ]
+                == 0
+                or telegram_users[message.chat.id].records[self.table_name][
+                    column["column"]
+                ]
+                == False
             ):
                 value = telegram_users[message.chat.id].records[self.table_name][
                     column["column"]
@@ -1015,12 +1027,9 @@ class EditRecordView(View):
                     text_value = database_views[column["data_type"]].inline_display(
                         relevant
                     )
-                    if text_value:
-                        text = f"{text} [{text_value}]"
+                    text = f"{text} [{str(text_value)}]"
                 else:
-                    text_value = str(value)
-                    if value:
-                        text = f"{text} [{text_value}]"
+                    text = f"{text} [{str(value)}]"
             elif "skippable" not in column or not column["skippable"]:
                 display_submit = False
 
@@ -1387,7 +1396,9 @@ class EditDateRecordValueView(EditRecordValueView):
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-        self.future: bool = column and "future" in column and column["future"] and True or False
+        self.future: bool = (
+            column and "future" in column and column["future"] and True or False
+        )
         self._help_text = "Select your value below"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
@@ -1418,10 +1429,14 @@ class EditDateRecordValueView(EditRecordValueView):
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
                 InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
-                    (date_offset > 0 or (self.future and date_offset < 0)) and "Last 3d" or "🚫", callback_data="_DATE_TODAY"
+                    (date_offset > 0 or (self.future and date_offset < 0))
+                    and "Last 3d"
+                    or "🚫",
+                    callback_data="_DATE_TODAY",
                 ),
                 InlineKeyboardButton(
-                    (date_offset > 0 or self.future) and "▶️" or "🚫", callback_data="_DATE_FORWARD"
+                    (date_offset > 0 or self.future) and "▶️" or "🚫",
+                    callback_data="_DATE_FORWARD",
                 ),
                 # InlineKeyboardButton(date_offset > 2 and "⏩" or "🚫", callback_data="_DATE_REWIND_FORWARD"),
             ]
@@ -1444,11 +1459,15 @@ class EditDateRecordValueView(EditRecordValueView):
             options_changed = True
             telegram_users[update.callback_query.message.chat.id].date_offset += 1
         elif data == "_DATE_FORWARD":
-            if telegram_users[update.callback_query.message.chat.id].date_offset > 0 or self.future:
+            if (
+                telegram_users[update.callback_query.message.chat.id].date_offset > 0
+                or self.future
+            ):
                 telegram_users[update.callback_query.message.chat.id].date_offset -= 1
                 if (
                     telegram_users[update.callback_query.message.chat.id].date_offset
-                    < 0 and not self.future
+                    < 0
+                    and not self.future
                 ):
                     telegram_users[
                         update.callback_query.message.chat.id

@@ -69,3 +69,7 @@ class Database:
     @abc.abstractmethod
     def search(self, tables: list[str], text_inputs: list[str]) -> list[dict]:
         pass
+
+    @abc.abstractmethod
+    def _revalidate_search_cache(self, table, record_id, data):
+        pass

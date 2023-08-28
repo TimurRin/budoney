@@ -193,6 +193,7 @@ class SQLiteDatabase(Database):
         query = f"UPDATE {table} SET {placeholders} WHERE id = ?"
         print("replace_data", query, values)
         self.cursor.execute(query, values)
+        self._revalidate_search_cache(table, record_id, data)
         if commit:
             self.connection.commit()
 
@@ -200,36 +201,13 @@ class SQLiteDatabase(Database):
         parsed_data = {
             k: v for k, v in data.items() if not k.startswith("_") and v or v == 0
         }
-        parsed_data_search = {
-            k: v.lower()
-            for k, v in data.items()
-            if not k.startswith("_") and isinstance(v, str) and v
-        }
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         print("append_data", query, list(parsed_data.values()))
         self.cursor.execute(query, list(parsed_data.values()))
         last_id = self.cursor.lastrowid
-        if parsed_data_search:
-            print(parsed_data_search)
-            values = []
-            values_placeholders = []
-            for key in parsed_data_search:
-                text = parsed_data_search[key]
-                values.append(table)
-                values.append(last_id)
-                values.append(key)
-                values.append(parsed_data_search[key])
-                text_translit = russian_to_latin(text)
-                if text != text_translit:
-                    values.append(text_translit)
-                else:
-                    values.append(None)
-                values_placeholders.append("?, ?, ?, ?, ?")
-            query_search = f"INSERT INTO search_compound (table_name, entry_id, entry_field, field_data, field_data_translit) VALUES ({'), ('.join(values_placeholders)})"
-            print("append_data", "search", query_search, values)
-            self.cursor.execute(query_search, values)
+        self._revalidate_search_cache(table, last_id, data)
         if commit:
             self.connection.commit()
         return last_id
@@ -287,3 +265,28 @@ class SQLiteDatabase(Database):
             search_results.extend(results)
 
         return search_results
+
+    def _revalidate_search_cache(self, table, record_id, data):
+        parsed_data_search = {
+            k: v.lower()
+            for k, v in data.items()
+            if not k.startswith("_") and isinstance(v, str) and v
+        }
+        if parsed_data_search:
+            values = []
+            values_placeholders = []
+            for key in parsed_data_search:
+                text = parsed_data_search[key]
+                values.append(table)
+                values.append(record_id)
+                values.append(key)
+                values.append(parsed_data_search[key])
+                text_translit = russian_to_latin(text)
+                if text != text_translit:
+                    values.append(text_translit)
+                else:
+                    values.append(None)
+                values_placeholders.append("?, ?, ?, ?, ?")
+            query_search = f"INSERT INTO search_compound (table_name, entry_id, entry_field, field_data, field_data_translit) VALUES ({'), ('.join(values_placeholders)}) ON CONFLICT (table_name, entry_id, entry_field) DO UPDATE SET field_data=excluded.field_data, field_data_translit=excluded.field_data_translit"
+            print("_update_search", query_search, values)
+            self.cursor.execute(query_search, values)

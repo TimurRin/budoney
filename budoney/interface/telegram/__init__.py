@@ -13,6 +13,7 @@ import interface.telegram.section.finances as finances_section
 import interface.telegram.section.tasks as tasks_section
 import interface.telegram.section.health as health_section
 import interface.telegram.section.plants as plants_section
+import interface.telegram.section.settings as settings_section
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, CommandHandler, ConversationHandler
 
@@ -77,6 +78,7 @@ finances_section.init()
 tasks_section.init()
 health_section.init()
 plants_section.init()
+settings_section.init()
 
 for name in conversation_views:
     print(print_label, "conversation_view", name)

@@ -118,6 +118,7 @@ class View:
         self.state_name = state_name
         self.skip_to_records = False
         self.handle_anything = False
+        self.no_sequence = False
         self.handlers = [
             CallbackQueryHandler(self._handle),
             MessageHandler(text_filters(), self._handle_typed),
@@ -392,7 +393,11 @@ class View:
         else:
             if data in conversation_views and conversation_views[data].skip_to_records:
                 data = f"{data}_RECORDS"
-            if telegram_users[update.callback_query.message.chat.id].state != data:
+            print(telegram_users[update.callback_query.message.chat.id].state, data)
+            if (
+                not self.no_sequence
+                and telegram_users[update.callback_query.message.chat.id].state != data
+            ):
                 if self.state_name in operational_states:
                     if (
                         len(telegram_user.operational_sequence[-1]) == 0
@@ -463,6 +468,51 @@ class DefaultView(View):
         return conversation_views[data].state(
             update.callback_query.message,
             "",
+            True,
+        )
+
+
+class ActionView(View):
+    def __init__(
+        self, state_name: str, actions: "list[tuple[str, Callable[[], str]]]"
+    ) -> None:
+        super().__init__(state_name)
+        self.handle_anything = True
+        self.no_sequence = True
+        self.actions = actions
+        keyboard = []
+
+        for index, action in enumerate(actions):
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        callback_data=index,
+                        text=localization["states"].get(
+                            f"{state_name}_ACTION_{action[0]}", action[0]
+                        ),
+                    )
+                ]
+            )
+
+        keyboard.append([back_button])
+
+        self._keyboard = InlineKeyboardMarkup(keyboard)
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        return self._keyboard
+
+    def handle(self, update: Update, data: str):
+        try:
+            index = int(data)
+        except:
+            return conversation_views["main"].state(
+                update.callback_query.message,
+                "Error",
+                True,
+            )
+        return conversation_views[self.state_name].state(
+            update.callback_query.message,
+            self.actions[index][1]() + " [" + datetime.now().isoformat() + "]",
             True,
         )
 
@@ -1669,6 +1719,7 @@ def _get_records_query(
     record_ids=None,
     no_join=None,
     conditions=None,
+    ignore_order=None,
 ):
     table_select = []
     join_select = []
@@ -1701,7 +1752,7 @@ def _get_records_query(
         external=external,
         join=linked_tables,
         join_select=join_select,
-        order_by=table_name and database_views[table_name].order_by,
+        order_by=table_name and not ignore_order and database_views[table_name].order_by,  # type: ignore
         conditions=conditions,
         record_ids=record_ids,
     )
@@ -1914,3 +1965,14 @@ def _records_handle_typed(
             "",
             False,
         )
+
+
+def revalidate_search_cache():
+    for db_name in database_views:
+        query: tuple[str, list[Any]] = _get_records_query(
+            table_name=db_name, no_join=True, ignore_order=True
+        )
+        records = DATABASE_DRIVER.get_records(query[0], query[1])
+        for record in records:
+            DATABASE_DRIVER._revalidate_search_cache(db_name, record["id"], record)
+    DATABASE_DRIVER.commit()

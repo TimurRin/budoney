@@ -1,7 +1,6 @@
 from interface.telegram.classes import (
-    DefaultView,
+    DefaultView
 )
-
 
 def init():
     DefaultView(
@@ -27,5 +26,6 @@ def init():
             # "plants",
             # ],
             ["organizations", "people"],
+            ["settings"]
         ],
     )

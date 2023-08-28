@@ -737,7 +737,7 @@ class RecordView(View):
                     conditions = [f"{report_link.link_by} = {record_data['id']}"]
                     if report.foreign_date:
                         conditions.append(
-                            f"{report.foreign_date} >= {date_utils.get_today_month_timestamp()}"
+                            f"{report.foreign_date} >= {date_utils.get_month_first_day_timestamp()}"
                         )
 
                     data = DATABASE_DRIVER.get_report(
@@ -1456,7 +1456,7 @@ class EditDateRecordValueView(EditRecordValueView):
 
         date_offset = telegram_users[message.chat.id].date_offset
 
-        today = datetime.today()
+        today = date_utils.get_today_midnight()
 
         dates = date_utils.date_range(
             today - timedelta(days=(date_offset * 3 + 2)),

@@ -81,7 +81,7 @@ def _action_conditions_done_current_task(record):
 
 
 def _action_process_done_current_task(record):
-    update = {"date_completed": date_utils.get_today_day_timestamp()}
+    update = {"date_completed": date_utils.get_today_midnight_timestamp()}
     DATABASE_DRIVER.replace_data(
         "tasks_current",
         record["id"],
@@ -128,7 +128,7 @@ def init():
             {
                 "column": "date_created",
                 "type": "date",
-                "autoset": lambda: datetime.today().timestamp(),
+                "autoset": lambda: date_utils.get_today_midnight_timestamp(),
             },
             {"column": "date_due", "type": "date", "skippable": True, "future": True},
             {"column": "date_completed", "type": "date", "skippable": True},

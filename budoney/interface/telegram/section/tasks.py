@@ -31,7 +31,7 @@ def _display_inline_current_task(record):
             )
 
         if "important" in record and record["important"]:
-            text_parts.append("‼️")
+            text_parts.append("❗️")
 
     if "recurring" in record and record["recurring"]:
         text_parts.append("🔁")
@@ -50,7 +50,7 @@ def _display_inline_scheduled_task(record):
         text_parts.append("⏸")
     else:
         if "important" in record and record["important"]:
-            text_parts.append("‼️")
+            text_parts.append("❗️")
 
         if (
             "urgent" in record

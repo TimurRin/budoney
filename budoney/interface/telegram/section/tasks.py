@@ -25,10 +25,10 @@ def _display_inline_current_task(record):
                 date_utils.get_relative_timestamp_text(record["date_due"])
             )
         elif "date_created" in record and record["date_created"]:
-            text_parts.append("🗓")
             text_parts.append(
                 date_utils.get_relative_timestamp_text(record["date_created"])
             )
+            text_parts.append("/")
 
         if "important" in record and record["important"]:
             text_parts.append("❗️")

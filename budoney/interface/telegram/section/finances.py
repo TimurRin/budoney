@@ -105,7 +105,7 @@ def _sub_organization_extended_display(record):
         organization_line.append(record["organization__emoji"])
 
     if "organization__name" in record and record["organization__name"]:
-        organization_line.append("<b>" + record["organization__name"] + "</b>")
+        organization_line.append(record["organization__name"])
 
     if "description" in record and record["description"]:
         organization_line.append("(" + record["description"] + ")")
@@ -208,11 +208,11 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
             payment_card_prefix = payment_card_prefix + "__"
         method_line.append("💳")
         method_line.append(
-            "<b>*" + record.get(f"{payment_card_prefix}number", "????") + "</b>"
+            "*" + record.get(f"{payment_card_prefix}number", "????")
         )
 
         method_line.append(
-            "<b>" + record.get(f"{payment_card_prefix}payment_system", "????") + "</b>"
+            record.get(f"{payment_card_prefix}payment_system", "????")
         )
 
         if record.get(f"{payment_card_prefix}credit_limit", 0) > 0:
@@ -221,7 +221,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
         if len(financial_account):
             method_line.append("(" + (" ".join(financial_account)) + ")")
     elif len(financial_account):
-        method_line.append("<b>" + (" ".join(financial_account)) + "</b>")
+        method_line.append(" ".join(financial_account))
 
     if len(method_line):
         return " ".join(method_line)
@@ -232,7 +232,7 @@ def _sub_date_extended_display(record):
     if "date" in record and record["date"]:
         date_line.append("🗓")
         date = datetime.fromtimestamp(record["date"])
-        date_line.append("<b>" + date.strftime("%Y-%m-%d, %A") + "</b>")
+        date_line.append(date.strftime("%Y-%m-%d, %A"))
         date_line.append("(" + date_utils.get_relative_date_text(date) + ")")
 
     if len(date_line):

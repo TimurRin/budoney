@@ -209,13 +209,9 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
         if payment_card_prefix:
             payment_card_prefix = payment_card_prefix + "__"
         method_line.append("💳")
-        method_line.append(
-            "*" + record.get(f"{payment_card_prefix}number", "????")
-        )
+        method_line.append("*" + record.get(f"{payment_card_prefix}number", "????"))
 
-        method_line.append(
-            record.get(f"{payment_card_prefix}payment_system", "????")
-        )
+        method_line.append(record.get(f"{payment_card_prefix}payment_system", "????"))
 
         if record.get(f"{payment_card_prefix}credit_limit", 0) > 0:
             method_line.append("<b>Credit</b>")
@@ -348,15 +344,15 @@ def _db_expenses_extended_display(record):
 
 def _db_expenses_fast_type_processor(
     data: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, list[str]]]:
     record = {}
-    record_filters_pre: dict[str, list[str]] = {}
-    record_filters: dict[str, str] = {}
+    record_filters_pre: dict[tuple[str, str], list[str]] = {}
+    record_filters: dict[str, list] = {}
 
     pairs = {
         "organizations": "organization",
-        "payment_cards": "payment_card",
-        "financial_accounts": "financial_account",
+        # "payment_cards": "payment_card",
+        # "financial_accounts": "financial_account",
     }
 
     splitted_data = data.split(", ")
@@ -364,24 +360,33 @@ def _db_expenses_fast_type_processor(
     record["proxy"] = 0
 
     if len(splitted_data) > 1:
-        splitted_data = splitted_data[1:]
+        organization = splitted_data[1]
+        if len(splitted_data) > 2:
+            record["description"] = ", ".join(splitted_data[2:])
+        
         rows = DATABASE_DRIVER.search(
-            ["organizations", "payment_cards", "financial_accounts"], splitted_data
+            [
+                "organizations",
+                #  "payment_cards",
+                #  "financial_accounts"
+            ],
+            [organization],
         )
         for row in rows:
-            if row["table_name"] not in record_filters_pre:
-                record_filters_pre[pairs[row["table_name"]]] = []
-            record_filters_pre[pairs[row["table_name"]]].append(row["entry_id"])
-
+            if row["table_name"] in pairs:
+                table_column = (row["table_name"], pairs[row["table_name"]])
+                if table_column not in record_filters_pre:
+                    record_filters_pre[table_column] = []
+                record_filters_pre[table_column].append(str(row["entry_id"]))
         for record_filter in record_filters_pre:
             if len(record_filters_pre[record_filter]) > 1:
-                record_filters[
-                    record_filter
-                ] = f"{record_filter} IN ({', '.join(record_filters_pre[record_filter])})"
-                print(print_label, record_filter, record_filters[record_filter])
+                if record_filter[0] not in record_filters:
+                    record_filters[record_filter[0]] = []
+                record_filters[record_filter[0]].append(
+                    f"{record_filter[0]}.id IN ({', '.join(record_filters_pre[record_filter])})"
+                )
             else:
-                record[record_filter] = int(record_filters_pre[record_filter][0])
-
+                record[record_filter[1]] = int(record_filters_pre[record_filter][0])
     return (record, record_filters)
 
 

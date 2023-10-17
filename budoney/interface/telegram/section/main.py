@@ -6,7 +6,8 @@ def init():
     DefaultView(
         "main",
         [
-            ["tasks_current_ADD", "expenses_ADD"],
+            ["transfer_ADD", "tasks_current_ADD"],
+            ["income_ADD", "expenses_ADD"],
             [
                 "tasks",
                 "finances",

@@ -33,26 +33,19 @@ class TelegramUser:
         self.records: dict = dict()
         self.records_data: dict = dict()
         self.records_extra: dict = dict()
-        self.temp_mode: bool = False
         self.filters: dict[str, list[str]] = dict()
-        self.temp_filters: list[str] = list()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
-        self.temp_pagination: Pagination = Pagination()
         self.search: dict[str, tuple[str, list[str]]] = dict()
         self.date_offset: int = 0
         self.last_query: tuple[str, list[Any]] = ("", [])
 
-    def get_filters(self, table_name, temp_mode=False):
-        if temp_mode:
-            return self.temp_filters
+    def get_filters(self, table_name):
         if table_name not in self.filters:
             self.filters[table_name] = list()
         return self.filters[table_name]
 
-    def get_pagination(self, table_name, temp_mode=False):
-        if temp_mode:
-            return self.temp_pagination
+    def get_pagination(self, table_name):
         if table_name not in self.pagination:
             self.pagination[table_name] = Pagination()
         return self.pagination[table_name]
@@ -356,16 +349,6 @@ class View:
             or data == "_CLEAR_FILTERS"
         )
 
-        if (
-            telegram_users[update.callback_query.message.chat.id].temp_mode
-            and not data_pagination
-        ):
-            telegram_users[update.callback_query.message.chat.id].temp_mode = False
-            telegram_users[update.callback_query.message.chat.id].temp_filters = list()
-            telegram_users[
-                update.callback_query.message.chat.id
-            ].temp_pagination = Pagination()
-
         if data == "_BACK":
             return self.go_back(update, telegram_user)
         elif data == "_NEXT":
@@ -555,7 +538,7 @@ class DatabaseView(View):
         inline_display: Callable[[dict[str, Any]], str] | None = None,
         extended_display: Callable[[dict[str, Any]], str] | None = None,
         fast_type: str | None = None,
-        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, Any]]]
+        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, list[str]]]]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         report: DatabaseReport | None = None,
@@ -574,7 +557,7 @@ class DatabaseView(View):
         )
         self.fast_type: str | None = fast_type
         self.fast_type_processor: Callable[
-            [str], tuple[dict[str, Any], dict[str, Any]]
+            [str], tuple[dict[str, Any], dict[str, list[str]]]
         ] | None = fast_type_processor
         if order_by == None:
             order_by = []
@@ -642,7 +625,7 @@ class ListRecordsView(View):
         return f"{localization['states'].get(self.table_name, self.table_name)} > {localization['states'].get('_HEADER_RECORDS', '_HEADER_RECORDS')}"
 
     def state_text(self, telegram_user):
-        text = _records_state_text(self.table_name, telegram_user, full_mode=True)
+        text = _records_state_text(self.table_name, telegram_user)
 
         report = database_views[self.table_name].report
         if report:
@@ -659,7 +642,7 @@ class ListRecordsView(View):
         return text
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
-        keyboard = _records_keyboard(self.table_name, [], message, full_mode=True)
+        keyboard = _records_keyboard(self.table_name, [], message)
         keyboard.append([back_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
@@ -694,7 +677,7 @@ class ListRecordsView(View):
 
     def handle_pagination(self, update: Update, data: str):
         options_changed = _records_handle_pagination(
-            self.table_name, update, data, full_mode=True
+            self.table_name, update, data
         )
 
         print(
@@ -726,7 +709,6 @@ class ListRecordsView(View):
             update,
             telegram_users[update.message.chat.id],
             data,
-            full_mode=True,
         )
 
 
@@ -881,13 +863,12 @@ class RecordView(View):
         )
 
     def handle_filter(self, update: Update, a1, a2, a3):
-        telegram_users[update.callback_query.message.chat.id].temp_mode = True
-        telegram_users[update.callback_query.message.chat.id].temp_filters = [
+        telegram_users[update.callback_query.message.chat.id].filters[self.table_name] = [
             f"{a1} = {a3}"
         ]
         pagination = telegram_users[
             update.callback_query.message.chat.id
-        ].get_pagination(self.table_name, temp_mode=True)
+        ].get_pagination(self.table_name)
         pagination.offset = 0
         pagination.total = -1
         return conversation_views[self.table_name + "_RECORDS"].state(
@@ -1020,6 +1001,9 @@ class FastTypeRecordView(View):
                 telegram_users[update.message.chat.id].records_extra[
                     self.table_name
                 ] = result[1]
+                telegram_users[update.message.chat.id].filters = {}
+                for filter_table in result[1]:
+                    telegram_users[update.message.chat.id].filters[filter_table] = result[1][filter_table]
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.message.chat.id],
@@ -1170,7 +1154,7 @@ class EditRecordView(View):
                 )
 
         for column in database_views[self.table_name].columns:
-            if column["type"] == "data":
+            if column["type"] == "data" and column["column"] in record:
                 DATABASE_DRIVER.update_entry_usage(
                     column["data_type"], record[column["column"]]
                 )
@@ -1647,7 +1631,7 @@ def check_record_params(state, telegram_user: TelegramUser):
     if state.table_name not in telegram_user.ignore_fast:
         telegram_user.ignore_fast[state.table_name] = {}
 
-    pagination = telegram_user.get_pagination(state.table_name, temp_mode=True)
+    pagination = telegram_user.get_pagination(state.table_name)
     pagination.total = -1
     pagination.offset = 0
 
@@ -1690,10 +1674,9 @@ def check_record_params(state, telegram_user: TelegramUser):
 # records outer functions to reuse them
 
 
-def _records_state_text(table_name, telegram_user: TelegramUser, full_mode=False):
-    temp_mode = telegram_user.temp_mode or not full_mode
-    filters = telegram_user.get_filters(table_name, temp_mode)
-    pagination: Pagination = telegram_user.get_pagination(table_name, temp_mode)
+def _records_state_text(table_name, telegram_user: TelegramUser):
+    filters = telegram_user.get_filters(table_name)
+    pagination: Pagination = telegram_user.get_pagination(table_name)
     search: tuple[str, list[str]] = telegram_user.get_search(table_name)
 
     search_result = (
@@ -1823,15 +1806,14 @@ def _get_records(
     return result
 
 
-def _records_keyboard(table_name, keyboard, message: Message, full_mode=False):
-    temp_mode = telegram_users[message.chat.id].temp_mode or not full_mode
-    filters = telegram_users[message.chat.id].get_filters(table_name, temp_mode)
-    pagination = telegram_users[message.chat.id].get_pagination(table_name, temp_mode)
+def _records_keyboard(table_name, keyboard, message: Message):
+    filters = telegram_users[message.chat.id].get_filters(table_name)
+    pagination = telegram_users[message.chat.id].get_pagination(table_name)
     search = telegram_users[message.chat.id].get_search(table_name)
 
     clear_line = []
 
-    if len(search[0]) and not temp_mode:
+    if len(search[0]):
         clear_line.append(
             InlineKeyboardButton(
                 callback_data="_CLEAR_SEARCH",
@@ -1839,7 +1821,7 @@ def _records_keyboard(table_name, keyboard, message: Message, full_mode=False):
             )
         )
 
-    if len(filters) and not temp_mode:
+    if len(filters):
         clear_line.append(
             InlineKeyboardButton(
                 callback_data="_CLEAR_FILTERS",
@@ -1890,7 +1872,7 @@ def _records_keyboard(table_name, keyboard, message: Message, full_mode=False):
             ]
         )
 
-    if pagination.total > 0 and full_mode:
+    if pagination.total > 0:
         extra_buttons = [
             InlineKeyboardButton(
                 "🎛 Filters",
@@ -1916,12 +1898,9 @@ def _records_keyboard(table_name, keyboard, message: Message, full_mode=False):
     return keyboard
 
 
-def _records_handle_pagination(table_name, update: Update, data: str, full_mode=False):
-    temp_mode = (
-        telegram_users[update.callback_query.message.chat.id].temp_mode or not full_mode
-    )
+def _records_handle_pagination(table_name, update: Update, data: str):
     pagination = telegram_users[update.callback_query.message.chat.id].get_pagination(
-        table_name, temp_mode
+        table_name
     )
 
     options_changed = False
@@ -1996,9 +1975,7 @@ def _records_handle_typed(
     update: Update,
     telegram_user: TelegramUser,
     data,
-    full_mode=False,
 ):
-    temp_mode = telegram_user.temp_mode or not full_mode
     search = telegram_user.get_search(table_name)
     print(print_label, "_records_handle_typed", str(search[0]), "-", data)
     if search[0] != data:
@@ -2006,7 +1983,7 @@ def _records_handle_typed(
             data,
             [],  # string_utils.sql_search(data)
         )
-        pagination = telegram_user.get_pagination(table_name, temp_mode)
+        pagination = telegram_user.get_pagination(table_name)
         pagination.offset = 0
         pagination.total = -1
         return conversation_views[state_name].state(

@@ -234,7 +234,7 @@ class View:
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_jump",
         )
 
-    def handle_filter(self, update: Update, a1, a2, a3):
+    def handle_filter(self, update: Update, action, filter_table, a1, a2, a3):
         print(
             print_label,
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_filter",
@@ -402,12 +402,12 @@ class View:
             data_split = data.split("__")
             if data_split[0] == "action" and len(data_split) == 2:
                 return self.handle_action(update, int(data_split[1]))
-            elif data_split[0] == "filter" and len(data_split) == 4:
+            elif data_split[0] == "filter" and len(data_split) == 6 and data_split[1] == "stay":
                 self.clear_operational_sequence(
                     telegram_users[update.callback_query.message.chat.id]
                 )
                 return self.handle_filter(
-                    update, data_split[1], data_split[2], data_split[3]
+                    update, data_split[1], data_split[2], data_split[3], data_split[4], data_split[5]
                 )
             if (
                 not self.no_sequence
@@ -427,6 +427,10 @@ class View:
                         telegram_user.states_sequence.append(self.state_name)
             if data_split[0] == "jump" and len(data_split) == 3:
                 return self.handle_jump(update, data_split[1], int(data_split[2]))
+            elif data_split[0] == "filter" and len(data_split) == 6 and data_split[1] == "jump":
+                return self.handle_filter(
+                    update, data_split[1], data_split[2], data_split[3], data_split[4], data_split[5]
+                )
             elif data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
             elif data in shortcuts and shortcuts[data]:
@@ -776,6 +780,8 @@ class RecordView(View):
         return "\n\n".join(text)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        record_data = telegram_users[message.chat.id].records_data[self.table_name]
+
         keyboard = []
 
         for column in database_views[self.table_name].columns:
@@ -793,13 +799,13 @@ class RecordView(View):
                 if column["type"] == "data":
                     line.append(
                         InlineKeyboardButton(
-                            callback_data=f"jump__{column['data_type']}__{telegram_users[message.chat.id].records_data[self.table_name][column['column']]}",
+                            callback_data=f"jump__{column['data_type']}__{record_data[column['column']]}",
                             text=f"Go to {text}",
                         )
                     )
                     line.append(
                         InlineKeyboardButton(
-                            callback_data=f"filter__{column['column']}__equals__{telegram_users[message.chat.id].records_data[self.table_name][column['column']]}",
+                            callback_data=f"filter__stay__{self.table_name}__{column['column']}__equals__{record_data[column['column']]}",
                             text=f"Filter by {text}",
                         )
                     )
@@ -807,15 +813,33 @@ class RecordView(View):
             if len(line):
                 keyboard.append(line)
 
+        for database in database_views:
+            if self.table_name != database:
+                for column in database_views[database].columns:
+                    if (
+                        column["type"] == "data"
+                        and column["data_type"] == self.table_name
+                    ):
+                        text1 = localization["states"].get(f"{database}", database)
+                        text2 = localization["states"].get(
+                            f"{database}_PARAM_{column['column']}", column["column"]
+                        )
+                        keyboard.append(
+                            [
+                                InlineKeyboardButton(
+                                    callback_data=f"filter__jump__{database}__{column['column']}__equals__{record_data['id']}",
+                                    text=f"See '{text1}' with this '{text2}'",
+                                )
+                            ]
+                        )
+
         actions = database_views[self.table_name].actions
         if actions:
             for index, action in enumerate(actions):
                 if (
                     "conditions" not in action
                     or action["conditions"]
-                    and action["conditions"](
-                        telegram_users[message.chat.id].records_data[self.table_name]
-                    )
+                    and action["conditions"](record_data)
                 ):
                     keyboard.append(
                         [
@@ -865,16 +889,16 @@ class RecordView(View):
             True,
         )
 
-    def handle_filter(self, update: Update, a1, a2, a3):
-        telegram_users[update.callback_query.message.chat.id].filters[
-            self.table_name
-        ] = [f"{a1} = {a3}"]
+    def handle_filter(self, update: Update, action, filter_table, a1, a2, a3):
+        telegram_users[update.callback_query.message.chat.id].filters[filter_table] = [
+            f"{a1} = {a3}"
+        ]
         pagination = telegram_users[
             update.callback_query.message.chat.id
-        ].get_pagination(self.table_name)
+        ].get_pagination(filter_table)
         pagination.offset = 0
         pagination.total = -1
-        return conversation_views[self.table_name + "_RECORDS"].state(
+        return conversation_views[filter_table + "_RECORDS"].state(
             update.callback_query.message,
             "",
             True,

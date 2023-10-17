@@ -63,6 +63,10 @@ class Database:
         pass
 
     @abc.abstractmethod
+    def delete_data(self, table: str, record_id):
+        pass
+
+    @abc.abstractmethod
     def create_table(self, table: str, columns: list[dict]):
         pass
 

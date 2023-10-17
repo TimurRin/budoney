@@ -403,7 +403,9 @@ class View:
             if data_split[0] == "action" and len(data_split) == 2:
                 return self.handle_action(update, int(data_split[1]))
             elif data_split[0] == "filter" and len(data_split) == 4:
-                self.clear_operational_sequence(telegram_users[update.callback_query.message.chat.id])
+                self.clear_operational_sequence(
+                    telegram_users[update.callback_query.message.chat.id]
+                )
                 return self.handle_filter(
                     update, data_split[1], data_split[2], data_split[3]
                 )
@@ -539,7 +541,9 @@ class DatabaseView(View):
         inline_display: Callable[[dict[str, Any]], str] | None = None,
         extended_display: Callable[[dict[str, Any]], str] | None = None,
         fast_type: str | None = None,
-        fast_type_processor: Callable[[str], tuple[dict[str, Any], dict[str, list[str]]]]
+        fast_type_processor: Callable[
+            [str], tuple[dict[str, Any], dict[str, list[str]]]
+        ]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
         report: DatabaseReport | None = None,
@@ -677,9 +681,7 @@ class ListRecordsView(View):
         )
 
     def handle_pagination(self, update: Update, data: str):
-        options_changed = _records_handle_pagination(
-            self.table_name, update, data
-        )
+        options_changed = _records_handle_pagination(self.table_name, update, data)
 
         print(
             print_label,
@@ -809,8 +811,8 @@ class RecordView(View):
         if actions:
             for index, action in enumerate(actions):
                 if (
-                    "conditions" in action
-                    and action["conditions"]
+                    "conditions" not in action
+                    or action["conditions"]
                     and action["conditions"](
                         telegram_users[message.chat.id].records_data[self.table_name]
                     )
@@ -864,9 +866,9 @@ class RecordView(View):
         )
 
     def handle_filter(self, update: Update, a1, a2, a3):
-        telegram_users[update.callback_query.message.chat.id].filters[self.table_name] = [
-            f"{a1} = {a3}"
-        ]
+        telegram_users[update.callback_query.message.chat.id].filters[
+            self.table_name
+        ] = [f"{a1} = {a3}"]
         pagination = telegram_users[
             update.callback_query.message.chat.id
         ].get_pagination(self.table_name)
@@ -1004,7 +1006,9 @@ class FastTypeRecordView(View):
                 ] = result[1]
                 telegram_users[update.message.chat.id].filters = {}
                 for filter_table in result[1]:
-                    telegram_users[update.message.chat.id].filters[filter_table] = result[1][filter_table]
+                    telegram_users[update.message.chat.id].filters[
+                        filter_table
+                    ] = result[1][filter_table]
         return check_record_params(
             conversation_views[f"{self.table_name}_EDIT"],
             telegram_users[update.message.chat.id],
@@ -1509,9 +1513,7 @@ class EditDateRecordValueView(EditRecordValueView):
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
                 InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
-                    (date_offset != 0)
-                    and "Last 3d"
-                    or "🚫",
+                    (date_offset != 0) and "Last 3d" or "🚫",
                     callback_data="_DATE_TODAY",
                 ),
                 InlineKeyboardButton(
@@ -1565,10 +1567,10 @@ class EditDateRecordValueView(EditRecordValueView):
             )
         elif date_button:
             return self.verify_next(update.callback_query.message, data, True)
-    
+
     def handle_typed(self, update: Update, data: str):
         try:
-            date = datetime.strptime(data, '%Y-%m-%d').timestamp()
+            date = datetime.strptime(data, "%Y-%m-%d").timestamp()
             return self.verify_next(update.message, str(int(date)), False)
         except:
             return conversation_views[self.state_name].state(
@@ -1576,6 +1578,7 @@ class EditDateRecordValueView(EditRecordValueView):
                 "Wrong date format. Need YYYY-MM-DD",
                 False,
             )
+
 
 class EditTimestampRecordValueView(EditDateRecordValueView):
     def __init__(
@@ -1588,11 +1591,11 @@ class EditTimestampRecordValueView(EditDateRecordValueView):
 
     def handle_typed(self, update: Update, data: str):
         try:
-            date = datetime.strptime(data, '%Y-%m-%d %H:%M:%S').timestamp()
+            date = datetime.strptime(data, "%Y-%m-%d %H:%M:%S").timestamp()
             return self.verify_next(update.message, str(int(date)), False)
         except:
             try:
-                date = datetime.strptime(data, '%Y-%m-%d').timestamp()
+                date = datetime.strptime(data, "%Y-%m-%d").timestamp()
                 return self.verify_next(update.message, str(int(date)), False)
             except:
                 return conversation_views[self.state_name].state(
@@ -1600,6 +1603,7 @@ class EditTimestampRecordValueView(EditDateRecordValueView):
                     "Wrong datetime format. Need YYYY-MM-DD [HH:MM:SS]",
                     False,
                 )
+
 
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, View]" = {}
@@ -1817,10 +1821,19 @@ def _get_records_query(
                 {"table": linked_table["alias"], "column": column["column"]}
             )
 
-    order_by = table_name and not ignore_order and list(database_views[table_name].order_by) or []
+    order_by = (
+        table_name
+        and not ignore_order
+        and list(database_views[table_name].order_by)
+        or []
+    )
 
     if table_name and not external and not no_join and not ignore_order:
-        linked_tables.append({"custom": f'LEFT JOIN entries_usage ON entries_usage.table_name = "{table_name}" AND entries_usage.entry_id = {table_name}.id'})
+        linked_tables.append(
+            {
+                "custom": f'LEFT JOIN entries_usage ON entries_usage.table_name = "{table_name}" AND entries_usage.entry_id = {table_name}.id'
+            }
+        )
         order_by.insert(0, ("entries_usage.last_date", True, None))
 
     query = DATABASE_DRIVER.get_records_query(
@@ -2012,10 +2025,12 @@ def _records_handle_add(table_name, update: Update):
             database_views[table_name].fast_type
             and database_views[table_name].fast_type == "required"
         ):
-            telegram_users[update.callback_query.message.chat.id].ignore_fast[table_name] = {}
-            telegram_users[update.callback_query.message.chat.id].ignore_fast[table_name][
-                "_NON_REQUIRED"
-            ] = True
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                table_name
+            ] = {}
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[
+                table_name
+            ]["_NON_REQUIRED"] = True
         return check_record_params(
             conversation_views[f"{table_name}_EDIT"],
             telegram_users[update.callback_query.message.chat.id],

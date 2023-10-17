@@ -80,6 +80,10 @@ def _action_conditions_done_current_task(record):
     return "date_completed" not in record or not record["date_completed"]
 
 
+def _action_process_delete_current_task(record):
+    DATABASE_DRIVER.delete_data("tasks_current", record["id"])
+
+
 def _action_process_done_current_task(record):
     update = {"date_completed": date_utils.get_today_midnight_timestamp()}
     DATABASE_DRIVER.replace_data(
@@ -144,11 +148,15 @@ def init():
         ],
         actions=[
             {
+                "name": "delete",
+                "process": _action_process_delete_current_task,
+            },
+            {
                 "name": "done",
                 "conditions": _action_conditions_done_current_task,
                 "params": ["date_completed"],
                 "process": _action_process_done_current_task,
-            }
+            },
         ],
     )
     DatabaseView(

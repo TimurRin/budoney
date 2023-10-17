@@ -83,7 +83,7 @@ class SQLiteDatabase(Database):
                 )
         if join:
             for linked_table in join:
-                if ("custom" in linked_table):
+                if "custom" in linked_table:
                     joins.append(linked_table["custom"])
                 else:
                     joins.append(
@@ -218,6 +218,13 @@ class SQLiteDatabase(Database):
         if commit:
             self.connection.commit()
         return last_id
+
+    def delete_data(self, table: str, record_id):
+        values = (record_id,)
+        query = f"DELETE FROM {table} WHERE id = ?"
+        print(print_label, "delete_data", query, values)
+        self.cursor.execute(query, values)
+        self.connection.commit()
 
     def _create_technical_tables(self):
         query_search_compound = f"CREATE TABLE IF NOT EXISTS search_compound (table_name TEXT, entry_id INTEGER, entry_field TEXT, field_data TEXT, field_data_translit TEXT, PRIMARY KEY(table_name, entry_id, entry_field))"

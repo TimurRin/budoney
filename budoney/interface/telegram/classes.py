@@ -905,7 +905,9 @@ class RecordView(View):
                     self.table_name
                 ]
             )
-            return self.go_back(update, telegram_users[update.callback_query.message.chat.id])
+            return self.go_back(
+                update, telegram_users[update.callback_query.message.chat.id]
+            )
 
     def handle_edit(self, update: Update):
         return conversation_views[self.table_name + "_EDIT"].state(
@@ -1165,6 +1167,12 @@ class EditRecordView(View):
                             update.callback_query.message.chat.id
                         ].records_data[self.table_name]
                     )
+                )
+
+        for column in database_views[self.table_name].columns:
+            if column["type"] == "data":
+                DATABASE_DRIVER.update_entry_usage(
+                    column["data_type"], record[column["column"]]
                 )
 
         telegram_users[update.callback_query.message.chat.id].clear_edits(
@@ -1781,13 +1789,19 @@ def _get_records_query(
                 {"table": linked_table["alias"], "column": column["column"]}
             )
 
+    order_by = table_name and not ignore_order and list(database_views[table_name].order_by) or []
+
+    if table_name and not external and not no_join and not ignore_order:
+        linked_tables.append({"custom": f'LEFT JOIN entries_usage ON entries_usage.table_name = "{table_name}" AND entries_usage.entry_id = {table_name}.id'})
+        order_by.insert(0, ("entries_usage.last_date", True, None))
+
     query = DATABASE_DRIVER.get_records_query(
         table=table_name,
         table_select=table_select,
         external=external,
         join=linked_tables,
         join_select=join_select,
-        order_by=table_name and not ignore_order and database_views[table_name].order_by,  # type: ignore
+        order_by=order_by,  # type: ignore
         conditions=conditions,
         record_ids=record_ids,
     )

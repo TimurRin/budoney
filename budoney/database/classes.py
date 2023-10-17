@@ -71,5 +71,9 @@ class Database:
         pass
 
     @abc.abstractmethod
+    def update_entry_usage(self, table_name, entry_id):
+        pass
+
+    @abc.abstractmethod
     def _revalidate_search_cache(self, table, record_id, data):
         pass

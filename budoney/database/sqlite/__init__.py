@@ -1,10 +1,12 @@
 import sqlite3
 import threading
 from typing import Any
+from datetime import datetime
 from database.classes import Database
 from utils.transliterate import russian_to_latin
 
 print_label: str = "[budoney :: Database :: SQLite]"
+
 
 class SQLiteDatabase(Database):
     SQLITE_DATA_TYPES = {
@@ -21,7 +23,7 @@ class SQLiteDatabase(Database):
         self.db_path = database_path
         self._local = threading.local()
         self._init_connection_and_cursor()
-        self._create_search_table()
+        self._create_technical_tables()
 
     def _init_connection_and_cursor(self):
         if not hasattr(self._local, "connection"):
@@ -80,9 +82,12 @@ class SQLiteDatabase(Database):
                 )
         if join:
             for linked_table in join:
-                joins.append(
-                    f"LEFT JOIN {linked_table['name']} AS {linked_table['alias']} ON {linked_table['alias']}.id = {linked_table['parent']}.{linked_table['linkedBy']}"
-                )
+                if ("custom" in linked_table):
+                    joins.append(linked_table["custom"])
+                else:
+                    joins.append(
+                        f"LEFT JOIN {linked_table['name']} AS {linked_table['alias']} ON {linked_table['alias']}.id = {linked_table['parent']}.{linked_table['linkedBy']}"
+                    )
         if len(selects) > 0:
             query += f" {', '.join(selects)}"
         else:
@@ -213,10 +218,26 @@ class SQLiteDatabase(Database):
             self.connection.commit()
         return last_id
 
-    def _create_search_table(self):
-        query = f"CREATE TABLE IF NOT EXISTS search_compound (table_name TEXT, entry_id INTEGER, entry_field TEXT, field_data TEXT, field_data_translit TEXT, PRIMARY KEY(table_name, entry_id, entry_field))"
-        print(print_label, "_create_search_table", query)
-        self.cursor.execute(query)
+    def _create_technical_tables(self):
+        query_search_compound = f"CREATE TABLE IF NOT EXISTS search_compound (table_name TEXT, entry_id INTEGER, entry_field TEXT, field_data TEXT, field_data_translit TEXT, PRIMARY KEY(table_name, entry_id, entry_field))"
+        print(print_label, "_create_technical_tables", query_search_compound)
+        self.cursor.execute(query_search_compound)
+
+        query_entries_usage = f"CREATE TABLE IF NOT EXISTS entries_usage (table_name TEXT, entry_id INTEGER, total_usages INTEGER, last_date INTEGER, PRIMARY KEY(table_name, entry_id))"
+        print(print_label, "_create_technical_tables", query_entries_usage)
+        self.cursor.execute(query_entries_usage)
+
+        self.connection.commit()
+
+    def update_entry_usage(self, table_name, entry_id, timestamp=None):
+        query = f"INSERT INTO entries_usage (table_name, entry_id, last_date) VALUES (?, ?, ?) ON CONFLICT (table_name, entry_id) DO UPDATE SET last_date=excluded.last_date"
+        if not timestamp:
+            timestamp = int(datetime.today().timestamp())
+        values = (table_name, entry_id, timestamp)
+        print(print_label, "update_entry_usage", query, values)
+
+        self.cursor.execute(query, values)
+
         self.connection.commit()
 
     def create_table(self, table: str, columns: list[dict]):

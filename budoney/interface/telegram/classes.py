@@ -1031,6 +1031,8 @@ class EditRecordView(View):
                 EditDataRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "date":
                 EditDateRecordValueView(code, state_name, table_name, column)
+            elif column["type"] == "timestamp":
+                EditTimestampRecordValueView(code, state_name, table_name, column)
             else:
                 EditTextRecordValueView(code, state_name, table_name, column)
 
@@ -1079,6 +1081,10 @@ class EditRecordView(View):
                 if column["type"] == "date":
                     date_timestamp = datetime.fromtimestamp(value)
                     date_string = f"{date_timestamp.strftime('%Y-%m-%d (%a)')}, {date_utils.get_relative_timestamp_text(value)}"
+                    text = f"{text} [{date_string}]"
+                elif column["type"] == "timestamp":
+                    date_timestamp = datetime.fromtimestamp(value)
+                    date_string = f"{date_timestamp.strftime('%a, %Y-%m-%d %H:%M:%S')}, {date_utils.get_relative_date_text(date_timestamp, today=datetime.today())}"
                     text = f"{text} [{date_string}]"
                 elif column["type"] == "data":
                     relevant = {
@@ -1223,6 +1229,7 @@ class EditRecordValueView(View):
             self.column["type"] == "int"
             or self.column["type"] == "data"
             or self.column["type"] == "date"
+            or self.column["type"] == "timestamp"
         ):
             parsed_data = int(data)
         elif self.column["type"] == "float":
@@ -1471,12 +1478,15 @@ class EditDateRecordValueView(EditRecordValueView):
         )
         self._help_text = "Select your value below"
 
+    def current_timestamp(self):
+        return date_utils.get_today_midnight()
+
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
         date_offset = telegram_users[message.chat.id].date_offset
 
-        today = date_utils.get_today_midnight()
+        today = self.current_timestamp()
 
         dates = date_utils.date_range(
             today - timedelta(days=(date_offset * 3 + 2)),
@@ -1567,6 +1577,29 @@ class EditDateRecordValueView(EditRecordValueView):
                 False,
             )
 
+class EditTimestampRecordValueView(EditDateRecordValueView):
+    def __init__(
+        self, state_name: str, parent_state_name: str, table_name, column
+    ) -> None:
+        super().__init__(state_name, parent_state_name, table_name, column)
+
+    def current_timestamp(self):
+        return datetime.today()
+
+    def handle_typed(self, update: Update, data: str):
+        try:
+            date = datetime.strptime(data, '%Y-%m-%d %H:%M:%S').timestamp()
+            return self.verify_next(update.message, str(int(date)), False)
+        except:
+            try:
+                date = datetime.strptime(data, '%Y-%m-%d').timestamp()
+                return self.verify_next(update.message, str(int(date)), False)
+            except:
+                return conversation_views[self.state_name].state(
+                    update.message,
+                    "Wrong datetime format. Need YYYY-MM-DD [HH:MM:SS]",
+                    False,
+                )
 
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, View]" = {}
@@ -1975,6 +2008,14 @@ def _records_handle_add(table_name, update: Update):
     if fast_type_processor:
         return conversation_views[f"{table_name}_FAST_TYPE"]
     else:
+        if (
+            database_views[table_name].fast_type
+            and database_views[table_name].fast_type == "required"
+        ):
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[table_name] = {}
+            telegram_users[update.callback_query.message.chat.id].ignore_fast[table_name][
+                "_NON_REQUIRED"
+            ] = True
         return check_record_params(
             conversation_views[f"{table_name}_EDIT"],
             telegram_users[update.callback_query.message.chat.id],

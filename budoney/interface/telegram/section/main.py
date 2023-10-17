@@ -1,6 +1,5 @@
-from interface.telegram.classes import (
-    DefaultView
-)
+from interface.telegram.classes import DefaultView
+
 
 def init():
     DefaultView(
@@ -12,21 +11,17 @@ def init():
                 "tasks",
                 "finances",
             ],
-            [
-                # "tasks",
-                # "reminders",
-            ],
+            ["health"],
             # [
             #     "utilities",
             #     "clothes",
             #     "storage",
             # ],
             # [
-            # "health",
             # "food",
             # "plants",
             # ],
             ["organizations", "people"],
-            ["settings"]
+            ["settings"],
         ],
     )

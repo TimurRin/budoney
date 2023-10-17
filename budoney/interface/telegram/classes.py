@@ -402,6 +402,11 @@ class View:
             data_split = data.split("__")
             if data_split[0] == "action" and len(data_split) == 2:
                 return self.handle_action(update, int(data_split[1]))
+            elif data_split[0] == "filter" and len(data_split) == 4:
+                self.clear_operational_sequence(telegram_users[update.callback_query.message.chat.id])
+                return self.handle_filter(
+                    update, data_split[1], data_split[2], data_split[3]
+                )
             if (
                 not self.no_sequence
                 and telegram_users[update.callback_query.message.chat.id].state != data
@@ -420,10 +425,6 @@ class View:
                         telegram_user.states_sequence.append(self.state_name)
             if data_split[0] == "jump" and len(data_split) == 3:
                 return self.handle_jump(update, data_split[1], int(data_split[2]))
-            elif data_split[0] == "filter" and len(data_split) == 4:
-                return self.handle_filter(
-                    update, data_split[1], data_split[2], data_split[3]
-                )
             elif data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
             elif data in shortcuts and shortcuts[data]:

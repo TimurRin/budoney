@@ -1498,7 +1498,7 @@ class EditDateRecordValueView(EditRecordValueView):
                 # InlineKeyboardButton("⏪", callback_data="_DATE_REWIND_BACKWARD"),
                 InlineKeyboardButton("◀️", callback_data="_DATE_BACKWARD"),
                 InlineKeyboardButton(
-                    (date_offset > 0 or (self.future and date_offset < 0))
+                    (date_offset != 0)
                     and "Last 3d"
                     or "🚫",
                     callback_data="_DATE_TODAY",
@@ -1554,6 +1554,17 @@ class EditDateRecordValueView(EditRecordValueView):
             )
         elif date_button:
             return self.verify_next(update.callback_query.message, data, True)
+    
+    def handle_typed(self, update: Update, data: str):
+        try:
+            date = datetime.strptime(data, '%Y-%m-%d').timestamp()
+            return self.verify_next(update.message, str(int(date)), False)
+        except:
+            return conversation_views[self.state_name].state(
+                update.message,
+                "Wrong date format. Need YYYY-MM-DD",
+                False,
+            )
 
 
 telegram_users: "dict[Any, TelegramUser]" = {}

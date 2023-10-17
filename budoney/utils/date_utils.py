@@ -14,10 +14,7 @@ def get_relative_timestamp(timestamp, today=None):
 def get_relative_date_text(date: datetime, today=None):
     if not today:
         today = get_today_midnight()
-    print(date.isoformat())
-    print(today.isoformat())
     days_ago = (today - date).days
-    print(days_ago)
     if days_ago == 0:
         return "today"
     elif days_ago == 1:

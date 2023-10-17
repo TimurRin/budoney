@@ -7,6 +7,7 @@ from dispatcher.telegram import send_info_message
 from interface.telegram.classes import database_views
 import utils.date_utils as date_utils
 
+print_label: str = "[budoney :: Scheduler :: Task]"
 
 def check_for_tasks():
     try:
@@ -29,9 +30,9 @@ def check_for_tasks():
                     "tasks_recurring",
                     record,
                 )
-                print("last_id", last_id)
+                print(print_label, "check_for_tasks", "last_id", last_id)
                 if last_id:
-                    print(plant_lot)
+                    print(print_label, "check_for_tasks", "plant_lot", plant_lot)
                     DATABASE_DRIVER.replace_data(
                         "plant_lots", plant_lot["id"], {"task": last_id}
                     )

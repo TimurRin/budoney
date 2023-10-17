@@ -4,6 +4,7 @@ from typing import Any
 from database.classes import Database
 from utils.transliterate import russian_to_latin
 
+print_label: str = "[budoney :: Database :: SQLite]"
 
 class SQLiteDatabase(Database):
     SQLITE_DATA_TYPES = {
@@ -125,7 +126,7 @@ class SQLiteDatabase(Database):
             query += " LIMIT " + str(limit)
         if offset and offset > 0:
             query += " OFFSET " + str(offset)
-        print("get_records", query, values)
+        print(print_label, print_label, "get_records", query, values)
         self.cursor.execute(query, values)
         records = list()
         for record in self.cursor.fetchall():
@@ -134,7 +135,7 @@ class SQLiteDatabase(Database):
 
     def get_records_count(self, table: str, query: str, values: list) -> int:
         count_query = f"SELECT COUNT(*) FROM ({query})"
-        print("get_records_count", count_query)
+        print(print_label, print_label, "get_records_count", count_query)
         self.cursor.execute(count_query, values)
         return self.cursor.fetchone()[0]
 
@@ -169,7 +170,7 @@ class SQLiteDatabase(Database):
             order_by_query.append(f"{orderee[0]} {orderee[1] and 'DESC' or 'ASC'}")
         report_query += " ORDER BY " + ", ".join(order_by_query)
 
-        print("get_report", report_query)
+        print(print_label, "get_report", report_query)
         self.cursor.execute(report_query, values)
         records = list()
         for record in self.cursor.fetchall():
@@ -177,7 +178,7 @@ class SQLiteDatabase(Database):
         return records
 
     def get_data(self, query: str, values: list) -> list[dict[str, Any]]:
-        print("get_data", query, values)
+        print(print_label, "get_data", query, values)
         self.cursor.execute(query, values)
         records = list()
         for record in self.cursor.fetchall():
@@ -191,7 +192,7 @@ class SQLiteDatabase(Database):
         placeholders = ", ".join([f"{column} = ?" for column in data.keys()])
         values = tuple(data.values()) + (record_id,)
         query = f"UPDATE {table} SET {placeholders} WHERE id = ?"
-        print("replace_data", query, values)
+        print(print_label, "replace_data", query, values)
         self.cursor.execute(query, values)
         self._revalidate_search_cache(table, record_id, data)
         if commit:
@@ -204,7 +205,7 @@ class SQLiteDatabase(Database):
         columns = ", ".join(parsed_data.keys())
         placeholders = ", ".join(["?" for column in parsed_data.keys()])
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
-        print("append_data", query, list(parsed_data.values()))
+        print(print_label, "append_data", query, list(parsed_data.values()))
         self.cursor.execute(query, list(parsed_data.values()))
         last_id = self.cursor.lastrowid
         self._revalidate_search_cache(table, last_id, data)
@@ -214,7 +215,7 @@ class SQLiteDatabase(Database):
 
     def _create_search_table(self):
         query = f"CREATE TABLE IF NOT EXISTS search_compound (table_name TEXT, entry_id INTEGER, entry_field TEXT, field_data TEXT, field_data_translit TEXT, PRIMARY KEY(table_name, entry_id, entry_field))"
-        print("_create_search_table", query)
+        print(print_label, "_create_search_table", query)
         self.cursor.execute(query)
         self.connection.commit()
 
@@ -231,7 +232,7 @@ class SQLiteDatabase(Database):
                 )
 
         query = f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join(column_definitions)});"
-        print("create_table", query)
+        print(print_label, "create_table", query)
 
         self.cursor.execute(query)
 
@@ -258,7 +259,7 @@ class SQLiteDatabase(Database):
                 )
 
             query = f"SELECT table_name, entry_id, entry_field, field_data FROM search_compound WHERE table_name = ? AND ({' OR '.join(wheres)})"
-            print("search", table, query, values)
+            print(print_label, "search", table, query, values)
             self.cursor.execute(query, values)
             results = self.cursor.fetchall()
 
@@ -288,5 +289,5 @@ class SQLiteDatabase(Database):
                     values.append(None)
                 values_placeholders.append("?, ?, ?, ?, ?")
             query_search = f"INSERT INTO search_compound (table_name, entry_id, entry_field, field_data, field_data_translit) VALUES ({'), ('.join(values_placeholders)}) ON CONFLICT (table_name, entry_id, entry_field) DO UPDATE SET field_data=excluded.field_data, field_data_translit=excluded.field_data_translit"
-            print("_update_search", query_search, values)
+            print(print_label, "_update_search", query_search, values)
             self.cursor.execute(query_search, values)

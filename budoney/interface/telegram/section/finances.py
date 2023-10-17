@@ -12,6 +12,8 @@ from interface.telegram.classes import (
 from loc import localization
 import utils.date_utils as date_utils
 
+print_label: str = "[budoney :: Telegram Interface :: Finances]"
+
 finance_format = "{:,.2f}"
 
 financial_account_types = ["BANK", "CASH", "OTHER"]
@@ -376,7 +378,7 @@ def _db_expenses_fast_type_processor(
                 record_filters[
                     record_filter
                 ] = f"{record_filter} IN ({', '.join(record_filters_pre[record_filter])})"
-                print(record_filter, record_filters[record_filter])
+                print(print_label, record_filter, record_filters[record_filter])
             else:
                 record[record_filter] = int(record_filters_pre[record_filter][0])
 

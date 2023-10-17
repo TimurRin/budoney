@@ -192,6 +192,37 @@ class View:
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         pass
 
+    def go_back(self, update, telegram_user):
+        if len(telegram_user.operational_sequence[-1]) > 0:
+            state = telegram_user.operational_sequence[-1].pop()
+            if (
+                len(telegram_user.operational_sequence[-1]) == 0
+                and len(telegram_user.operational_sequence) > 1
+            ):
+                telegram_user.operational_sequence.pop()
+        elif len(telegram_user.states_sequence) > 0:
+            state = telegram_user.states_sequence.pop()
+        else:
+            state = "main"
+        return conversation_views[state].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+
+    def clear_operational_sequence(self, telegram_user):
+        if len(telegram_user.operational_sequence) > 1:
+            telegram_user.operational_sequence.pop()
+        else:
+            telegram_user.operational_sequence[0].clear()
+        if len(telegram_user.states_sequence[-1]) > 0:
+            state = telegram_user.states_sequence.pop()
+        elif len(telegram_user.states_sequence) > 0:
+            state = telegram_user.states_sequence.pop()
+        else:
+            state = "main"
+        return state
+
     def handle(self, update: Update, data: str):
         print(
             print_label,
@@ -202,6 +233,24 @@ class View:
         print(
             print_label,
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_records",
+        )
+
+    def handle_jump(self, update: Update, jump_table, jump_record_id):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_jump",
+        )
+
+    def handle_filter(self, update: Update, a1, a2, a3):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_filter",
+        )
+
+    def handle_action(self, update: Update, action_id):
+        print(
+            print_label,
+            f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_action",
         )
 
     def handle_pagination(self, update: Update, data: str):
@@ -288,12 +337,12 @@ class View:
         )
 
     def _handle_typed(self, update: Update, context: CallbackContext):
-        print("_handle_typed", self.state_name)
+        print(print_label, "_handle_typed", self.state_name)
         return self.handle_typed(update, update.message.text)
 
     def _handle(self, update: Update, context: CallbackContext):
         data: str = update.callback_query.data
-        print("_handle", self.state_name, data)
+        print(print_label, "_handle", self.state_name, data)
         context.bot.answer_callback_query(callback_query_id=update.callback_query.id)
 
         telegram_user = telegram_users[update.callback_query.message.chat.id]
@@ -318,22 +367,7 @@ class View:
             ].temp_pagination = Pagination()
 
         if data == "_BACK":
-            if len(telegram_user.operational_sequence[-1]) > 0:
-                state = telegram_user.operational_sequence[-1].pop()
-                if (
-                    len(telegram_user.operational_sequence[-1]) == 0
-                    and len(telegram_user.operational_sequence) > 1
-                ):
-                    telegram_user.operational_sequence.pop()
-            elif len(telegram_user.states_sequence) > 0:
-                state = telegram_user.states_sequence.pop()
-            else:
-                state = "main"
-            return conversation_views[state].state(
-                update.callback_query.message,
-                "",
-                True,
-            )
+            return self.go_back(update, telegram_user)
         elif data == "_NEXT":
             telegram_user.operational_sequence[-1].append(self.state_name)
             return self.handle_next(update)
@@ -347,31 +381,13 @@ class View:
         ):
             return self.handle_date(update, data)
         elif data == "_CANCEL":
-            if len(telegram_user.operational_sequence) > 1:
-                telegram_user.operational_sequence.pop()
-            else:
-                telegram_user.operational_sequence[0].clear()
-            if len(telegram_user.states_sequence[-1]) > 0:
-                state = telegram_user.states_sequence.pop()
-            elif len(telegram_user.states_sequence) > 0:
-                state = telegram_user.states_sequence.pop()
-            else:
-                state = "main"
-            return self._handle_cancel(update, state)
+            return self._handle_cancel(
+                update, self.clear_operational_sequence(telegram_user)
+            )
         elif data == "_SUBMIT":
-            if len(telegram_user.operational_sequence) > 1:
-                telegram_user.operational_sequence.pop()
-            else:
-                telegram_user.operational_sequence[0].clear()
-            if len(telegram_user.states_sequence[-1]) > 0:
-                state = telegram_user.states_sequence.pop()
-            elif len(telegram_user.states_sequence) > 0:
-                state = telegram_user.states_sequence.pop()
-            else:
-                state = "main"
             return self.handle_submit(
                 update,
-                state,
+                self.clear_operational_sequence(telegram_user),
             )
         elif data == "_RECORDS":
             telegram_user.states_sequence.append(self.state_name)
@@ -393,7 +409,16 @@ class View:
         else:
             if data in conversation_views and conversation_views[data].skip_to_records:
                 data = f"{data}_RECORDS"
-            print(telegram_users[update.callback_query.message.chat.id].state, data)
+            print(
+                print_label,
+                "state",
+                telegram_users[update.callback_query.message.chat.id].state,
+                "data",
+                data,
+            )
+            data_split = data.split("__")
+            if data_split[0] == "action" and len(data_split) == 2:
+                return self.handle_action(update, int(data_split[1]))
             if (
                 not self.no_sequence
                 and telegram_users[update.callback_query.message.chat.id].state != data
@@ -410,7 +435,13 @@ class View:
                         or telegram_user.states_sequence[-1] != self.state_name
                     ):
                         telegram_user.states_sequence.append(self.state_name)
-            if data in conversation_views or self.handle_anything:
+            if data_split[0] == "jump" and len(data_split) == 3:
+                return self.handle_jump(update, data_split[1], int(data_split[2]))
+            elif data_split[0] == "filter" and len(data_split) == 4:
+                return self.handle_filter(
+                    update, data_split[1], data_split[2], data_split[3]
+                )
+            elif data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
             elif data in shortcuts and shortcuts[data]:
                 if shortcuts[data][0] == "add":
@@ -457,7 +488,6 @@ class DefaultView(View):
             lines = []
             for row in self.extra_info:
                 lines.append(row())
-            print(lines)
             return "\n".join(lines)
         return ""
 
@@ -668,6 +698,7 @@ class ListRecordsView(View):
         )
 
         print(
+            print_label,
             self.table_name,
             "options_changed",
             options_changed,
@@ -819,66 +850,62 @@ class RecordView(View):
 
         return InlineKeyboardMarkup(keyboard)
 
-    def handle(self, update: Update, data: str):
-        data_split = data.split("__")
-        if data_split[0] == "jump" and len(data_split) == 3:
-            telegram_users[update.callback_query.message.chat.id].records[
-                data_split[1]
-            ] = _get_records(
-                _get_records_query(
-                    table_name=data_split[1],
-                    record_ids=[int(data_split[2])],
-                    no_join=True,
-                )
-            )[
-                0
-            ]
-            telegram_users[update.callback_query.message.chat.id].records_data[
-                data_split[1]
-            ] = _get_records(
-                _get_records_query(
-                    table_name=data_split[1],
-                    external=telegram_users[
-                        update.callback_query.message.chat.id
-                    ].records[data_split[1]],
-                )
-            )[
-                0
-            ]
-            return conversation_views[data_split[1] + "_RECORD"].state(
-                update.callback_query.message,
-                "",
-                True,
+    def handle_jump(self, update: Update, jump_table, jump_record_id):
+        telegram_users[update.callback_query.message.chat.id].records[
+            jump_table
+        ] = _get_records(
+            _get_records_query(
+                table_name=jump_table,
+                record_ids=[jump_record_id],
+                no_join=True,
             )
-        elif data_split[0] == "filter" and len(data_split) == 4:
-            telegram_users[update.callback_query.message.chat.id].temp_mode = True
-            telegram_users[update.callback_query.message.chat.id].temp_filters = [
-                f"{data_split[1]} = {data_split[3]}"
-            ]
-            pagination = telegram_users[
-                update.callback_query.message.chat.id
-            ].get_pagination(self.table_name, temp_mode=True)
-            pagination.offset = 0
-            pagination.total = -1
-            return conversation_views[self.table_name + "_RECORDS"].state(
-                update.callback_query.message,
-                "",
-                True,
+        )[
+            0
+        ]
+        telegram_users[update.callback_query.message.chat.id].records_data[
+            jump_table
+        ] = _get_records(
+            _get_records_query(
+                table_name=jump_table,
+                external=telegram_users[update.callback_query.message.chat.id].records[
+                    jump_table
+                ],
             )
-        elif data_split[0] == "action" and len(data_split) == 2:
-            actions = database_views[self.table_name].actions
-            if actions:
-                action = actions[int(data_split[1])]
-                action["process"](
-                    telegram_users[update.callback_query.message.chat.id].records_data[
-                        self.table_name
-                    ]
-                )
-                return conversation_views[self.table_name + "_RECORDS"].state(
-                    update.callback_query.message,
-                    "",
-                    True,
-                )
+        )[
+            0
+        ]
+        return conversation_views[jump_table + "_RECORD"].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+
+    def handle_filter(self, update: Update, a1, a2, a3):
+        telegram_users[update.callback_query.message.chat.id].temp_mode = True
+        telegram_users[update.callback_query.message.chat.id].temp_filters = [
+            f"{a1} = {a3}"
+        ]
+        pagination = telegram_users[
+            update.callback_query.message.chat.id
+        ].get_pagination(self.table_name, temp_mode=True)
+        pagination.offset = 0
+        pagination.total = -1
+        return conversation_views[self.table_name + "_RECORDS"].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
+
+    def handle_action(self, update: Update, action_id):
+        actions = database_views[self.table_name].actions
+        if actions:
+            action = actions[action_id]
+            action["process"](
+                telegram_users[update.callback_query.message.chat.id].records_data[
+                    self.table_name
+                ]
+            )
+            return self.go_back(update, telegram_users[update.callback_query.message.chat.id])
 
     def handle_edit(self, update: Update):
         return conversation_views[self.table_name + "_EDIT"].state(
@@ -908,15 +935,15 @@ class FastTypeRecordView(View):
             [
                 InlineKeyboardButton(
                     callback_data="_ALL",
-                    text="All",
+                    text="Enter all",
                 ),
                 InlineKeyboardButton(
                     callback_data="_REQUIRED",
-                    text="Required",
+                    text="Enter required",
                 ),
                 InlineKeyboardButton(
                     callback_data="_NONE",
-                    text="None",
+                    text="Edit",
                 ),
             ]
         )
@@ -965,7 +992,7 @@ class FastTypeRecordView(View):
         proc = database_views[self.table_name].fast_type_processor
         if proc is not None:
             result = proc(data)
-            print(result)
+            print(print_label, "handle_typed", "result", result)
             if result[0]:
                 if self.table_name in telegram_users[update.message.chat.id].records:
                     telegram_users[update.message.chat.id].records[
@@ -1026,7 +1053,7 @@ class EditRecordView(View):
         return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
 
     def record_display(self, record):
-        print(self.table_name, str(record.get("id", "?")))
+        print(print_label, self.table_name, str(record.get("id", "?")))
         return database_views[self.table_name].extended_display(record) or str(
             record.get("id", "?")
         )
@@ -1111,7 +1138,7 @@ class EditRecordView(View):
         )
 
     def handle_cancel(self, update: Update):
-        print("cancel from EditRecordView")
+        print(print_label, "cancel from EditRecordView")
         telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
         )
@@ -1167,7 +1194,7 @@ class EditRecordValueView(View):
         return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
 
     def record_display(self, record):
-        print(self.table_name, str(record.get("id", "?")))
+        print(print_label, self.table_name, str(record.get("id", "?")))
         return database_views[self.table_name].extended_display(record) or str(
             record.get("id", "?")
         )
@@ -1243,7 +1270,7 @@ class EditRecordValueView(View):
             conversation_views[self.parent_state_name],
             telegram_users[message.chat.id],
         )
-        print("next state is " + state.state_name)
+        print(print_label, "next state is " + state.state_name)
         return state.state(
             message,
             f"Successfully added <b>{data}</b> ({self.column['type']}) for column <b>{self.column['column']}</b>",
@@ -1293,7 +1320,7 @@ class EditRecordValueView(View):
         )
 
     def handle_cancel(self, update: Update):
-        print("cancel from EditRecordView")
+        print(print_label, "cancel from EditRecordView")
         telegram_users[update.callback_query.message.chat.id].clear_edits(
             self.table_name
         )
@@ -1421,7 +1448,7 @@ class EditDataRecordValueView(EditRecordValueView):
 
     def handle_add(self, update: Update):
         state = _records_handle_add(self.column["data_type"], update)
-        print(state)
+        print(print_label, state)
         telegram_users[
             update.callback_query.message.chat.id
         ].operational_sequence.append(deque())
@@ -1636,11 +1663,19 @@ def check_record_params(state, telegram_user: TelegramUser):
                         ]
                     )
                 ):
-                    print(f"{column['column']} is not typed")
+                    print(
+                        print_label,
+                        "check_record_params",
+                        f"{column['column']} is not typed",
+                    )
                     return conversation_views[
                         f"{state.table_name}_PARAM_{column['column']}"
                     ]
-    print(f"everything is typed but {telegram_user.ignore_fast[state.table_name]}")
+    print(
+        print_label,
+        "check_record_params",
+        f"everything is typed but {telegram_user.ignore_fast[state.table_name]}",
+    )
     return state
 
 
@@ -1951,7 +1986,7 @@ def _records_handle_typed(
 ):
     temp_mode = telegram_user.temp_mode or not full_mode
     search = telegram_user.get_search(table_name)
-    print(str(search[0]), "-", data)
+    print(print_label, "_records_handle_typed", str(search[0]), "-", data)
     if search[0] != data:
         telegram_user.search[table_name] = (
             data,

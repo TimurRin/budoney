@@ -15,6 +15,7 @@ class SQLiteDatabase(Database):
         "boolean": "INTEGER",
         "float": "REAL",
         "date": "INTEGER",
+        "timestamp": "INTEGER",
         "data": "INTEGER",
     }
 

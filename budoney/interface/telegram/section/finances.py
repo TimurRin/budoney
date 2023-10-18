@@ -363,7 +363,7 @@ def _db_expenses_fast_type_processor(
         organization = splitted_data[1]
         if len(splitted_data) > 2:
             record["description"] = ", ".join(splitted_data[2:])
-        
+
         rows = DATABASE_DRIVER.search(
             [
                 "organizations",
@@ -637,9 +637,14 @@ def init():
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "sum", "type": "float"},
+            {"column": "sum", "type": "float", "request_frequent_data": True},
             {"column": "proxy", "type": "float", "skippable": True},
-            {"column": "description", "type": "text", "skippable": True},
+            {
+                "column": "description",
+                "type": "text",
+                "skippable": True,
+                "request_frequent_data": True,
+            },
         ],
         inline_display=_db_transactions_inline_display,
         extended_display=_db_income_extended_display,
@@ -684,9 +689,14 @@ def init():
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "sum", "type": "float"},
+            {"column": "sum", "type": "float", "request_frequent_data": True},
             {"column": "proxy", "type": "float", "skippable": True},
-            {"column": "description", "type": "text", "skippable": True},
+            {
+                "column": "description",
+                "type": "text",
+                "skippable": True,
+                "request_frequent_data": True,
+            },
         ],
         inline_display=_db_transactions_inline_display,
         extended_display=_db_expenses_extended_display,
@@ -718,13 +728,13 @@ def init():
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "sum_source", "type": "float"},
+            {"column": "sum_source", "type": "float", "request_frequent_data": True},
             {
                 "column": "account_target",
                 "type": "data",
                 "data_type": "financial_accounts",
             },
-            {"column": "sum_target", "type": "float"},
+            {"column": "sum_target", "type": "float", "request_frequent_data": True},
             {"column": "description", "type": "text", "skippable": True},
         ],
         order_by=[("date", True, None)],

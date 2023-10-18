@@ -402,12 +402,21 @@ class View:
             data_split = data.split("__")
             if data_split[0] == "action" and len(data_split) == 2:
                 return self.handle_action(update, int(data_split[1]))
-            elif data_split[0] == "filter" and len(data_split) == 6 and data_split[1] == "stay":
+            elif (
+                data_split[0] == "filter"
+                and len(data_split) == 6
+                and data_split[1] == "stay"
+            ):
                 self.clear_operational_sequence(
                     telegram_users[update.callback_query.message.chat.id]
                 )
                 return self.handle_filter(
-                    update, data_split[1], data_split[2], data_split[3], data_split[4], data_split[5]
+                    update,
+                    data_split[1],
+                    data_split[2],
+                    data_split[3],
+                    data_split[4],
+                    data_split[5],
                 )
             if (
                 not self.no_sequence
@@ -427,9 +436,18 @@ class View:
                         telegram_user.states_sequence.append(self.state_name)
             if data_split[0] == "jump" and len(data_split) == 3:
                 return self.handle_jump(update, data_split[1], int(data_split[2]))
-            elif data_split[0] == "filter" and len(data_split) == 6 and data_split[1] == "jump":
+            elif (
+                data_split[0] == "filter"
+                and len(data_split) == 6
+                and data_split[1] == "jump"
+            ):
                 return self.handle_filter(
-                    update, data_split[1], data_split[2], data_split[3], data_split[4], data_split[5]
+                    update,
+                    data_split[1],
+                    data_split[2],
+                    data_split[3],
+                    data_split[4],
+                    data_split[5],
                 )
             elif data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
@@ -1362,15 +1380,38 @@ class EditTextRecordValueView(EditRecordValueView):
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
+        self.freqValues = []
         self._help_text = "Type your value below or skip it to the next value"
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
+        if "request_frequent_data" in self.column and self.column["request_frequent_data"]:
+            self.freqValues = DATABASE_DRIVER.get_data(
+                f"SELECT [{self.column['column']}] AS freqValue, COUNT([{self.column['column']}]) AS freqCount FROM {self.table_name} GROUP BY freqValue ORDER BY freqCount DESC LIMIT ?",
+                [15],
+            )
+
+            for index, freqValue in enumerate(self.freqValues):
+                if not keyboard or len(keyboard[-1]) >= 3:
+                    keyboard.append([])
+
+                keyboard[-1].append(
+                    InlineKeyboardButton(
+                        callback_data=str(index),
+                        text=f"{freqValue['freqValue']} ({freqValue['freqCount']})",
+                    )
+                )
+
         controls = self._keyboard_controls(telegram_users[message.chat.id])
         keyboard.append(controls)
 
         return InlineKeyboardMarkup(keyboard)
+
+    def handle(self, update: Update, data: str):
+        return self.verify_next(
+            update.callback_query.message, self.freqValues[int(data)]["freqValue"], True
+        )
 
 
 class EditBooleanRecordValueView(EditRecordValueView):

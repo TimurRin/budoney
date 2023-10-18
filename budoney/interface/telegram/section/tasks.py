@@ -120,7 +120,12 @@ def init():
         "tasks_current",
         [
             {"column": "name", "type": "text"},
-            {"column": "category", "type": "text", "skippable": True},
+            {
+                "column": "category",
+                "type": "text",
+                "skippable": True,
+                "request_frequent_data": True,
+            },
             {"column": "important", "type": "boolean"},
             {
                 "column": "recurring",
@@ -163,12 +168,12 @@ def init():
         "tasks_recurring",
         [
             {"column": "name", "type": "text"},
-            {"column": "category", "type": "text"},
+            {"column": "category", "type": "text", "request_frequent_data": True},
             {"column": "important", "type": "boolean"},
-            {"column": "urgent", "type": "int", "skippable": True},
-            {"column": "work_days", "type": "int", "min": 1},
-            {"column": "rest_days", "type": "int", "min": 0},
-            {"column": "weekdays", "type": "text", "skippable": True},
+            {"column": "urgent", "type": "int", "skippable": True, "request_frequent_data": True},
+            {"column": "work_days", "type": "int", "min": 1, "request_frequent_data": True},
+            {"column": "rest_days", "type": "int", "min": 0, "request_frequent_data": True},
+            {"column": "weekdays", "type": "text", "skippable": True, "request_frequent_data": True},
             {"column": "paused", "type": "boolean", "skippable": True},
         ],
         inline_display=_display_inline_scheduled_task,

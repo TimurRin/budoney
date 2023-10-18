@@ -180,7 +180,7 @@ def init():
                 "type": "data",
                 "data_type": "pills",
             },
-            {"column": "dose", "type": "float"},
+            {"column": "dose", "type": "float", "request_frequent_data": True},
             {
                 "column": "patient",
                 "type": "data",
@@ -223,7 +223,7 @@ def init():
                 "type": "timestamp",
                 "autoset": lambda: int(datetime.today().timestamp()),
             },
-            {"column": "level", "type": "float"},
+            {"column": "level", "type": "float", "request_frequent_data": True},
             {
                 "column": "patient",
                 "type": "data",
@@ -245,7 +245,7 @@ def init():
                 "type": "timestamp",
                 "autoset": lambda: int(datetime.today().timestamp()),
             },
-            {"column": "degrees", "type": "float"},
+            {"column": "degrees", "type": "float", "request_frequent_data": True},
             {
                 "column": "patient",
                 "type": "data",
@@ -267,8 +267,8 @@ def init():
                 "type": "timestamp",
                 "autoset": lambda: int(datetime.today().timestamp()),
             },
-            {"column": "systolic", "type": "int"},
-            {"column": "diastolic", "type": "int"},
+            {"column": "systolic", "type": "int", "request_frequent_data": True},
+            {"column": "diastolic", "type": "int", "request_frequent_data": True},
             {
                 "column": "patient",
                 "type": "data",
@@ -290,7 +290,7 @@ def init():
                 "type": "timestamp",
                 "autoset": lambda: int(datetime.today().timestamp()),
             },
-            {"column": "beats", "type": "int"},
+            {"column": "beats", "type": "int", "request_frequent_data": True},
             {
                 "column": "patient",
                 "type": "data",

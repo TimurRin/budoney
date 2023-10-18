@@ -1368,8 +1368,24 @@ class EditTextRecordValueView(EditRecordValueView):
             "request_frequent_data" in self.column
             and self.column["request_frequent_data"]
         ):
+            where_clause = []
+            if (
+                "frequent_data_lookup" in self.column
+                and self.column["frequent_data_lookup"]
+            ):
+                for lookup_column in self.column["frequent_data_lookup"]:
+                    if (
+                        lookup_column
+                        in telegram_users[message.chat.id].records[self.table_name]
+                        and telegram_users[message.chat.id].records[self.table_name][
+                            lookup_column
+                        ]
+                    ):
+                        where_clause.append(
+                            f"{lookup_column} = {telegram_users[message.chat.id].records[self.table_name][lookup_column]}"
+                        )
             self.freqValues = DATABASE_DRIVER.get_data(
-                f"SELECT [{self.column['column']}] AS freqValue, COUNT([{self.column['column']}]) AS freqCount FROM {self.table_name} GROUP BY freqValue ORDER BY freqCount DESC LIMIT ?",
+                f"SELECT [{self.column['column']}] AS freqValue, COUNT([{self.column['column']}]) AS freqCount FROM {self.table_name} {where_clause and ('WHERE ' + ' AND '.join(where_clause)) or ''} GROUP BY freqValue ORDER BY freqCount DESC LIMIT ?",
                 [15],
             )
 

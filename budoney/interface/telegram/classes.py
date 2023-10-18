@@ -27,9 +27,8 @@ class TelegramUser:
     def __init__(self, name: str) -> None:
         self.name: str = name
         self.state: str = "none"
-        self.states_sequence: deque = deque()
-        self.operational_sequence: deque[deque] = deque()
-        self.operational_sequence.append(deque())
+        self.state_sequences: deque[deque] = deque()
+        self.state_sequences.append(deque())
         self.records: dict = dict()
         self.records_data: dict = dict()
         self.records_extra: dict = dict()
@@ -55,10 +54,42 @@ class TelegramUser:
             self.search[table_name] = ("", list())
         return self.search[table_name]
 
-    def is_operational(self):
-        return (
-            len(self.operational_sequence) > 1 or len(self.operational_sequence[0]) > 0
-        )
+    def add_new_sequence(self):
+        self.state_sequences.append(deque())
+
+    def add_to_current_sequence(self, state_name):
+        if (
+            len(self.state_sequences[-1]) == 0
+            or self.state_sequences[-1][-1] != state_name
+        ):
+            self.state_sequences[-1].append(state_name)
+
+    def add_to_new_sequence(self, state_name):
+        self.add_new_sequence()
+        self.add_to_current_sequence(state_name)
+
+    def back_in_sequence(self) -> str:
+        if len(self.state_sequences[-1]) > 0:
+            state = self.state_sequences[-1].pop()
+            if len(self.state_sequences[-1]) == 0:
+                if len(self.state_sequences) > 1:
+                    self.state_sequences.pop()
+                else:
+                    self.state_sequences[0].clear()
+        else:
+            state = "main"
+        return state
+
+    def drop_last_sequence(self) -> str:
+        if len(self.state_sequences) > 1:
+            self.state_sequences.pop()
+        else:
+            self.state_sequences[0].clear()
+        if len(self.state_sequences[-1]) > 0:
+            state = self.state_sequences[-1].pop()
+        else:
+            state = "main"
+        return state
 
     def clear_edits(self, table_name):
         if table_name in self.records:
@@ -167,11 +198,7 @@ class View:
 
         text = f"👩‍💻 Debug for {user.name}:\n"
 
-        text = text + f"- states_sequence: <code>{str(user.states_sequence)}</code>\n"
-        text = (
-            text
-            + f"- operational_sequence: <code>{str(user.operational_sequence)}</code>\n"
-        )
+        text = text + f"- state_sequences: <code>{str(user.state_sequences)}</code>\n"
         text = text + f"- state: <code>{str(user.state)}</code>\n"
         # text = text + f"- records: <code>{str(user.records)}</code>\n"
         # text = text + f"- records_data: <code>{str(user.records_data)}</code>\n"
@@ -185,36 +212,12 @@ class View:
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         pass
 
-    def go_back(self, update, telegram_user):
-        if len(telegram_user.operational_sequence[-1]) > 0:
-            state = telegram_user.operational_sequence[-1].pop()
-            if (
-                len(telegram_user.operational_sequence[-1]) == 0
-                and len(telegram_user.operational_sequence) > 1
-            ):
-                telegram_user.operational_sequence.pop()
-        elif len(telegram_user.states_sequence) > 0:
-            state = telegram_user.states_sequence.pop()
-        else:
-            state = "main"
-        return conversation_views[state].state(
+    def go_back(self, update: Update, telegram_user: TelegramUser):
+        return conversation_views[telegram_user.back_in_sequence()].state(
             update.callback_query.message,
             "",
             True,
         )
-
-    def clear_operational_sequence(self, telegram_user):
-        if len(telegram_user.operational_sequence) > 1:
-            telegram_user.operational_sequence.pop()
-        else:
-            telegram_user.operational_sequence[0].clear()
-        if len(telegram_user.states_sequence[-1]) > 0:
-            state = telegram_user.states_sequence.pop()
-        elif len(telegram_user.states_sequence) > 0:
-            state = telegram_user.states_sequence.pop()
-        else:
-            state = "main"
-        return state
 
     def handle(self, update: Update, data: str):
         print(
@@ -258,7 +261,8 @@ class View:
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_date ({str(data)})",
         )
 
-    def handle_add(self, update: Update):
+    @abc.abstractmethod
+    def handle_add(self, update: Update) -> str:
         print(
             print_label,
             f"{update.callback_query.message.chat.first_name} ({update.callback_query.message.chat.id}) state {self.state_name} doesn't have handle_add",
@@ -352,10 +356,10 @@ class View:
         if data == "_BACK":
             return self.go_back(update, telegram_user)
         elif data == "_NEXT":
-            telegram_user.operational_sequence[-1].append(self.state_name)
+            telegram_user.add_to_current_sequence(self.state_name)
             return self.handle_next(update)
         elif data == "_SKIP":
-            telegram_user.operational_sequence[-1].append(self.state_name)
+            telegram_user.add_to_current_sequence(self.state_name)
             return self.handle_skip(update)
         elif data_pagination:
             return self.handle_pagination(update, data)
@@ -364,22 +368,22 @@ class View:
         ):
             return self.handle_date(update, data)
         elif data == "_CANCEL":
-            return self._handle_cancel(
-                update, self.clear_operational_sequence(telegram_user)
-            )
+            return self._handle_cancel(update, telegram_user.drop_last_sequence())
         elif data == "_SUBMIT":
             return self.handle_submit(
                 update,
-                self.clear_operational_sequence(telegram_user),
+                telegram_user.drop_last_sequence(),
             )
         elif data == "_RECORDS":
-            telegram_user.states_sequence.append(self.state_name)
+            telegram_user.add_to_current_sequence(self.state_name)
             return self.handle_records(update)
         elif data == "_ADD":
-            telegram_user.states_sequence.append(self.state_name)
-            return self.handle_add(update)
+            telegram_user.add_to_current_sequence(self.state_name)
+            added_state = self.handle_add(update)
+            telegram_user.add_to_new_sequence(added_state)
+            return added_state
         elif data == "_EDIT":
-            # telegram_user.states_sequence.append(self.state_name)
+            telegram_user.add_to_new_sequence(self.state_name)
             return self.handle_edit(update)
         elif data == "_REMOVE":
             return self.handle_remove(update)
@@ -402,14 +406,14 @@ class View:
             data_split = data.split("__")
             if data_split[0] == "action" and len(data_split) == 2:
                 return self.handle_action(update, int(data_split[1]))
-            elif (
-                data_split[0] == "filter"
-                and len(data_split) == 6
-                and data_split[1] == "stay"
-            ):
-                self.clear_operational_sequence(
-                    telegram_users[update.callback_query.message.chat.id]
-                )
+            elif data_split[0] == "jump" and len(data_split) == 3:
+                telegram_user.add_to_new_sequence(self.state_name)
+                return self.handle_jump(update, data_split[1], int(data_split[2]))
+            elif data_split[0] == "filter" and len(data_split) == 6:
+                if data_split[1] == "jump":
+                    telegram_user.add_to_new_sequence(self.state_name)
+                else:
+                    telegram_user.back_in_sequence()
                 return self.handle_filter(
                     update,
                     data_split[1],
@@ -422,34 +426,8 @@ class View:
                 not self.no_sequence
                 and telegram_users[update.callback_query.message.chat.id].state != data
             ):
-                if self.state_name in operational_states:
-                    if (
-                        len(telegram_user.operational_sequence[-1]) == 0
-                        or telegram_user.operational_sequence[-1][-1] != self.state_name
-                    ):
-                        telegram_user.operational_sequence[-1].append(self.state_name)
-                else:
-                    if (
-                        len(telegram_user.states_sequence) == 0
-                        or telegram_user.states_sequence[-1] != self.state_name
-                    ):
-                        telegram_user.states_sequence.append(self.state_name)
-            if data_split[0] == "jump" and len(data_split) == 3:
-                return self.handle_jump(update, data_split[1], int(data_split[2]))
-            elif (
-                data_split[0] == "filter"
-                and len(data_split) == 6
-                and data_split[1] == "jump"
-            ):
-                return self.handle_filter(
-                    update,
-                    data_split[1],
-                    data_split[2],
-                    data_split[3],
-                    data_split[4],
-                    data_split[5],
-                )
-            elif data in conversation_views or self.handle_anything:
+                telegram_user.add_to_current_sequence(self.state_name)
+            if data in conversation_views or self.handle_anything:
                 return self.handle(update, data)
             elif data in shortcuts and shortcuts[data]:
                 if shortcuts[data][0] == "add":
@@ -633,7 +611,7 @@ class DatabaseView(View):
             True,
         )
 
-    def handle_add(self, update: Update):
+    def handle_add(self, update: Update) -> str:
         state = _records_handle_add(self.state_name, update)
         return state.state(
             update.callback_query.message,
@@ -719,7 +697,7 @@ class ListRecordsView(View):
                 True,
             )
 
-    def handle_add(self, update: Update):
+    def handle_add(self, update: Update) -> str:
         state = _records_handle_add(self.table_name, update)
         return state.state(
             update.callback_query.message,
@@ -1159,8 +1137,8 @@ class EditRecordView(View):
             )
 
         controls = []
-        if telegram_users[message.chat.id].is_operational():
-            controls.append(back_button)
+        # if telegram_users[message.chat.id].is_operational():
+        controls.append(back_button)
         controls.append(cancel_button)
         if display_submit:
             controls.append(submit_button)
@@ -1251,8 +1229,8 @@ class EditRecordValueView(View):
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []
-        if telegram_user.is_operational():
-            controls.append(back_button)
+        # if telegram_user.is_operational():
+        controls.append(back_button)
         controls.append(cancel_button)
         if add:
             controls.append(add_button)
@@ -1386,7 +1364,10 @@ class EditTextRecordValueView(EditRecordValueView):
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
 
-        if "request_frequent_data" in self.column and self.column["request_frequent_data"]:
+        if (
+            "request_frequent_data" in self.column
+            and self.column["request_frequent_data"]
+        ):
             self.freqValues = DATABASE_DRIVER.get_data(
                 f"SELECT [{self.column['column']}] AS freqValue, COUNT([{self.column['column']}]) AS freqCount FROM {self.table_name} GROUP BY freqValue ORDER BY freqCount DESC LIMIT ?",
                 [15],
@@ -1515,12 +1496,9 @@ class EditDataRecordValueView(EditRecordValueView):
                 True,
             )
 
-    def handle_add(self, update: Update):
+    def handle_add(self, update: Update) -> str:
         state = _records_handle_add(self.column["data_type"], update)
         print(print_label, state)
-        telegram_users[
-            update.callback_query.message.chat.id
-        ].operational_sequence.append(deque())
         return state.state(
             update.callback_query.message,
             "",

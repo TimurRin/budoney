@@ -20,6 +20,7 @@ states:
     body_temperature_diary: "🌡 Температура",
     blood_pressure_diary: "🤕 Давление",
     pulse_diary: "⚡️ Пульс",
+    weight_diary: "🍞 Вес",
     food: "🥘 Еда",
     plants: "🪴 Садоводство",
     people: "👫 Люди",

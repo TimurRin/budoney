@@ -143,13 +143,35 @@ def _display_inline_pulse_diary(record):
     return " ".join(text_parts)
 
 
+def _display_inline_weight_diary(record):
+    text_parts = []
+
+    text_parts.append(
+        date_utils.get_relative_timestamp_text(
+            record["date_occurred"], today=datetime.today(), limit=30
+        )
+    )
+
+    text_parts.append("—")
+
+    text_parts.append(str(record.get("weight", "???")) + " kg")
+
+    text_parts.append("—")
+
+    if f"owner__emoji" in record and record[f"patient__emoji"]:
+        text_parts.append(record[f"patient__emoji"])
+    text_parts.append(str(record.get("patient__name", "???")))
+
+    return " ".join(text_parts)
+
+
 def init():
     DefaultView(
         "health",
         [
             ["pills", "pills_diary"],
             # ["diseases_seasonal", "diseases_chronic"],
-            ["symptoms_diary"],
+            ["weight_diary", "symptoms_diary"],
             [
                 "glucose_level_diary",
                 "body_temperature_diary",
@@ -299,6 +321,28 @@ def init():
             {"column": "notes", "type": "text", "skippable": True},
         ],
         inline_display=_display_inline_pulse_diary,
+        fast_type="required",
+        order_by=[
+            ("date_occurred", True, None),
+        ],
+    )
+    DatabaseView(
+        "weight_diary",
+        [
+            {
+                "column": "date_occurred",
+                "type": "timestamp",
+                "autoset": lambda: int(datetime.today().timestamp()),
+            },
+            {"column": "weight", "type": "float", "request_frequent_data": True},
+            {
+                "column": "patient",
+                "type": "data",
+                "data_type": "people",
+            },
+            {"column": "notes", "type": "text", "skippable": True},
+        ],
+        inline_display=_display_inline_weight_diary,
         fast_type="required",
         order_by=[
             ("date_occurred", True, None),

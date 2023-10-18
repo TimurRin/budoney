@@ -15,12 +15,12 @@ def _display_inline_current_task(record):
     if "date_completed" in record and record["date_completed"]:
         text_parts.append("[☑️")
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date_completed"]) + "]"
+            date_utils.get_relative_timestamp_text(record["date_completed"], limit=7) + "]"
         )
     else:
         if "date_due" in record and record["date_due"]:
             days = date_utils.get_relative_timestamp(record["date_due"])
-            text_parts.append((days < -3 and "⏳") or (days < 0 and "⌛️") or "⚠️⌛️")
+            text_parts.append((days < -7 and "🔮") or (days < -3 and "⏳") or (days < 0 and "⌛️") or "⚠️⌛️")
             text_parts.append(
                 date_utils.get_relative_timestamp_text(record["date_due"])
             )

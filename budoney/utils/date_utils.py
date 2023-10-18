@@ -11,7 +11,7 @@ def get_relative_timestamp(timestamp, today=None):
     return get_relative_date(datetime.fromtimestamp(timestamp), today=today)
 
 
-def get_relative_date_text(date: datetime, today=None):
+def get_relative_date_text(date: datetime, today=None, limit=None):
     if not today:
         today = get_today_midnight()
     days_ago = (today - date).days
@@ -21,14 +21,16 @@ def get_relative_date_text(date: datetime, today=None):
         return "yesterday"
     elif days_ago == -1:
         return "tomorrow"
+    elif limit and abs(days_ago) > limit:
+        return date.strftime("%Y-%m-%d")
     elif days_ago < 0:
         return f"in {abs(days_ago)}d"
     else:
         return f"{days_ago}d ago"
 
 
-def get_relative_timestamp_text(timestamp, today=None):
-    return get_relative_date_text(datetime.fromtimestamp(timestamp), today=today)
+def get_relative_timestamp_text(timestamp, today=None, limit=None):
+    return get_relative_date_text(datetime.fromtimestamp(timestamp), today=today, limit=limit)
 
 
 def get_today_midnight():

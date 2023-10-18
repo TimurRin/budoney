@@ -11,7 +11,7 @@ def _display_inline_pills_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_taken"], today=datetime.today()
+            record["date_taken"], today=datetime.today(), limit=30
         )
     )
 
@@ -34,7 +34,7 @@ def _display_inline_symptoms_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_occurred"], today=datetime.today()
+            record["date_occurred"], today=datetime.today(), limit=30
         )
     )
 
@@ -56,7 +56,7 @@ def _display_inline_glucose_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_occurred"], today=datetime.today()
+            record["date_occurred"], today=datetime.today(), limit=30
         )
     )
 
@@ -78,7 +78,7 @@ def _display_inline_body_temperature_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_occurred"], today=datetime.today()
+            record["date_occurred"], today=datetime.today(), limit=30
         )
     )
 
@@ -100,7 +100,7 @@ def _display_inline_blood_pressure_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_occurred"], today=datetime.today()
+            record["date_occurred"], today=datetime.today(), limit=30
         )
     )
 
@@ -126,7 +126,7 @@ def _display_inline_pulse_diary(record):
 
     text_parts.append(
         date_utils.get_relative_timestamp_text(
-            record["date_occurred"], today=datetime.today()
+            record["date_occurred"], today=datetime.today(), limit=30
         )
     )
 

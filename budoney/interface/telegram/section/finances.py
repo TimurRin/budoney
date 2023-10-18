@@ -241,7 +241,7 @@ def _db_transactions_inline_display(record):
     text_parts = []
 
     if "date" in record and record["date"]:
-        text_parts.append(date_utils.get_relative_timestamp_text(record["date"]))
+        text_parts.append(date_utils.get_relative_timestamp_text(record["date"], limit=30))
         text_parts.append("—")
 
     text_parts.append(
@@ -414,7 +414,7 @@ def _db_transfers_inline_display(record):
     text_parts = []
 
     if "date" in record and record["date"]:
-        text_parts.append(date_utils.get_relative_timestamp_text(record["date"]))
+        text_parts.append(date_utils.get_relative_timestamp_text(record["date"], limit=30))
         text_parts.append("—")
 
     sum_present = (

@@ -52,6 +52,8 @@ states:
     transfers_PARAM_account_target: "Счёт получения",
     transfers_PARAM_comission: "Комиссия",
     transfers_PARAM_description: "Описание",
+    loans: "Кредиты",
+    loan_payments: "Кредитные платежи",
     financial_accounts: "🏦 Счета",
     financial_accounts_PARAM_name: "Название",
     financial_accounts_PARAM_number: "Номер",

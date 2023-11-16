@@ -96,9 +96,9 @@ def _action_process_done_current_task(record):
 
 def _db_current_task_fast_type_processor(
     data: str,
-) -> tuple[dict[str, Any], dict[str, list[str]]]:
+) -> tuple[dict[str, Any], dict[str, tuple[list[str], list[Any]]]]:
     record = {}
-    record_filters: dict[str, list] = {}
+    record_filters: dict[str, tuple[list[str], list[Any]]] = {}
 
     if data:
         record["name"] = data

@@ -15,7 +15,7 @@ class Database:
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
-        conditions: list | None = None,
+        conditions: tuple[list[str], list[Any]] | None = None,
         record_ids: list[int] | None = None,
     ) -> tuple[str, list[Any]]:
         pass

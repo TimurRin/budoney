@@ -198,10 +198,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
     if f"{account_prefix}number" in record and record[f"{account_prefix}number"]:
         financial_account.append("*" + record[f"{account_prefix}number"])
 
-    if (
-        f"{account_prefix}name" in record
-        and record[f"{account_prefix}name"]
-    ):
+    if f"{account_prefix}name" in record and record[f"{account_prefix}name"]:
         financial_account.append(record[f"{account_prefix}name"])
     elif (
         f"{account_prefix}operator__name" in record
@@ -360,10 +357,10 @@ def _db_expenses_extended_display(record):
 
 def _db_expenses_fast_type_processor(
     data: str,
-) -> tuple[dict[str, Any], dict[str, list[str]]]:
-    record = {}
+) -> tuple[dict[str, Any], dict[str, tuple[list[str], list[str | int | float]]]]:
+    record: dict[str, Any] = {}
     record_filters_pre: dict[tuple[str, str], list[str]] = {}
-    record_filters: dict[str, list] = {}
+    record_filters: dict[str, tuple[list[str], list[str | int | float]]] = {}
 
     pairs = {
         "organizations": "organization",
@@ -397,12 +394,16 @@ def _db_expenses_fast_type_processor(
         for record_filter in record_filters_pre:
             if len(record_filters_pre[record_filter]) > 1:
                 if record_filter[0] not in record_filters:
-                    record_filters[record_filter[0]] = []
-                record_filters[record_filter[0]].append(
-                    f"{record_filter[0]}.id IN ({', '.join(record_filters_pre[record_filter])})"
+                    record_filters[record_filter[0]] = (list(), list())
+                record_filters[record_filter[0]][1].extend(
+                    list(set(map(int, record_filters_pre[record_filter])))
+                )
+                record_filters[record_filter[0]][0].append(
+                    f"{record_filter[0]}.id IN ({('?, ' * len(record_filters[record_filter[0]][1]))[:-2]})"
                 )
             else:
                 record[record_filter[1]] = int(record_filters_pre[record_filter][0])
+    print("record_filters", record_filters)
     return (record, record_filters)
 
 
@@ -638,7 +639,6 @@ def _db_loan_payments_extended_display(record):
                 record.get("financial_account__currency__code", "XXX"),
             )
         )
-
 
     method_line = _sub_method_extended_display(record, "financial_account")
     if method_line:

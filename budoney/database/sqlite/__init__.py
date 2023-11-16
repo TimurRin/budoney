@@ -51,7 +51,7 @@ class SQLiteDatabase(Database):
         join: list[dict[str, Any]] | None = None,
         join_select: list[dict[str, Any]] | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
-        conditions: list | None = None,
+        conditions: tuple[list[str], list[Any]] | None = None,
         record_ids: list[int] | None = None,
     ) -> tuple[str, list[Any]]:
         selects = []
@@ -102,14 +102,17 @@ class SQLiteDatabase(Database):
         if record_ids and not external and table:
             record_ids_set = set(record_ids)
             if len(record_ids_set) > 1:
-                query += f" WHERE {table}.id IN ({('?, ' * len(record_ids_set))[:-2]})"
+                wheres.append(f"{table}.id IN ({('?, ' * len(record_ids_set))[:-2]})")
                 values.extend(record_ids_set)
             else:
-                query += f" WHERE {table}.id = ?"
+                wheres.append(f"{table}.id = ?")
                 values.append(record_ids[0])
-        if conditions:
-            for condition in conditions:
+        if conditions and conditions[0]:
+            for condition in conditions[0]:
                 wheres.append(condition)
+            if conditions[1]:
+                for condition in conditions[1]:
+                    values.append(condition)
         if len(wheres) > 0:
             query += f" WHERE {' OR '.join(wheres)}"
         if order_by and not record_ids and not external:

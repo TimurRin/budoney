@@ -32,7 +32,7 @@ class TelegramUser:
         self.records: dict = dict()
         self.records_data: dict = dict()
         self.records_extra: dict = dict()
-        self.filters: dict[str, list[str]] = dict()
+        self.filters: dict[str, tuple[list[str], list[str | int | float]]] = dict()
         self.ignore_fast: dict[str, dict[str, bool]] = dict()
         self.pagination: dict[str, Pagination] = dict()
         self.search: dict[str, tuple[str, list[str]]] = dict()
@@ -41,7 +41,7 @@ class TelegramUser:
 
     def get_filters(self, table_name):
         if table_name not in self.filters:
-            self.filters[table_name] = list()
+            self.filters[table_name] = (list(), list())
         return self.filters[table_name]
 
     def get_pagination(self, table_name):
@@ -542,7 +542,8 @@ class DatabaseView(View):
         extended_display: Callable[[dict[str, Any]], str] | None = None,
         fast_type: str | None = None,
         fast_type_processor: Callable[
-            [str], tuple[dict[str, Any], dict[str, list[str]]]
+            [str],
+            tuple[dict[str, Any], dict[str, tuple[list[str], list[str | int | float]]]],
         ]
         | None = None,
         order_by: list[tuple[str, bool, str | None]] | None = None,
@@ -562,7 +563,8 @@ class DatabaseView(View):
         )
         self.fast_type: str | None = fast_type
         self.fast_type_processor: Callable[
-            [str], tuple[dict[str, Any], dict[str, list[str]]]
+            [str],
+            tuple[dict[str, Any], dict[str, tuple[list[str], list[str | int | float]]]],
         ] | None = fast_type_processor
         if order_by == None:
             order_by = []
@@ -886,9 +888,10 @@ class RecordView(View):
         )
 
     def handle_filter(self, update: Update, action, filter_table, a1, a2, a3):
-        telegram_users[update.callback_query.message.chat.id].filters[filter_table] = [
-            f"{a1} = {a3}"
-        ]
+        telegram_users[update.callback_query.message.chat.id].filters[filter_table] = (
+            [f"{a1} = ?"],
+            [a3],
+        )
         pagination = telegram_users[
             update.callback_query.message.chat.id
         ].get_pagination(filter_table)
@@ -1818,8 +1821,8 @@ def _records_state_text(table_name, telegram_user: TelegramUser):
         )
         or "No records found"
     )
-    if len(filters):
-        text = f"{text} (filters: {len(filters)})"
+    if len(filters[0]):
+        text = f"{text} (filters: {len(filters[0])})"
     return text
 
 
@@ -1852,7 +1855,7 @@ def _get_records_query(
     external=None,
     record_ids=None,
     no_join=None,
-    conditions=None,
+    conditions: tuple[list[str], list[Any]] | None = None,
     ignore_order=None,
 ):
     table_select = []
@@ -1938,7 +1941,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
             )
         )
 
-    if len(filters):
+    if len(filters[0]):
         clear_line.append(
             InlineKeyboardButton(
                 callback_data="_CLEAR_FILTERS",
@@ -2054,9 +2057,10 @@ def _records_handle_pagination(table_name, update: Update, data: str):
         options_changed = True
         pagination.offset = 0
         pagination.total = -1
-        telegram_users[update.callback_query.message.chat.id].filters[
-            table_name
-        ] = list()
+        telegram_users[update.callback_query.message.chat.id].filters[table_name] = (
+            list(),
+            list(),
+        )
 
     return options_changed
 

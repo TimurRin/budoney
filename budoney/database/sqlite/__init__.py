@@ -11,6 +11,8 @@ print_label: str = "[budoney :: Database :: SQLite]"
 class SQLiteDatabase(Database):
     SQLITE_DATA_TYPES = {
         "text": "TEXT",
+        "array": "TEXT",
+        "dict_boolean": "TEXT",
         "int": "INTEGER",
         "boolean": "INTEGER",
         "float": "REAL",

@@ -5,6 +5,18 @@ from interface.telegram.classes import (
 from datetime import datetime
 import utils.date_utils as date_utils
 
+def _display_inline_pills(record):
+    text_parts = []
+
+    text_parts.append(str(record.get("name", "???")))
+    if "brand" in record and record["brand"]:
+        text_parts.append(f"({str(record.get('brand', '???'))})")
+
+    # text_parts.append("—")
+
+    # if f"intake_hours" in record and len(record[f"intake_hours"]):
+    #     text_parts.append(len(record[f"intake_hours"]))
+    return " ".join(text_parts)
 
 def _display_inline_pills_diary(record):
     text_parts = []
@@ -17,8 +29,8 @@ def _display_inline_pills_diary(record):
 
     text_parts.append("—")
 
-    text_parts.append(str(record.get("pill__name", "???")))
-    text_parts.append(f"({str(record.get('dose', '???'))} mg)")
+    text_parts.append(str(record.get("pill__brand", record.get("pill__name", "Unknown pill"))))
+    text_parts.append(f"({str(record.get('dose', '???'))} {str(record.get('pill__dosage_type', 'smth'))})")
 
     text_parts.append("—")
 
@@ -182,9 +194,12 @@ def init():
     DatabaseView(
         "pills",
         [
-            {"column": "name", "type": "text"},
+            {"column": "name", "type": "text", "request_frequent_data": True},
+            {"column": "brand", "type": "text", "skippable": True},
+            {"column": "dosage_type", "type": "text", "request_frequent_data": True},
+            # {"column": "intake_hours", "type": "array", "skippable": True},
         ],
-        inline_display=lambda record: f"{record.get('name', 'Unnamed pill')}",
+        inline_display=_display_inline_pills,
         order_by=[
             ("name", False, None),
         ],

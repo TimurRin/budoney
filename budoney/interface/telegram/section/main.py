@@ -22,6 +22,6 @@ def init():
             # "plants",
             # ],
             ["organizations", "people"],
-            ["settings"],
+            ["settings", "statistics"],
         ],
     )

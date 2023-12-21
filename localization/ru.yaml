@@ -25,6 +25,8 @@ states:
     plants: "🪴 Садоводство",
     people: "👫 Люди",
     settings: "⚙️ Настройки",
+    statistics: "📊 Статистика",
+    aggregation: "♾ Агрегация",
     settings_ACTION_revalidate_search: "🔄🔍 Ревалидировать поиск",
     people_PARAM_name: "Имя",
     people_PARAM_emoji: "Эмодзи",

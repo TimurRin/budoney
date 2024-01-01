@@ -1,4 +1,5 @@
 import configs
+from loc import translate
 from interface.telegram.classes import (
     conversation_views,
     telegram_users,
@@ -34,7 +35,10 @@ budoney_link = InlineKeyboardMarkup(
 
 
 def command_start(update: Update, context: CallbackContext):
-    if update.message.chat.type == "private" and update.message.from_user.id in configs.telegram["authorized"]:
+    if (
+        update.message.chat.type == "private"
+        and update.message.from_user.id in configs.telegram["authorized"]
+    ):
         telegram_users[update.message.from_user.id] = TelegramUser(
             update.message.from_user.first_name
         )
@@ -44,7 +48,7 @@ def command_start(update: Update, context: CallbackContext):
         )
         return conversation_views["main"].state(
             update.message,
-            f"🤠 Hiya, {update.message.from_user.first_name}! Welcome to Budoney 🤗",
+            f"{translate('_HOWDY')}, {update.message.from_user.first_name}! {translate('_HOWDY_2')}",
             False,
         )
     elif update.message.chat.type != "private":
@@ -54,7 +58,7 @@ def command_start(update: Update, context: CallbackContext):
         )
         if configs.telegram["reveal_unauthorized"]:
             update.message.reply_text(
-                "👋 Hello there! You can use Budoney Household Management inside a bot dialog only. If you want a personal Budoney instance, follow the link below",
+                f"{translate('_NO_GROUPS')}. {translate('_GET_YOUR_COPY')}",
                 reply_markup=budoney_link,
             )
     else:
@@ -64,7 +68,7 @@ def command_start(update: Update, context: CallbackContext):
         )
         if configs.telegram["reveal_unauthorized"]:
             update.message.reply_text(
-                "👋 Hello there! This is a private instance of Budoney Household Management. If you want a personal Budoney instance, follow the link below",
+                f"{translate('_PRIVATE')}. {translate('_GET_YOUR_COPY')}",
                 reply_markup=budoney_link,
             )
 
@@ -93,7 +97,7 @@ conversation = ConversationHandler(
     entry_points=[entry_point_handler],
     states=state_handlers,
     fallbacks=[entry_point_handler],
-    allow_reentry=True
+    allow_reentry=True,
 )
 
 print(

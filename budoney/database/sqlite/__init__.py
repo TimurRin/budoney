@@ -18,6 +18,7 @@ class SQLiteDatabase(Database):
         "float": "REAL",
         "date": "INTEGER",
         "timestamp": "INTEGER",
+        "year_month": "INTEGER",
         "data": "INTEGER",
     }
 

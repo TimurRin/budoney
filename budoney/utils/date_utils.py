@@ -30,7 +30,9 @@ def get_relative_date_text(date: datetime, today=None, limit=None):
 
 
 def get_relative_timestamp_text(timestamp, today=None, limit=None):
-    return get_relative_date_text(datetime.fromtimestamp(timestamp), today=today, limit=limit)
+    return get_relative_date_text(
+        datetime.fromtimestamp(timestamp), today=today, limit=limit
+    )
 
 
 def get_today_midnight():
@@ -42,13 +44,17 @@ def get_today_midnight_timestamp():
     return int(get_today_midnight().timestamp())
 
 
-def get_month_first_day():
+def get_current_month_first_day():
     today = datetime.today()
     return datetime(today.year, today.month, 1)
 
 
-def get_month_first_day_timestamp():
-    return int(get_month_first_day().timestamp())
+def get_current_month_first_day_timestamp():
+    return int(get_current_month_first_day().timestamp())
+
+
+def get_month_first_day(year, month):
+    return datetime(year, month, 1)
 
 
 def date_range(start_date: datetime, end_date: datetime):
@@ -57,3 +63,17 @@ def date_range(start_date: datetime, end_date: datetime):
         d = start_date + timedelta(n)
         so.append(d)
         yield d
+
+
+def year_month_range(start: tuple[int, int], end: tuple[int, int]):
+    so = []
+    for year in range(start[0], end[0] + 1):
+        if start[0] == year and end[0] == year:
+            month_range = range(start[1], end[1] + 1)
+        elif start[0] == year:
+            month_range = range(start[1], 13)
+        else:
+            month_range = range(1, end[1] + 1)
+        for month in month_range:
+            so.append(get_month_first_day(year, month))
+    return so

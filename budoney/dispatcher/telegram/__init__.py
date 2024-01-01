@@ -1,6 +1,7 @@
 from typing import Union
 from telegram.ext import ConversationHandler, Updater
 import configs
+from loc import translate
 
 
 print_label: str = "[budoney :: Telegram Dispatcher]"
@@ -14,7 +15,7 @@ def start(conversation: Union[ConversationHandler, None]):
     print(print_label, "Starting Telegram updater polling...")
     updater.start_polling()
 
-    send_message_to_authorized("Hello, I've just started, so I need you to type /start")
+    send_message_to_authorized(translate("_START"))
 
     print(print_label, "Started")
     updater.idle()

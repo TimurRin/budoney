@@ -3,11 +3,11 @@ from collections import deque
 from typing import Any, Callable
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import CallbackContext, CallbackQueryHandler, MessageHandler, Filters
-from loc import localization
+from loc import translate
 from database import DATABASE_DRIVER
 from dispatcher.telegram import send_info_message
 import utils.date_utils as date_utils
-import utils.string_utils as string_utils
+from utils.version import cf_version
 from datetime import datetime, timedelta
 import configs
 import math
@@ -37,6 +37,7 @@ class TelegramUser:
         self.pagination: dict[str, Pagination] = dict()
         self.search: dict[str, tuple[str, list[str]]] = dict()
         self.date_offset: int = 0
+        self.year: int = 0
         self.last_query: tuple[str, list[Any]] = ("", [])
 
     def get_filters(self, table_name):
@@ -104,6 +105,10 @@ class TelegramUser:
         if table_name in self.pagination and self.pagination[table_name]:
             self.pagination[table_name].total = -1
         self.temp_pagination = Pagination()
+
+    def clear_sequences(self):
+        self.state_sequences: deque[deque] = deque()
+        self.state_sequences.append(deque())
 
 
 class DatabaseReport:
@@ -190,7 +195,7 @@ class View:
         return self.state_name
 
     def state_name_text(self, telegram_user: TelegramUser):
-        return localization["states"].get(self.state_name, self.state_name)
+        return translate(self.state_name)
 
     def debug_text(self, user: TelegramUser):
         if configs.general["production_mode"]:
@@ -211,6 +216,14 @@ class View:
     @abc.abstractmethod
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         pass
+
+    def go_home(self, update: Update, telegram_user: TelegramUser):
+        telegram_user.clear_sequences()
+        return conversation_views["main"].state(
+            update.callback_query.message,
+            "",
+            True,
+        )
 
     def go_back(self, update: Update, telegram_user: TelegramUser):
         return conversation_views[telegram_user.back_in_sequence()].state(
@@ -317,7 +330,7 @@ class View:
         self.handle_cancel(update)
         return conversation_views[state].state(
             update.callback_query.message,
-            "Operation has been cancelled",
+            translate("_OPERATION_CANCELLED"),
             True,
         )
 
@@ -353,7 +366,9 @@ class View:
             or data == "_CLEAR_FILTERS"
         )
 
-        if data == "_BACK":
+        if data == "_HOME":
+            return self.go_home(update, telegram_user)
+        elif data == "_BACK":
             return self.go_back(update, telegram_user)
         elif data == "_NEXT":
             telegram_user.add_to_current_sequence(self.state_name)
@@ -439,7 +454,7 @@ class View:
                     )
             return conversation_views["_WIP"].state(
                 update.callback_query.message,
-                f"⚠️ State '<b>{data}</b>' doesn't exist",
+                f"⚠️ {translate('_NO_STATE')}: <b>{data}</b>",
                 True,
             )
 
@@ -460,12 +475,12 @@ class DefaultView(View):
                 keyboard_line.append(
                     InlineKeyboardButton(
                         callback_data=fork,
-                        text=localization["states"].get(fork, fork),
+                        text=translate(fork),
                     )
                 )
 
         if state_name != "main":
-            keyboard.append([back_button])
+            keyboard.append([back_button, home_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
@@ -474,8 +489,8 @@ class DefaultView(View):
             lines = []
             for row in self.extra_info:
                 lines.append(row())
-            return "\n".join(lines)
-        return ""
+            return "\n".join(lines) + "\n" + (self.state_name == "main" and cf_version or "")
+        return self.state_name == "main" and cf_version or ""
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -503,14 +518,12 @@ class ActionView(View):
                 [
                     InlineKeyboardButton(
                         callback_data=index,
-                        text=localization["states"].get(
-                            f"{state_name}_ACTION_{action[0]}", action[0]
-                        ),
+                        text=translate(f"{state_name}_ACTION_{action[0]}"),
                     )
                 ]
             )
 
-        keyboard.append([back_button])
+        keyboard.append([back_button, home_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
 
@@ -591,7 +604,7 @@ class DatabaseView(View):
                 f"{state_name}_FAST_TYPE", state_name
             )
 
-        keyboard.append([back_button, records_button, add_button])
+        keyboard.append([back_button, home_button, records_button, add_button])
 
         self._keyboard = InlineKeyboardMarkup(keyboard)
         self._special_handlers = special_handlers
@@ -629,7 +642,7 @@ class ListRecordsView(View):
         self.handle_anything = True
 
     def state_name_text(self, telegram_user: TelegramUser):
-        return f"{localization['states'].get(self.table_name, self.table_name)} > {localization['states'].get('_HEADER_RECORDS', '_HEADER_RECORDS')}"
+        return f"{translate(self.table_name)} > {translate('_HEADER_RECORDS')}"
 
     def state_text(self, telegram_user):
         text = _records_state_text(self.table_name, telegram_user)
@@ -650,7 +663,7 @@ class ListRecordsView(View):
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = _records_keyboard(self.table_name, [], message)
-        keyboard.append([back_button, add_button])
+        keyboard.append([back_button, home_button, add_button])
 
         return InlineKeyboardMarkup(keyboard)
 
@@ -726,10 +739,8 @@ class RecordView(View):
 
     def state_name_text(self, telegram_user: TelegramUser):
         # record_data = telegram_user.records_data[self.table_name]
-        # return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and ('ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
-        return (
-            f"{localization['states'].get(self.table_name, self.table_name)} > Record"
-        )
+        # return f"{translate(self.table_name, self.table_name)} > {'id' in record_data and ('ID ' + str(record_data['id'])) or translate('_HEADER_NEW', '_HEADER_NEW')}"
+        return f"{translate(self.table_name)} > {translate('_RECORD')}"
 
     def record_display(self, record):
         return database_views[self.table_name].extended_display(record) or str(
@@ -755,7 +766,7 @@ class RecordView(View):
                     conditions = [f"{report_link.link_by} = {record_data['id']}"]
                     if report.foreign_date:
                         conditions.append(
-                            f"{report.foreign_date} >= {date_utils.get_month_first_day_timestamp()}"
+                            f"{report.foreign_date} >= {date_utils.get_current_month_first_day_timestamp()}"
                         )
 
                     data = DATABASE_DRIVER.get_report(
@@ -783,9 +794,7 @@ class RecordView(View):
         keyboard = []
 
         for column in database_views[self.table_name].columns:
-            text = localization["states"].get(
-                f"{self.table_name}_PARAM_{column['column']}", column["column"]
-            )
+            text = translate(f"{self.table_name}_PARAM_{column['column']}")
             line = []
             if (
                 column["column"]
@@ -798,13 +807,20 @@ class RecordView(View):
                     line.append(
                         InlineKeyboardButton(
                             callback_data=f"jump__{column['data_type']}__{record_data[column['column']]}",
-                            text=f"Go to {text}",
+                            text=f"{translate('_GO_TO')}: {text}",
                         )
                     )
                     line.append(
                         InlineKeyboardButton(
                             callback_data=f"filter__stay__{self.table_name}__{column['column']}__equals__{record_data[column['column']]}",
-                            text=f"Filter by {text}",
+                            text=f"{translate('_FILTER_BY')}: {text}",
+                        )
+                    )
+                elif "filtrable" in column and column["filtrable"]:
+                    line.append(
+                        InlineKeyboardButton(
+                            callback_data=f"filter__stay__{self.table_name}__{column['column']}__equals__{record_data[column['column']]}",
+                            text=f"{translate('_FILTER_BY')}: {text}",
                         )
                     )
 
@@ -818,15 +834,13 @@ class RecordView(View):
                         column["type"] == "data"
                         and column["data_type"] == self.table_name
                     ):
-                        text1 = localization["states"].get(f"{database}", database)
-                        text2 = localization["states"].get(
-                            f"{database}_PARAM_{column['column']}", column["column"]
-                        )
+                        text1 = translate(f"{database}")
+                        text2 = translate(f"{database}_PARAM_{column['column']}")
                         keyboard.append(
                             [
                                 InlineKeyboardButton(
                                     callback_data=f"filter__jump__{database}__{column['column']}__equals__{record_data['id']}",
-                                    text=f"See '{text1}' with this '{text2}'",
+                                    text=f"{translate('_GO_TO')}: {text1} ({text2})",
                                 )
                             ]
                         )
@@ -843,15 +857,14 @@ class RecordView(View):
                         [
                             InlineKeyboardButton(
                                 callback_data=f"action__{index}",
-                                text=localization["states"].get(
+                                text=translate(
                                     f"{self.table_name}_ACTION_{action['name']}",
-                                    action["name"],
                                 ),
                             )
                         ]
                     )
 
-        controls = [back_button, edit_button]
+        controls = [back_button, home_button, edit_button]
 
         keyboard.append(controls)
 
@@ -912,6 +925,11 @@ class RecordView(View):
                     self.table_name
                 ]
             )
+            pagination = telegram_users[
+                update.callback_query.message.chat.id
+            ].get_pagination(self.table_name)
+            # pagination.offset = 0
+            pagination.total = -1
             return self.go_back(
                 update, telegram_users[update.callback_query.message.chat.id]
             )
@@ -932,10 +950,10 @@ class FastTypeRecordView(View):
         self.handle_anything = True
 
     def state_name_text(self, telegram_user: TelegramUser):
-        return f"{localization['states'].get(self.table_name, self.table_name)} > {localization['states'].get('_HEADER_FAST_TYPE', '_HEADER_FAST_TYPE')}"
+        return f"{translate(self.table_name)} > {translate('_HEADER_FAST_TYPE')}"
 
     def state_text(self, telegram_user) -> str:
-        return "Select an appropriate template or type data to work with"
+        return translate("_FAST_TYPE")
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -944,20 +962,20 @@ class FastTypeRecordView(View):
             [
                 InlineKeyboardButton(
                     callback_data="_ALL",
-                    text="Enter all",
+                    text=translate("_FAST_TYPE_ALL"),
                 ),
                 InlineKeyboardButton(
                     callback_data="_REQUIRED",
-                    text="Enter required",
+                    text=translate("_FAST_TYPE_REQUIRED"),
                 ),
                 InlineKeyboardButton(
                     callback_data="_NONE",
-                    text="Edit",
+                    text=translate("_FAST_TYPE_NONE"),
                 ),
             ]
         )
 
-        controls = [back_button]
+        controls = [back_button, home_button]
 
         keyboard.append(controls)
 
@@ -1056,6 +1074,8 @@ class EditRecordView(View):
                 EditSelectRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "data":
                 EditDataRecordValueView(code, state_name, table_name, column)
+            elif column["type"] == "year_month":
+                EditDateYearMonthRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "date":
                 EditDateRecordValueView(code, state_name, table_name, column)
             elif column["type"] == "timestamp":
@@ -1066,7 +1086,7 @@ class EditRecordView(View):
     def state_name_text(self, telegram_user: TelegramUser):
         record_data = telegram_user.records_data[self.table_name]
 
-        return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
+        return f"{translate(self.table_name)} > {'id' in record_data and (translate('_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or translate('_HEADER_NEW')}"
 
     def record_display(self, record):
         print(print_label, self.table_name, str(record.get("id", "?")))
@@ -1086,7 +1106,7 @@ class EditRecordView(View):
         for column in database_views[self.table_name].columns:
             code = f"{self.table_name}_PARAM_{column['column']}"
             code_text = f"{self.table_name}_PARAM_{column['column']}"
-            text = localization["states"].get(code_text, column["column"])
+            text = translate(code_text)
             if column["column"] in telegram_users[message.chat.id].records[
                 self.table_name
             ] and (
@@ -1112,6 +1132,10 @@ class EditRecordView(View):
                 elif column["type"] == "timestamp":
                     date_timestamp = datetime.fromtimestamp(value)
                     date_string = f"{date_timestamp.strftime('%a, %Y-%m-%d %H:%M:%S')}, {date_utils.get_relative_date_text(date_timestamp, today=datetime.today())}"
+                    text = f"{text} [{date_string}]"
+                elif column["type"] == "year_month":
+                    date_timestamp = datetime.fromtimestamp(value)
+                    date_string = f"{date_timestamp.strftime('%Y-%m')}"
                     text = f"{text} [{date_string}]"
                 elif column["type"] == "data":
                     relevant = {
@@ -1142,6 +1166,7 @@ class EditRecordView(View):
         controls = []
         # if telegram_users[message.chat.id].is_operational():
         controls.append(back_button)
+        controls.append(home_button)
         controls.append(cancel_button)
         if display_submit:
             controls.append(submit_button)
@@ -1198,7 +1223,7 @@ class EditRecordView(View):
         )
         return conversation_views[state].state(
             update.callback_query.message,
-            "✅ The record has been added successfully",
+            f"✅ {translate('_RECORD_ADDED')}",
             True,
         )
 
@@ -1213,11 +1238,11 @@ class EditRecordValueView(View):
         self.table_name = table_name
         self.column = column
         self.handle_anything = True
-        self._help_text = "Set your value below"
+        self._help_text = _input_value_text(column)
 
     def state_name_text(self, telegram_user: TelegramUser):
         record_data = telegram_user.records_data[self.table_name]
-        return f"{localization['states'].get(self.table_name, self.table_name)} > {'id' in record_data and (localization['states'].get('_HEADER_EDIT', '_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or localization['states'].get('_HEADER_NEW', '_HEADER_NEW')}"
+        return f"{translate(self.table_name)} > {'id' in record_data and (translate('_HEADER_EDIT') + ' ID ' + str(record_data['id'])) or translate('_HEADER_NEW')}"
 
     def record_display(self, record):
         print(print_label, self.table_name, str(record.get("id", "?")))
@@ -1228,12 +1253,13 @@ class EditRecordValueView(View):
     def state_text(self, telegram_user):
         record_data = telegram_user.records_data[self.table_name]
         param = f"{self.table_name}_PARAM_{self.column['column']}"
-        return f"{self.record_display(record_data)}\n\n<b><u>{localization['states'].get(param, self.column['column'])}</u></b>: {self._help_text}"
+        return f"{self.record_display(record_data)}\n\n<b><u>{translate(param)}</u></b>: {self._help_text}"
 
     def _keyboard_controls(self, telegram_user, add=False):
         controls = []
         # if telegram_user.is_operational():
         controls.append(back_button)
+        controls.append(home_button)
         controls.append(cancel_button)
         if add:
             controls.append(add_button)
@@ -1257,6 +1283,7 @@ class EditRecordValueView(View):
             or self.column["type"] == "data"
             or self.column["type"] == "date"
             or self.column["type"] == "timestamp"
+            or self.column["type"] == "year_month"
         ):
             parsed_data = int(data)
         elif self.column["type"] == "float":
@@ -1300,7 +1327,7 @@ class EditRecordValueView(View):
         print(print_label, "next state is " + state.state_name)
         return state.state(
             message,
-            f"Successfully added <b>{data}</b> ({self.column['type']}) for column <b>{self.column['column']}</b>",
+            f"{translate('_RECORD_PARAM_ADDED')}: {self.column['type']} <b>{data}</b> ({self.column['column']})",
             edit,
         )
 
@@ -1324,7 +1351,7 @@ class EditRecordValueView(View):
         )
         return state.state(
             update.callback_query.message,
-            f"⚠️ Removing column <i>{self.column['column']}</i>",
+            f"⚠️ {translate('_RECORD_PARAM_CLEARED')}: {self.column['column']}",
             True,
         )
 
@@ -1342,7 +1369,7 @@ class EditRecordValueView(View):
         )
         return state.state(
             update.callback_query.message,
-            f"Skipping column <i>{self.column['column']}</i>",
+            f"{translate('_RECORD_PARAM_SKIPPED')}: {self.column['column']}",
             True,
         )
 
@@ -1362,7 +1389,7 @@ class EditTextRecordValueView(EditRecordValueView):
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
         self.freqValues = []
-        self._help_text = "Type your value below or skip it to the next value"
+        self._help_text = _input_value_text(column)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -1420,7 +1447,7 @@ class EditBooleanRecordValueView(EditRecordValueView):
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
 
-        self._help_text = "Select your value below"
+        self._help_text = _input_value_text(column)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -1453,7 +1480,7 @@ class EditSelectRecordValueView(EditRecordValueView):
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-        self._help_text = "Select your value below"
+        self._help_text = _input_value_text(column)
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []
@@ -1465,9 +1492,8 @@ class EditSelectRecordValueView(EditRecordValueView):
                         callback_data=selectee,
                         text=(
                             "select_key" in self.column
-                            and localization["states"].get(
+                            and translate(
                                 f"SELECT_{self.column['select_key']}_{selectee}",
-                                selectee,
                             )
                             or selectee
                         ),
@@ -1486,7 +1512,7 @@ class EditDataRecordValueView(EditRecordValueView):
         self, state_name: str, parent_state_name: str, table_name, column
     ) -> None:
         super().__init__(state_name, parent_state_name, table_name, column)
-        self._help_text = "Select your value below"
+        self._help_text = _input_value_text(column)
 
     def state_text(self, telegram_user):
         return (
@@ -1534,6 +1560,112 @@ class EditDataRecordValueView(EditRecordValueView):
         )
 
 
+class EditDateYearMonthRecordValueView(EditRecordValueView):
+    def __init__(
+        self, state_name: str, parent_state_name: str, table_name, column
+    ) -> None:
+        super().__init__(state_name, parent_state_name, table_name, column)
+        self.future: bool = (
+            column and "future" in column and column["future"] and True or False
+        )
+        self._help_text = _input_value_text(column)
+
+    def current_timestamp(self):
+        return date_utils.get_current_month_first_day()
+
+    def keyboard(self, message: Message) -> InlineKeyboardMarkup:
+        keyboard = []
+
+        today = self.current_timestamp()
+
+        year = today.year - telegram_users[message.chat.id].date_offset
+
+        line = []
+
+        for date in date_utils.year_month_range((year, 1), (year, 12)):
+            date_string = f"{date.strftime('%Y-%m')}"
+            line.append(
+                InlineKeyboardButton(
+                    date_string,
+                    callback_data=int(date.timestamp()),
+                )
+            )
+            if len(line) == 4:
+                keyboard.append(line)
+                line = []
+
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    ("◀️ " + str(year - 1)), callback_data="_DATE_BACKWARD"
+                ),
+                InlineKeyboardButton(
+                    (year != today.year) and translate("_TODAY") or "🚫",
+                    callback_data="_DATE_TODAY",
+                ),
+                InlineKeyboardButton(
+                    (year > 0 or self.future) and (str(year + 1) + " ▶️") or "🚫",
+                    callback_data="_DATE_FORWARD",
+                ),
+            ]
+        )
+
+        controls = self._keyboard_controls(telegram_users[message.chat.id])
+        keyboard.append(controls)
+
+        return InlineKeyboardMarkup(keyboard)
+
+    def handle_date(self, update: Update, data: str):
+        options_changed = False
+        date_button = False
+
+        if data == "_DATE_TODAY":
+            if telegram_users[update.callback_query.message.chat.id].date_offset != 0:
+                options_changed = True
+                telegram_users[update.callback_query.message.chat.id].date_offset = 0
+        elif data == "_DATE_BACKWARD":
+            options_changed = True
+            telegram_users[update.callback_query.message.chat.id].date_offset += 1
+        elif data == "_DATE_FORWARD":
+            if (
+                telegram_users[update.callback_query.message.chat.id].date_offset > 0
+                or self.future
+            ):
+                telegram_users[update.callback_query.message.chat.id].date_offset -= 1
+                if (
+                    telegram_users[update.callback_query.message.chat.id].date_offset
+                    < 0
+                    and not self.future
+                ):
+                    telegram_users[
+                        update.callback_query.message.chat.id
+                    ].date_offset = 0
+                else:
+                    options_changed = True
+        else:
+            date_button = True
+
+        if options_changed:
+            return conversation_views[self.state_name].state(
+                update.callback_query.message,
+                "",
+                True,
+            )
+        elif date_button:
+            return self.verify_next(update.callback_query.message, data, True)
+
+    def handle_typed(self, update: Update, data: str):
+        try:
+            date = datetime.strptime(data, "%Y-%m").timestamp()
+            return self.verify_next(update.message, str(int(date)), False)
+        except:
+            return conversation_views[self.state_name].state(
+                update.message,
+                f"{translate('_DATE_WRONG')} YYYY-MM",
+                False,
+            )
+
+
 class EditDateRecordValueView(EditRecordValueView):
     def __init__(
         self, state_name: str, parent_state_name: str, table_name, column
@@ -1542,7 +1674,7 @@ class EditDateRecordValueView(EditRecordValueView):
         self.future: bool = (
             column and "future" in column and column["future"] and True or False
         )
-        self._help_text = "Select your value below"
+        self._help_text = _input_value_text(column)
 
     def current_timestamp(self):
         return date_utils.get_today_midnight()
@@ -1637,7 +1769,7 @@ class EditDateRecordValueView(EditRecordValueView):
         except:
             return conversation_views[self.state_name].state(
                 update.message,
-                "Wrong date format. Need YYYY-MM-DD",
+                f"{translate('_DATE_WRONG')} YYYY-MM-DD",
                 False,
             )
 
@@ -1662,7 +1794,7 @@ class EditTimestampRecordValueView(EditDateRecordValueView):
             except:
                 return conversation_views[self.state_name].state(
                     update.message,
-                    "Wrong datetime format. Need YYYY-MM-DD [HH:MM:SS]",
+                    f"{translate('_DATE_WRONG')} YYYY-MM-DD [HH:MM:SS]",
                     False,
                 )
 
@@ -1676,41 +1808,45 @@ shortcuts = {}
 operational_states = {}
 
 # special handlers that don't have view
+home_button = InlineKeyboardButton(
+    callback_data="_HOME",
+    text=translate("_HOME"),
+)
 back_button = InlineKeyboardButton(
     callback_data="_BACK",
-    text=localization["states"].get("_BACK", "_BACK"),
+    text=translate("_BACK"),
 )
 records_button = InlineKeyboardButton(
     callback_data="_RECORDS",
-    text=localization["states"].get("_RECORDS", "_RECORDS"),
+    text=translate("_RECORDS"),
 )
 add_button = InlineKeyboardButton(
     callback_data="_ADD",
-    text=localization["states"].get("_ADD", "_ADD"),
+    text=translate("_ADD"),
 )
 edit_button = InlineKeyboardButton(
     callback_data="_EDIT",
-    text=localization["states"].get("_EDIT", "_EDIT"),
+    text=translate("_EDIT"),
 )
 remove_button = InlineKeyboardButton(
     callback_data="_REMOVE",
-    text=localization["states"].get("_REMOVE", "_REMOVE"),
+    text=translate("_REMOVE"),
 )
 next_button = InlineKeyboardButton(
     callback_data="_NEXT",
-    text=localization["states"].get("_NEXT", "_NEXT"),
+    text=translate("_NEXT"),
 )
 skip_button = InlineKeyboardButton(
     callback_data="_SKIP",
-    text=localization["states"].get("_SKIP", "_SKIP"),
+    text=translate("_SKIP"),
 )
 cancel_button = InlineKeyboardButton(
     callback_data="_CANCEL",
-    text=localization["states"].get("_CANCEL", "_CANCEL"),
+    text=translate("_CANCEL"),
 )
 submit_button = InlineKeyboardButton(
     callback_data="_SUBMIT",
-    text=localization["states"].get("_SUBMIT", "_SUBMIT"),
+    text=translate("_SUBMIT"),
 )
 
 
@@ -1809,20 +1945,12 @@ def _records_state_text(table_name, telegram_user: TelegramUser):
     text = (
         pagination.total > 0
         and (
-            pagination.total == 1
-            and (f"Displaying <b>1</b> record")
-            or (
-                pagination.total > pagination.limit
-                and (
-                    f"Displaying <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> of <b>{pagination.total}</b> records"
-                )
-                or (f"Displaying <b>{pagination.total}</b> records")
-            )
+            f"{translate('_RECORD_DISPLAY')}: <b>{pagination.offset+1}-{min(pagination.offset+pagination.limit, pagination.total)}</b> / <b>{pagination.total}</b>"
         )
-        or "No records found"
+        or translate("_RECORD_NO_DISPLAY")
     )
     if len(filters[0]):
-        text = f"{text} (filters: {len(filters[0])})"
+        text = f"{text}\n{translate('_RECORDS_FILTERS')}: {len(filters[0])}"
     return text
 
 
@@ -1937,7 +2065,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
         clear_line.append(
             InlineKeyboardButton(
                 callback_data="_CLEAR_SEARCH",
-                text=f"❌🔍 Clear search: {search[0]}",
+                text=f"{translate('_CLEAR_SEARCH')}: {search[0]}",
             )
         )
 
@@ -1945,7 +2073,7 @@ def _records_keyboard(table_name, keyboard, message: Message):
         clear_line.append(
             InlineKeyboardButton(
                 callback_data="_CLEAR_FILTERS",
-                text=f"❌🎛 Clear filters",
+                text=translate("_CLEAR_FILTERS"),
             )
         )
 
@@ -1994,14 +2122,14 @@ def _records_keyboard(table_name, keyboard, message: Message):
 
     if pagination.total > 0:
         extra_buttons = [
-            InlineKeyboardButton(
-                "🎛 Filters",
-                callback_data="_RECORDS_FILTERS",
-            ),
-            InlineKeyboardButton(
-                "🔢 Sort",
-                callback_data="_RECORDS_SORT",
-            ),
+            # InlineKeyboardButton(
+            #     translate("_RECORDS_FILTERS", "filters"),
+            #     callback_data="_RECORDS_FILTERS",
+            # ),
+            # InlineKeyboardButton(
+            #     translate("_RECORDS_SORT"),
+            #     callback_data="_RECORDS_SORT",
+            # ),
         ]
 
         report_links = database_views[table_name].report_links
@@ -2013,8 +2141,8 @@ def _records_keyboard(table_name, keyboard, message: Message):
                 )
             )
 
-        # if len(extra_buttons):
-        #     keyboard.append(extra_buttons)
+        if len(extra_buttons):
+            keyboard.append(extra_buttons)
     return keyboard
 
 
@@ -2037,14 +2165,14 @@ def _records_handle_pagination(table_name, update: Update, data: str):
         if pagination.offset < pagination.total - pagination.limit:
             options_changed = True
             pagination.offset = min(
-                pagination.offset + pagination.limit,
-                pagination.total,
-                pagination.total - pagination.limit,
+                pagination.offset + pagination.limit, pagination.total
             )
     elif data == "_PAGE_FASTFORWARD":
-        if pagination.offset < pagination.total - pagination.limit:
+        if pagination.offset < pagination.total:
             options_changed = True
-            pagination.offset = pagination.total - pagination.limit
+            pagination.offset = (
+                math.floor(pagination.total / pagination.limit) * pagination.limit
+            )
     elif data == "_CLEAR_SEARCH":
         options_changed = True
         pagination.offset = 0
@@ -2122,6 +2250,42 @@ def _records_handle_typed(
             "",
             False,
         )
+
+
+def _input_value_text(column):
+    actions = []
+    if column["type"] != "data":
+        actions.append(translate("_INPUT_VALUE_ACTION_enter"))
+    if (
+        ("request_frequent_data" in column and column["request_frequent_data"])
+        or column["type"] == "select"
+        or column["type"] == "data"
+        or column["type"] == "date"
+        or column["type"] == "timestamp"
+        or column["type"] == "year_month"
+    ):
+        actions.append(translate("_INPUT_VALUE_ACTION_select"))
+    if "skippable" in column and column["skippable"]:
+        actions.append(translate("_INPUT_VALUE_ACTION_skip"))
+
+    if column["type"] == "text":
+        column_type = "text"
+    elif column["type"] == "boolean":
+        column_type = "boolean"
+    elif column["type"] == "select":
+        column_type = "select"
+    elif column["type"] == "data":
+        column_type = "data"
+    elif (
+        column["type"] == "date"
+        or column["type"] == "timestamp"
+        or column["type"] == "year_month"
+    ):
+        column_type = "date"
+    else:
+        column_type = "value"
+
+    return "/".join(actions) + " " + translate("_INPUT_VALUE_TYPE_" + column_type)
 
 
 def revalidate_search_cache():

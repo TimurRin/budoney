@@ -2132,14 +2132,14 @@ def _records_keyboard(table_name, keyboard, message: Message):
             # ),
         ]
 
-        report_links = database_views[table_name].report_links
-        if report_links and len(report_links) > 0:
-            extra_buttons.append(
-                InlineKeyboardButton(
-                    f"📊 Overlays ({len(report_links)})",
-                    callback_data="_REPORT_LAYERS",
-                )
-            )
+        # report_links = database_views[table_name].report_links
+        # if report_links and len(report_links) > 0:
+        #     extra_buttons.append(
+        #         InlineKeyboardButton(
+        #             f"📊 Overlays ({len(report_links)})",
+        #             callback_data="_REPORT_LAYERS",
+        #         )
+        #     )
 
         if len(extra_buttons):
             keyboard.append(extra_buttons)

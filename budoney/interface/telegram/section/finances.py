@@ -2,7 +2,7 @@ from typing import Any
 from datetime import datetime
 from utils.simple_math import calculate
 from database import DATABASE_DRIVER
-import configs
+from loc import translate
 from interface.telegram.classes import (
     DatabaseLinkedReport,
     DatabaseReport,
@@ -149,7 +149,7 @@ def _sub_method_inline_display(record, account_prefix="", payment_card_prefix=""
     if f"{account_prefix}type" in record and record[f"{account_prefix}type"] == "CASH":
         financial_account.append("💵")
         financial_account.append(
-            localization["states"].get(f"SELECT_account_type_CASH", "CASH")
+            translate("SELECT_account_type_CASH")
         )
 
     if record.get(f"{account_prefix}credit_limit", 0) > 0:
@@ -208,7 +208,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
 
     if not len(financial_account):
         financial_account.append(
-            localization["states"].get(f"SELECT_account_type_CASH", "CASH")
+            translate("SELECT_account_type_CASH")
         )
 
     if record.get(f"{account_prefix}credit_limit", 0) > 0:

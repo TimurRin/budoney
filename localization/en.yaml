@@ -1,94 +1,205 @@
-states:
-  {
-    _WIP: "🏗 Work in progress",
-    main: "🌝 Main page",
-    tasks_current_ADD: "✍️🗒 Add task",
-    expenses_ADD: "✍️💸 Add expense",
-    transaction: "💸 Transaction",
-    task_current: "🗒 Task",
-    finances: "💸 Finances",
-    tasks: "🗒 Tasks",
-    reminders: "⏰ Reminders",
-    utilities: "🚰 Utilities",
-    clothes: "👚 Clothes",
-    storage: "📦 Storage",
-    health: "🏥 Health",
-    food: "🥘 Food",
-    plants: "🪴 Plants",
-    people: "👫 People",
-    people_PARAM_name: "Name",
-    people_PARAM_emoji: "Emoji",
-    financial_categories: "🏷 Financial categories",
-    financial_categories_PARAM_name: "Name",
-    financial_categories_PARAM_emoji: "Emoji",
-    income: "📈 Income",
-    income_PARAM_date: "Date",
-    income_PARAM_currency: "Currency",
-    income_PARAM_sum: "Sum",
-    income_PARAM_financial_account: "account",
-    income_PARAM_payment_card: "Card",
-    income_PARAM_organization: "Organization",
-    income_PARAM_description: "Description",
-    expenses: "📉 Expenses",
-    expenses_PARAM_date: "Date",
-    expenses_PARAM_currency: "Currency",
-    expenses_PARAM_sum: "Sum",
-    expenses_PARAM_financial_account: "Account",
-    expenses_PARAM_payment_card: "Card",
-    expenses_PARAM_organization: "Organization",
-    expenses_PARAM_description: "Description",
-    transfers: "🔄 Transfers",
-    transfers_PARAM_date: "Date",
-    transfers_PARAM_currency_source: "Source currency",
-    transfers_PARAM_sum_source: "Source sum",
-    transfers_PARAM_account_source: "Source account",
-    transfers_PARAM_currency_target: "Target currency",
-    transfers_PARAM_sum_target: "Target sum",
-    transfers_PARAM_account_target: "Target account",
-    transfers_PARAM_comission: "Comission",
-    transfers_PARAM_description: "Description",
-    financial_accounts: "🏦 Financial accounts",
-    financial_accounts_PARAM_name: "Name",
-    financial_accounts_PARAM_number: "Number",
-    financial_accounts_PARAM_operator: "Operator",
-    financial_accounts_PARAM_type: "Type",
-    financial_accounts_PARAM_currency: "Currency",
-    financial_accounts_PARAM_credit_limit: "Credit limit",
-    financial_accounts_PARAM_owner: "Owner",
-    financial_accounts_SELECT_type_BANK: "Bank Account",
-    financial_accounts_SELECT_type_SIM: "SIM Account",
-    payment_cards: "💳 Payment cards",
-    payment_cards_PARAM_number: "Number",
-    payment_cards_PARAM_financial_account: "Account",
-    payment_cards_PARAM_payment_system: "Payment system",
-    organizations: "🏬 Organizations",
-    organizations_PARAM_name: "Name",
-    organizations_PARAM_keywords: "Keywords",
-    organizations_PARAM_category: "Category",
-    organizations_PARAM_emoji: "Emoji",
-    categories: "🏷 Categories",
-    currencies: "💱 Currencies",
-    currencies_PARAM_name: "Name",
-    currencies_PARAM_code: "Code (ISO 4217)",
-    currencies_PARAM_emoji: "Emoji",
-    pills: "💊 Pills",
-    diseases: "🤧🦠 Diseases",
-    body_temperature: "🤒 Temperature",
-    tasks_current: "🗒 Current tasks",
-    tasks_recurring: "🔁 Recurring tasks",
-    SELECT_account_type_CASH: "Cash",
-    SELECT_account_type_BANK: "Bank account",
-    _HEADER_RECORDS: "🗄 List",
-    _HEADER_NEW: "🆕 New",
-    _HEADER_EDIT: "✏️ Edit",
-    _HEADER_FAST_TYPE: "🏃 Fast type",
-    _BACK: "⬅️ Back",
-    _RECORDS: "🗄 See all",
-    _ADD: "🆕 Add",
-    _EDIT: "✏️ Edit",
-    _REMOVE: "🗑 Remove",
-    _NEXT: "➡️ Next",
-    _SKIP: "➡️ Skip",
-    _CANCEL: "❌ Cancel",
-    _SUBMIT: "✅ Submit",
-  }
+SELECT_account_type_BANK: Bank account
+SELECT_account_type_CASH: Cash
+SELECT_account_type_OTHER: Other account
+_ADD: 🆕 Add
+_BACK: ⬅️ Back
+_CANCEL: ❌ Cancel
+_CLEAR_FILTERS: ❌🎛 Clear filters
+_CLEAR_SEARCH: ❌🔍 Clear search
+_DATE_WRONG: Wrong date format. Use
+_EDIT: ✏️ Edit
+_FAST_TYPE: Enter data in the format below or select input type
+_FAST_TYPE_ALL: Step-by-step
+_FAST_TYPE_NONE: Edit
+_FAST_TYPE_REQUIRED: Required
+_FILTER_BY: Filter by
+_GET_YOUR_COPY: Visit link below to get your own Budoney copy
+_GO_TO: Go to
+_HEADER_EDIT: ✏️ Edit
+_HEADER_FAST_TYPE: 🏃 Fast type
+_HEADER_NEW: 🆕 New
+_HEADER_RECORDS: 🗄 List
+_HOME: 🏠 Home
+_HOWDY: 🤠 Howdy!
+_HOWDY_2: Welcome to Budoney 🤗
+_INPUT_VALUE_ACTION_enter: enter
+_INPUT_VALUE_ACTION_select: select
+_INPUT_VALUE_ACTION_skip: skip
+_INPUT_VALUE_TYPE_boolean: true or false
+_INPUT_VALUE_TYPE_data: instance
+_INPUT_VALUE_TYPE_date: date
+_INPUT_VALUE_TYPE_select: option
+_INPUT_VALUE_TYPE_text: text
+_INPUT_VALUE_TYPE_value: value
+_NEXT: ➡️ Next
+_NO_GROUPS: 👋 Howdy! You can use Budoney only as a bot chat
+_NO_STATE: State doesn't exist
+_OPERATION_CANCELLED: Operation has been cancelled
+_PRIVATE: 👋 Howdy! This is a private Budoney instance
+_RECORD: Record
+_RECORDS: 🗄 See all
+_RECORDS_FILTERS: 🎛 Filters
+_RECORDS_SORT: 🔢 Sort
+_RECORD_ADDED: Record has been added
+_RECORD_DISPLAY: Records
+_RECORD_NO_DISPLAY: No records
+_RECORD_PARAM_ADDED: Added
+_RECORD_PARAM_CLEARED: Deleted
+_RECORD_PARAM_SKIPPED: Skipping
+_REMOVE: 🗑 Remove
+_SKIP: ➡️ Skip
+_START: Use /start command to start Budoney
+_SUBMIT: ✅ Submit
+_TODAY: Today
+_WIP: 🏗 Work in progress
+aggregation: ♾ Aggregation
+blood_pressure_diary: 🤕 Blood pressure
+blood_pressure_diary_PARAM_date_occurred: Measurement date
+blood_pressure_diary_PARAM_diastolic: Diastolic
+blood_pressure_diary_PARAM_notes: Notes
+blood_pressure_diary_PARAM_patient: Patient
+blood_pressure_diary_PARAM_systolic: Systolic
+body_temperature_diary: 🤒 Temperature
+body_temperature_diary_PARAM_date_occurred: Measurement date
+body_temperature_diary_PARAM_degrees: Degrees
+body_temperature_diary_PARAM_notes: Notes
+body_temperature_diary_PARAM_patient: Patient
+categories: 🏷 Categories
+clothes: 👚 Clothes
+currencies: 💱 Currencies
+currencies_PARAM_code: Code (ISO 4217)
+currencies_PARAM_emoji: Emoji
+currencies_PARAM_name: Name
+expenses: 📉 Expenses
+expenses_ADD: ✍️💸 Add expense
+expenses_PARAM_date: Date
+expenses_PARAM_description: Description
+expenses_PARAM_financial_account: Account
+expenses_PARAM_organization: Organization
+expenses_PARAM_payment_card: Card
+expenses_PARAM_proxy: Proxy
+expenses_PARAM_sum: Sum
+finances: 💸 Finances
+financial_accounts: 🏦 Financial accounts
+financial_accounts_PARAM_credit_limit: Credit limit
+financial_accounts_PARAM_currency: Currency
+financial_accounts_PARAM_name: Name
+financial_accounts_PARAM_number: Number
+financial_accounts_PARAM_operator: Operator
+financial_accounts_PARAM_owner: Owner
+financial_accounts_PARAM_type: Type
+financial_categories: 🏷 Financial categories
+financial_categories_PARAM_emoji: Emoji
+financial_categories_PARAM_name: Name
+food: 🥘 Food
+glucose_level_diary: 🩸 Glucose
+glucose_level_diary_PARAM_date_occurred: Measurement date
+glucose_level_diary_PARAM_level: Level
+glucose_level_diary_PARAM_notes: Notes
+glucose_level_diary_PARAM_patient: Patient
+health: 🏥 Health
+income: 📈 Income
+income_ADD: 💸📈 New income
+income_PARAM_date: Date
+income_PARAM_description: Description
+income_PARAM_financial_account: Account
+income_PARAM_organization: Organization
+income_PARAM_proxy: Proxy
+income_PARAM_sum: Sum
+loan_payments: Loan payments
+loan_payments_PARAM_credit: Loan
+loan_payments_PARAM_date: Payment date
+loan_payments_PARAM_financial_account: Account
+loan_payments_PARAM_notes: Notes
+loan_payments_PARAM_sum: Sum
+loan_payments_PARAM_sum_interest: Interest
+loans: Loans
+loans_PARAM_date_end: Loan termination
+loans_PARAM_date_start: Loan taken
+loans_PARAM_financial_account: Account
+loans_PARAM_interest: Interest
+loans_PARAM_issuer: Issuer
+loans_PARAM_notes: Notes
+loans_PARAM_paid: Paid
+loans_PARAM_sum: Sum
+main: 🌝 Main page
+organizations: 🏬 Organizations
+organizations_PARAM_category: Category
+organizations_PARAM_emoji: Emoji
+organizations_PARAM_keywords: Keywords
+organizations_PARAM_name: Name
+payment_cards: 💳 Payment cards
+payment_cards_PARAM_financial_account: Account
+payment_cards_PARAM_number: Number
+payment_cards_PARAM_payment_system: Payment system
+people: 👫 People
+people_PARAM_emoji: Emoji
+people_PARAM_name: Name
+pills: 💊 Pills
+pills_PARAM_brand: Brand
+pills_PARAM_dosage_type: Dosage type
+pills_PARAM_name: Name
+pills_diary: 💊🕐 Pills diary
+pills_diary_PARAM_date_taken: Date taken
+pills_diary_PARAM_dose: Dose
+pills_diary_PARAM_notes: Notes
+pills_diary_PARAM_patient: Patient
+pills_diary_PARAM_pill: Pill
+plant_lots: Plant lots
+plant_lots_PARAM_task: Task
+plant_registry: Plant registry
+plant_replants: Plant replants
+plant_species: Plant species
+plant_stages: Plant stages
+plants: 🪴 Plants
+pulse_diary: ⚡️ Pulse
+pulse_diary_PARAM_beats: Beats per minute
+pulse_diary_PARAM_date_occurred: Measurement date
+pulse_diary_PARAM_notes: Notes
+pulse_diary_PARAM_patient: Patient
+reminders: ⏰ Reminders
+settings: ⚙️ Settings
+settings_ACTION_revalidate_search: 🔄🔍 Revalidate search
+statistics: 📊 Statistics
+storage: 📦 Storage
+symptoms_diary: 🤧 Symptoms
+symptoms_diary_PARAM_date_occurred: Record date
+symptoms_diary_PARAM_factors: Factors
+symptoms_diary_PARAM_feelings: Feelings
+symptoms_diary_PARAM_patient: Patient
+tasks: 🗒 Tasks
+tasks_current: 🗒 Current tasks
+tasks_current_ACTION_delete: Delete
+tasks_current_ACTION_done: Mark as complete
+tasks_current_ADD: 🗒 New task
+tasks_current_PARAM_category: Category
+tasks_current_PARAM_date_completed: Date completed
+tasks_current_PARAM_date_created: Date created
+tasks_current_PARAM_date_due: Due date
+tasks_current_PARAM_important: Important
+tasks_current_PARAM_name: Name
+tasks_current_PARAM_recurring: Recurring
+tasks_recurring: 🔁 Recurring tasks
+tasks_recurring_PARAM_category: Category
+tasks_recurring_PARAM_important: Important
+tasks_recurring_PARAM_name: Name
+tasks_recurring_PARAM_paused: Paused
+tasks_recurring_PARAM_rest_days: Rest days
+tasks_recurring_PARAM_urgent: Urgent
+tasks_recurring_PARAM_weekdays: Weekdays
+tasks_recurring_PARAM_work_days: Work days
+transfers: 🔄 Transfers
+transfers_ADD: 💸🔄 New transfer
+transfers_PARAM_account_source: Source account
+transfers_PARAM_account_target: Target account
+transfers_PARAM_comission: Comission
+transfers_PARAM_date: Date
+transfers_PARAM_description: Description
+transfers_PARAM_sum_source: Source sum
+transfers_PARAM_sum_target: Target sum
+utilities: 🚰 Utilities
+weight_diary: 🍞 Weight
+weight_diary_PARAM_date_occurred: Measurement date
+weight_diary_PARAM_notes: Notes
+weight_diary_PARAM_patient: Patient
+weight_diary_PARAM_weight: Weight

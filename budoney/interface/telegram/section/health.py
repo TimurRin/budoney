@@ -124,6 +124,10 @@ def _display_inline_blood_pressure_diary(record):
         + " mmHg"
     )
 
+    if "systolic" in record and record["systolic"] and "diastolic" in record and record["diastolic"]:
+        text_parts.append("—")
+        text_parts.append("diff " + str(record["systolic"] - record["diastolic"]))
+
     text_parts.append("—")
 
     if f"owner__emoji" in record and record[f"patient__emoji"]:

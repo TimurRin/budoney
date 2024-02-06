@@ -7,6 +7,7 @@ def init():
         [
             ["transfers_ADD", "tasks_current_ADD"],
             ["income_ADD", "expenses_ADD"],
+            ["blood_pressure_diary_ADD", "pills_diary_ADD"],
             [
                 "tasks",
                 "finances",

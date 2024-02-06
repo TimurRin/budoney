@@ -54,6 +54,7 @@ _TODAY: Сегодня
 _WIP: 🏗 В разработке
 aggregation: ♾ Агрегация
 blood_pressure_diary: 🤕 Давление
+blood_pressure_diary_ADD: ✍️🏥🤕 +Арт. давл.
 blood_pressure_diary_PARAM_date_occurred: Дата измерения
 blood_pressure_diary_PARAM_diastolic: Диастолическое
 blood_pressure_diary_PARAM_notes: Заметки
@@ -71,7 +72,7 @@ currencies_PARAM_code: Код (ISO 4217)
 currencies_PARAM_emoji: Эмодзи
 currencies_PARAM_name: Название
 expenses: 📉 Расходы
-expenses_ADD: 💸📉 Новый расход
+expenses_ADD: ✍️💸📉 +Расход
 expenses_PARAM_date: Дата
 expenses_PARAM_description: Описание
 expenses_PARAM_financial_account: Счёт
@@ -99,7 +100,7 @@ glucose_level_diary_PARAM_notes: Заметки
 glucose_level_diary_PARAM_patient: Пациент
 health: 🏥 Здоровье
 income: 📈 Доходы
-income_ADD: 💸📈 Новый доход
+income_ADD: ✍️💸📈 +Доход
 income_PARAM_date: Дата
 income_PARAM_description: Описание
 income_PARAM_financial_account: Счёт
@@ -140,6 +141,7 @@ pills_PARAM_brand: Бренд
 pills_PARAM_dosage_type: Единица дозировка
 pills_PARAM_name: Название
 pills_diary: 💊🕐 Приём лекарств
+pills_diary_ADD: ✍️🏥💊🕐 +Приём лекарства
 pills_diary_PARAM_date_taken: Дата принятия
 pills_diary_PARAM_dose: Дозировка
 pills_diary_PARAM_notes: Заметки
@@ -171,7 +173,7 @@ tasks: 🗒 Задачи
 tasks_current: 🗒 Текущие задачи
 tasks_current_ACTION_delete: Удалить
 tasks_current_ACTION_done: Отметить сделанным
-tasks_current_ADD: 🗒 Новая задача
+tasks_current_ADD: ✍️🗒 +Задача
 tasks_current_PARAM_category: Категория
 tasks_current_PARAM_date_completed: Дата выполнения
 tasks_current_PARAM_date_created: Дата создания
@@ -189,7 +191,7 @@ tasks_recurring_PARAM_urgent: Срочность
 tasks_recurring_PARAM_weekdays: Дни недели
 tasks_recurring_PARAM_work_days: Дни исполнения
 transfers: 🔄 Трансферы
-transfers_ADD: 💸🔄 Новый трансфер
+transfers_ADD: ✍️💸🔄 +Трансфер
 transfers_PARAM_account_source: Счёт отправки
 transfers_PARAM_account_target: Счёт получения
 transfers_PARAM_comission: Комиссия

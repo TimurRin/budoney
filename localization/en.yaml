@@ -54,6 +54,7 @@ _TODAY: Today
 _WIP: 🏗 Work in progress
 aggregation: ♾ Aggregation
 blood_pressure_diary: 🤕 Blood pressure
+blood_pressure_diary_ADD: ✍️🏥🤕 +Blood pressure
 blood_pressure_diary_PARAM_date_occurred: Measurement date
 blood_pressure_diary_PARAM_diastolic: Diastolic
 blood_pressure_diary_PARAM_notes: Notes
@@ -71,7 +72,7 @@ currencies_PARAM_code: Code (ISO 4217)
 currencies_PARAM_emoji: Emoji
 currencies_PARAM_name: Name
 expenses: 📉 Expenses
-expenses_ADD: ✍️💸 Add expense
+expenses_ADD: ✍️💸📉 +Expense
 expenses_PARAM_date: Date
 expenses_PARAM_description: Description
 expenses_PARAM_financial_account: Account
@@ -99,7 +100,7 @@ glucose_level_diary_PARAM_notes: Notes
 glucose_level_diary_PARAM_patient: Patient
 health: 🏥 Health
 income: 📈 Income
-income_ADD: 💸📈 New income
+income_ADD: ✍️💸📈 +Income
 income_PARAM_date: Date
 income_PARAM_description: Description
 income_PARAM_financial_account: Account
@@ -140,6 +141,7 @@ pills_PARAM_brand: Brand
 pills_PARAM_dosage_type: Dosage type
 pills_PARAM_name: Name
 pills_diary: 💊🕐 Pills diary
+pills_diary_ADD: ✍️🏥💊🕐 +Pill intake
 pills_diary_PARAM_date_taken: Date taken
 pills_diary_PARAM_dose: Dose
 pills_diary_PARAM_notes: Notes
@@ -171,7 +173,7 @@ tasks: 🗒 Tasks
 tasks_current: 🗒 Current tasks
 tasks_current_ACTION_delete: Delete
 tasks_current_ACTION_done: Mark as complete
-tasks_current_ADD: 🗒 New task
+tasks_current_ADD: ✍️🗒 +Task
 tasks_current_PARAM_category: Category
 tasks_current_PARAM_date_completed: Date completed
 tasks_current_PARAM_date_created: Date created
@@ -189,7 +191,7 @@ tasks_recurring_PARAM_urgent: Urgent
 tasks_recurring_PARAM_weekdays: Weekdays
 tasks_recurring_PARAM_work_days: Work days
 transfers: 🔄 Transfers
-transfers_ADD: 💸🔄 New transfer
+transfers_ADD: ✍️💸🔄 +Transfer
 transfers_PARAM_account_source: Source account
 transfers_PARAM_account_target: Target account
 transfers_PARAM_comission: Comission

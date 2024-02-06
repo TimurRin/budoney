@@ -253,7 +253,7 @@ def _db_transactions_inline_display(record):
 
     if "date" in record and record["date"]:
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date"], limit=30)
+            date_utils.get_relative_timestamp_text(record["date"], limit=-1)
         )
         text_parts.append("—")
 
@@ -432,7 +432,7 @@ def _db_transfers_inline_display(record):
 
     if "date" in record and record["date"]:
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date"], limit=30)
+            date_utils.get_relative_timestamp_text(record["date"], limit=-1)
         )
         text_parts.append("—")
 
@@ -551,7 +551,7 @@ def _db_loans_inline_display(record):
     if "date_end" in record and record["date_end"]:
         text_parts.append("—")
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date_end"], limit=30)
+            date_utils.get_relative_timestamp_text(record["date_end"], limit=-1)
         )
 
     return " ".join(text_parts)
@@ -591,7 +591,7 @@ def _db_loan_payments_inline_display(record):
 
     if "date" in record and record["date"]:
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date"], limit=30)
+            date_utils.get_relative_timestamp_text(record["date"], limit=-1)
         )
         text_parts.append("—")
 

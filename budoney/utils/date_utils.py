@@ -15,14 +15,14 @@ def get_relative_date_text(date: datetime, today=None, limit=None):
     if not today:
         today = get_today_midnight()
     days_ago = (today - date).days
-    if days_ago == 0:
+    if limit and abs(days_ago) > limit:
+        return date.strftime("%Y-%m-%d")
+    elif days_ago == 0:
         return "today"
     elif days_ago == 1:
         return "yesterday"
     elif days_ago == -1:
         return "tomorrow"
-    elif limit and abs(days_ago) > limit:
-        return date.strftime("%Y-%m-%d")
     elif days_ago < 0:
         return f"in {abs(days_ago)}d"
     else:

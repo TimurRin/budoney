@@ -1,9 +1,12 @@
+from typing import Any
 from interface.telegram.classes import (
     DatabaseView,
     DefaultView,
+    DatabaseReport,
 )
 from datetime import datetime
 import utils.date_utils as date_utils
+
 
 def _display_inline_pills(record):
     text_parts = []
@@ -17,6 +20,7 @@ def _display_inline_pills(record):
     # if f"intake_hours" in record and len(record[f"intake_hours"]):
     #     text_parts.append(len(record[f"intake_hours"]))
     return " ".join(text_parts)
+
 
 def _display_inline_pills_diary(record):
     text_parts = []
@@ -34,7 +38,9 @@ def _display_inline_pills_diary(record):
     else:
         text_parts.append(record.get("pill__name", "Unknown pill"))
 
-    text_parts.append(f"({str(record.get('dose', '???'))} {str(record.get('pill__dosage_type', 'smth'))})")
+    text_parts.append(
+        f"({str(record.get('dose', '???'))} {str(record.get('pill__dosage_type', 'smth'))})"
+    )
 
     text_parts.append("—")
 
@@ -128,7 +134,12 @@ def _display_inline_blood_pressure_diary(record):
         + " mmHg"
     )
 
-    if "systolic" in record and record["systolic"] and "diastolic" in record and record["diastolic"]:
+    if (
+        "systolic" in record
+        and record["systolic"]
+        and "diastolic" in record
+        and record["diastolic"]
+    ):
         text_parts.append("—")
         text_parts.append("diff " + str(record["systolic"] - record["diastolic"]))
 
@@ -139,6 +150,17 @@ def _display_inline_blood_pressure_diary(record):
     text_parts.append(str(record.get("patient__name", "???")))
 
     return " ".join(text_parts)
+
+
+def _db_blood_pressure_diary_report_local_display(data: list[dict[str, Any]]) -> str:
+    if not data:
+        return ""
+    lines = ["Average <b>blood pressure</b> in this query:"]
+    for row in data:
+        lines.append(
+            f"{row['patient__name']}: {int(row['avg_sys'])}/{int(row['avg_dia'])} mmHg"
+        )
+    return "\n".join(lines)
 
 
 def _display_inline_pulse_diary(record):
@@ -380,6 +402,20 @@ def init():
         order_by=[
             ("date_occurred", True, None),
         ],
+        report=DatabaseReport(
+            select=[
+                ("patient__name", None),
+                ("avg_sys", "ROUND(AVG(systolic))"),
+                ("avg_dia", "ROUND(AVG(diastolic))")
+            ],
+            group_by=["patient"],
+            order_by=[
+                ("avg_sys", True, None),
+            ],
+            local_display=_db_blood_pressure_diary_report_local_display,
+            foreign_display=_db_blood_pressure_diary_report_local_display,
+            layer_display=lambda x: x,
+        ),
     )
     DatabaseView(
         "pulse_diary",

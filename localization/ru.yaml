@@ -82,6 +82,7 @@ expenses_PARAM_proxy: Прокси
 expenses_PARAM_sum: Сумма
 finances: 💸 Финансы
 financial_accounts: 🏦 Счета
+financial_accounts_PARAM_correction: Коррекция
 financial_accounts_PARAM_credit_limit: Кредитный лимит
 financial_accounts_PARAM_currency: Валюта
 financial_accounts_PARAM_name: Название

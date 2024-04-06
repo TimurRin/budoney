@@ -82,6 +82,7 @@ expenses_PARAM_proxy: Proxy
 expenses_PARAM_sum: Sum
 finances: 💸 Finances
 financial_accounts: 🏦 Financial accounts
+financial_accounts_PARAM_correction: Correction
 financial_accounts_PARAM_credit_limit: Credit limit
 financial_accounts_PARAM_currency: Currency
 financial_accounts_PARAM_name: Name
@@ -194,7 +195,7 @@ transfers: 🔄 Transfers
 transfers_ADD: ✍️💸🔄 +Transfer
 transfers_PARAM_account_source: Source account
 transfers_PARAM_account_target: Target account
-transfers_PARAM_comission: Comission
+transfers_PARAM_comission: Commission
 transfers_PARAM_date: Date
 transfers_PARAM_description: Description
 transfers_PARAM_sum_source: Source sum

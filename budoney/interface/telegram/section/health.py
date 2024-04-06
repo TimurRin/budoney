@@ -8,7 +8,7 @@ from datetime import datetime
 import utils.date_utils as date_utils
 
 
-def _display_inline_pills(record):
+def _display_inline_pills(record, telegram_user):
     text_parts = []
 
     text_parts.append(str(record.get("name", "???")))
@@ -22,7 +22,7 @@ def _display_inline_pills(record):
     return " ".join(text_parts)
 
 
-def _display_inline_pills_diary(record):
+def _display_inline_pills_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -51,7 +51,7 @@ def _display_inline_pills_diary(record):
     return " ".join(text_parts)
 
 
-def _display_inline_symptoms_diary(record):
+def _display_inline_symptoms_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -73,7 +73,7 @@ def _display_inline_symptoms_diary(record):
     return " ".join(text_parts)
 
 
-def _display_inline_glucose_diary(record):
+def _display_inline_glucose_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -95,7 +95,7 @@ def _display_inline_glucose_diary(record):
     return " ".join(text_parts)
 
 
-def _display_inline_body_temperature_diary(record):
+def _display_inline_body_temperature_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -117,7 +117,7 @@ def _display_inline_body_temperature_diary(record):
     return " ".join(text_parts)
 
 
-def _display_inline_blood_pressure_diary(record):
+def _display_inline_blood_pressure_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -163,7 +163,7 @@ def _db_blood_pressure_diary_report_local_display(data: list[dict[str, Any]]) ->
     return "\n".join(lines)
 
 
-def _display_inline_pulse_diary(record):
+def _display_inline_pulse_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -185,7 +185,7 @@ def _display_inline_pulse_diary(record):
     return " ".join(text_parts)
 
 
-def _display_inline_weight_diary(record):
+def _display_inline_weight_diary(record, telegram_user):
     text_parts = []
 
     text_parts.append(

@@ -6,6 +6,9 @@ class Database:
     def __init__(self):
         pass
 
+    def post_load(self):
+        pass
+
     @abc.abstractmethod
     def get_records_query(
         self,

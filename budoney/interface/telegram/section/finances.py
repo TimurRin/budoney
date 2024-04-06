@@ -248,7 +248,7 @@ def _sub_date_extended_display(record, key="date"):
         return " ".join(date_line)
 
 
-def _db_transactions_inline_display(record):
+def _db_transactions_inline_display(record, telegram_user):
     text_parts = []
 
     if "date" in record and record["date"]:
@@ -289,7 +289,7 @@ def _db_transactions_inline_display(record):
     return " ".join(text_parts)
 
 
-def _db_income_extended_display(record):
+def _db_income_extended_display(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -331,7 +331,7 @@ def _db_income_report_foreign_display(data: list[dict[str, Any]]) -> str:
     return _db_income_report_display("<b>Income</b> this month:", data)
 
 
-def _db_expenses_extended_display(record):
+def _db_expenses_extended_display(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -427,7 +427,7 @@ def _db_expenses_report_foreign_display(data: list[dict[str, Any]]) -> str:
     return _db_expenses_report_display("<b>Expenses</b> this month:", data)
 
 
-def _db_transfers_inline_display(record):
+def _db_transfers_inline_display(record, telegram_user):
     text_parts = []
 
     if "date" in record and record["date"]:
@@ -477,7 +477,7 @@ def _db_transfers_inline_display(record):
     return " ".join(text_parts)
 
 
-def _db_transfers_extended_display(record):
+def _db_transfers_extended_display(record, telegram_user):
     text_parts = []
 
     text_parts.append(f"<b><u>TRANSFER</u></b>")
@@ -526,7 +526,7 @@ def _db_transfers_extended_display(record):
     return "\n".join(text_parts)
 
 
-def _db_loans_inline_display(record):
+def _db_loans_inline_display(record, telegram_user):
     text_parts = []
 
     if "issuer__emoji" in record and record["issuer__emoji"]:
@@ -557,7 +557,7 @@ def _db_loans_inline_display(record):
     return " ".join(text_parts)
 
 
-def _db_loans_extended_display(record):
+def _db_loans_extended_display(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -586,7 +586,7 @@ def _db_loans_extended_display(record):
     return "\n".join(text_parts)
 
 
-def _db_loan_payments_inline_display(record):
+def _db_loan_payments_inline_display(record, telegram_user):
     text_parts = []
 
     if "date" in record and record["date"]:
@@ -612,7 +612,7 @@ def _db_loan_payments_inline_display(record):
     return " ".join(text_parts)
 
 
-def _db_loan_payments_extended_display(record):
+def _db_loan_payments_extended_display(record, telegram_user):
     text_parts = []
 
     text_parts.append(
@@ -651,7 +651,7 @@ def _db_loan_payments_extended_display(record):
     return "\n".join(text_parts)
 
 
-def _db_financial_accounts_inline_display(record):
+def _db_financial_accounts_inline_display(record, telegram_user):
     text_parts = []
 
     name = "name" in record and record["name"]
@@ -691,7 +691,7 @@ def _db_financial_accounts_inline_display(record):
     return " ".join(text_parts)
 
 
-def _db_payment_cards_inline_display(record):
+def _db_payment_cards_inline_display(record, telegram_user):
     text_parts = []
 
     if (
@@ -766,7 +766,7 @@ def init():
             {"column": "code", "type": "text"},
             {"column": "emoji", "type": "text"},
         ],
-        inline_display=lambda record: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
+        inline_display=lambda record, telegram_user: f"{record.get('emoji', '') or ''}{record.get('code', '???')}: {record.get('name', 'Unnamed currency')}",
         report_links=[
             DatabaseLinkedReport("income", "financial_account__currency"),
             DatabaseLinkedReport("expenses", "financial_account__currency"),
@@ -1005,7 +1005,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        inline_display=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
+        inline_display=lambda record, telegram_user: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed category')}",
         order_by=[("name", False, None)],
         report_links=[
             DatabaseLinkedReport("income", "organization__category"),

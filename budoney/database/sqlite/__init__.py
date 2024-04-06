@@ -1,9 +1,11 @@
+import os
 import sqlite3
 import threading
 from typing import Any
 from datetime import datetime
 from database.classes import Database
 from utils.transliterate import russian_to_latin
+import utils.yaml_manager as yaml_manager
 
 print_label: str = "[budoney :: Database :: SQLite]"
 
@@ -13,6 +15,8 @@ class SQLiteDatabase(Database):
         "text": "TEXT",
         "array": "TEXT",
         "dict_boolean": "TEXT",
+        "map": "TEXT",
+        "url": "TEXT",
         "int": "INTEGER",
         "boolean": "INTEGER",
         "float": "REAL",
@@ -20,6 +24,7 @@ class SQLiteDatabase(Database):
         "timestamp": "INTEGER",
         "year_month": "INTEGER",
         "data": "INTEGER",
+        "telegram_id": "INTEGER",
     }
 
     def __init__(self, database_path):
@@ -28,6 +33,17 @@ class SQLiteDatabase(Database):
         self._local = threading.local()
         self._init_connection_and_cursor()
         self._create_technical_tables()
+
+    def post_load(self):
+        print("post_load")
+        if not os.path.exists("data/database_init_done"):
+            tables = yaml_manager.load("data/database_init")
+            for key, value in tables.items():
+                for entry in value:
+                    self.append_data(key, entry, commit=False)
+            self.commit()
+            with open("data/database_init_done", "w"):
+                pass
 
     def _init_connection_and_cursor(self):
         if not hasattr(self._local, "connection"):

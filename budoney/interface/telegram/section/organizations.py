@@ -4,7 +4,7 @@ from interface.telegram.classes import (
 )
 
 
-def _display_inline_organization(record):
+def _display_inline_organization(record, telegram_user):
     text_parts = []
 
     if "category__emoji" in record and record["category__emoji"]:

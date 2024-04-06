@@ -9,18 +9,24 @@ from datetime import datetime
 from dispatcher.telegram import send_info_message
 
 
-def _display_inline_current_task(record):
+def _display_inline_current_task(record, telegram_user):
     text_parts = []
 
     if "date_completed" in record and record["date_completed"]:
         text_parts.append("[☑️")
         text_parts.append(
-            date_utils.get_relative_timestamp_text(record["date_completed"], limit=7) + "]"
+            date_utils.get_relative_timestamp_text(record["date_completed"], limit=7)
+            + "]"
         )
     else:
         if "date_due" in record and record["date_due"]:
             days = date_utils.get_relative_timestamp(record["date_due"])
-            text_parts.append((days < -7 and "🔮") or (days < -3 and "⏳") or (days < 0 and "⌛️") or "⚠️⌛️")
+            text_parts.append(
+                (days < -7 and "🔮")
+                or (days < -3 and "⏳")
+                or (days < 0 and "⌛️")
+                or "⚠️⌛️"
+            )
             text_parts.append(
                 date_utils.get_relative_timestamp_text(record["date_due"])
             )
@@ -41,7 +47,7 @@ def _display_inline_current_task(record):
     return " ".join(text_parts)
 
 
-def _display_inline_scheduled_task(record):
+def _display_inline_scheduled_task(record, telegram_user):
     text_parts = []
 
     paused = "paused" in record and record["paused"]
@@ -76,22 +82,25 @@ def _display_inline_scheduled_task(record):
     return " ".join(text_parts)
 
 
-def _action_conditions_done_current_task(record):
+def _action_conditions_done_current_task(record, telegram_user):
     return "date_completed" not in record or not record["date_completed"]
 
 
-def _action_process_delete_current_task(record):
+def _action_process_delete_current_task(record, telegram_user):
     DATABASE_DRIVER.delete_data("tasks_current", record["id"])
+    return "Task has been deleted", "tasks_current_RECORDS"
 
 
-def _action_process_done_current_task(record):
+def _action_process_done_current_task(record, telegram_user):
     update = {"date_completed": date_utils.get_today_midnight_timestamp()}
     DATABASE_DRIVER.replace_data(
         "tasks_current",
         record["id"],
         update,
     )
-    send_info_message("✅ 🗒 Task completed: " + record["name"])
+    info_message = "✅ 🗒 Task completed: " + record["name"]
+    send_info_message(info_message)
+    return info_message, "tasks_current_RECORDS"
 
 
 def _db_current_task_fast_type_processor(
@@ -170,10 +179,30 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "category", "type": "text", "request_frequent_data": True},
             {"column": "important", "type": "boolean"},
-            {"column": "urgent", "type": "int", "skippable": True, "request_frequent_data": True},
-            {"column": "work_days", "type": "int", "min": 1, "request_frequent_data": True},
-            {"column": "rest_days", "type": "int", "min": 0, "request_frequent_data": True},
-            {"column": "weekdays", "type": "text", "skippable": True, "request_frequent_data": True},
+            {
+                "column": "urgent",
+                "type": "int",
+                "skippable": True,
+                "request_frequent_data": True,
+            },
+            {
+                "column": "work_days",
+                "type": "int",
+                "min": 1,
+                "request_frequent_data": True,
+            },
+            {
+                "column": "rest_days",
+                "type": "int",
+                "min": 0,
+                "request_frequent_data": True,
+            },
+            {
+                "column": "weekdays",
+                "type": "text",
+                "skippable": True,
+                "request_frequent_data": True,
+            },
             {"column": "paused", "type": "boolean", "skippable": True},
         ],
         inline_display=_display_inline_scheduled_task,

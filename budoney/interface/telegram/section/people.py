@@ -11,7 +11,7 @@ def init():
             {"column": "name", "type": "text"},
             {"column": "emoji", "type": "text", "skippable": True},
         ],
-        inline_display=lambda record: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed user')}",
+        inline_display=lambda record, telegram_user: f"{record.get('emoji', '') or ''}{record.get('name', 'Unnamed user')}",
         order_by=[("name", False, None)],
         report_links=[
             DatabaseLinkedReport("income", "financial_account__owner"),

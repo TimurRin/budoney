@@ -1,5 +1,5 @@
 import json
 
-with open("version.json", mode="r", encoding="utf-8") as file:
-    cf_version_data = json.load(file)
-    cf_version = f"{cf_version_data['package']}@{cf_version_data['major']}.{cf_version_data['minor']}.{cf_version_data['patch']}"
+with open("cinnabar.json", mode="r", encoding="utf-8") as file:
+    cinnabar_data = json.load(file)
+    budoney_version = f"{cinnabar_data['name']} v{cinnabar_data['version']['text']}"

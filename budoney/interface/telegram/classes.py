@@ -7,7 +7,7 @@ from loc import translate
 from database import DATABASE_DRIVER
 from dispatcher.telegram import send_info_message
 import utils.date_utils as date_utils
-from utils.version import cf_version
+from utils.version import budoney_version
 from datetime import datetime, timedelta
 import configs
 import math
@@ -552,9 +552,9 @@ class DefaultView(View):
             return (
                 "\n".join(lines)
                 + "\n"
-                + (self.state_name == "main" and cf_version or "")
+                + (self.state_name == "main" and budoney_version or "")
             )
-        return self.state_name == "main" and cf_version or ""
+        return self.state_name == "main" and budoney_version or ""
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         return self._keyboard
@@ -586,9 +586,9 @@ class ConditionalView(View):
             return (
                 "\n".join(lines)
                 + "\n"
-                + (self.state_name == "main" and cf_version or "")
+                + (self.state_name == "main" and budoney_version or "")
             )
-        return self.state_name == "main" and cf_version or ""
+        return self.state_name == "main" and budoney_version or ""
 
     def keyboard(self, message: Message) -> InlineKeyboardMarkup:
         keyboard = []

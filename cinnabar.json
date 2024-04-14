@@ -1,0 +1,14 @@
+{
+  "cinnabarMetaVersion": 1,
+  "description": "A Telegram bot for your household finances, tasks, health and more!",
+  "name": "Budoney",
+  "version": {
+    "dev": 0,
+    "major": 0,
+    "minor": 17,
+    "patch": 0,
+    "revision": 30,
+    "text": "0.17.0",
+    "timestamp": 1707246772
+  }
+}

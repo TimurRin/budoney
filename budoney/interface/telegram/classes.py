@@ -666,8 +666,8 @@ class DatabaseView(View):
         self,
         state_name: str,
         columns: list[dict],
-        inline_display: Callable[[dict[str, Any], TelegramUser], str] | None = None,
-        extended_display: Callable[[dict[str, Any], TelegramUser], str] | None = None,
+        inline_display: Callable[[dict[str, Any], TelegramUser | None], str] | None = None,
+        extended_display: Callable[[dict[str, Any], TelegramUser | None], str] | None = None,
         fast_type: str | None = None,
         fast_type_processor: (
             Callable[
@@ -693,10 +693,10 @@ class DatabaseView(View):
         self.columns = columns
         if not inline_display:
             inline_display = default_display
-        self.inline_display: Callable[[dict[str, Any], TelegramUser], str] = (
+        self.inline_display: Callable[[dict[str, Any], TelegramUser | None], str] = (
             inline_display
         )
-        self.extended_display: Callable[[dict[str, Any], TelegramUser], str] | None = (
+        self.extended_display: Callable[[dict[str, Any], TelegramUser | None], str] | None = (
             extended_display
         )
         self.fast_type: str | None = fast_type

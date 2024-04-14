@@ -148,9 +148,7 @@ def _sub_method_inline_display(record, account_prefix="", payment_card_prefix=""
 
     if f"{account_prefix}type" in record and record[f"{account_prefix}type"] == "CASH":
         financial_account.append("💵")
-        financial_account.append(
-            translate("SELECT_account_type_CASH")
-        )
+        financial_account.append(translate("SELECT_account_type_CASH"))
 
     if record.get(f"{account_prefix}credit_limit", 0) > 0:
         financial_account.append("Credit")
@@ -207,9 +205,7 @@ def _sub_method_extended_display(record, account_prefix="", payment_card_prefix=
         financial_account.append(record[f"{account_prefix}operator__name"])
 
     if not len(financial_account):
-        financial_account.append(
-            translate("SELECT_account_type_CASH")
-        )
+        financial_account.append(translate("SELECT_account_type_CASH"))
 
     if record.get(f"{account_prefix}credit_limit", 0) > 0:
         financial_account.append("Credit")
@@ -524,6 +520,20 @@ def _db_transfers_extended_display(record, telegram_user):
         text_parts.append("🗒 " + record["description"])
 
     return "\n".join(text_parts)
+
+
+def _db_transfers_fast_type_processor(
+    data: str,
+) -> tuple[dict[str, Any], dict[str, tuple[list[str], list[str | int | float]]]]:
+    record: dict[str, Any] = {}
+    record_filters: dict[str, tuple[list[str], list[str | int | float]]] = {}
+
+    splitted_data = data.split(", ")
+    calculated = calculate(splitted_data[0])
+    record["sum_source"] = calculated
+    record["sum_target"] = calculated
+
+    return (record, record_filters)
 
 
 def _db_loans_inline_display(record, telegram_user):
@@ -858,7 +868,7 @@ def init():
         inline_display=_db_transactions_inline_display,
         extended_display=_db_expenses_extended_display,
         fast_type_processor=_db_expenses_fast_type_processor,
-        order_by=[("date", True, None)],
+        order_by=[("date", True, None), ("id", True, None)],
         report=DatabaseReport(
             select=[
                 ("spent", "SUM(sum)-COALESCE(SUM(proxy), 0)"),
@@ -907,6 +917,7 @@ def init():
         order_by=[("date", True, None)],
         inline_display=_db_transfers_inline_display,
         extended_display=_db_transfers_extended_display,
+        fast_type_processor=_db_transfers_fast_type_processor,
     )
     DatabaseView(
         "loans",

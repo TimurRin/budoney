@@ -880,10 +880,11 @@ class RecordView(View):
     def __init__(self, state_name: str, table_name) -> None:
         super().__init__(state_name)
         operational_states[state_name] = self
+        record_views[table_name] = self
         self.table_name = table_name
         self.handle_anything = True
 
-    def generic_extended_display(self, telegram_user: TelegramUser):
+    def generic_extended_display(self, some_dict, telegram_user: TelegramUser):
         output_text = ""
         for column in database_views[self.table_name].columns:
             text = translate(f"{self.table_name}_PARAM_{column['column']}")
@@ -929,7 +930,7 @@ class RecordView(View):
         ed = database_views[self.table_name].extended_display
         return (
             (ed and ed(record, telegram_user))
-            or (self.generic_extended_display(telegram_user))
+            or (self.generic_extended_display({}, telegram_user))
             or str(record.get("id", "?"))
         )
 
@@ -1420,6 +1421,10 @@ class EditRecordView(View):
                         ].records_data[self.table_name],
                         telegram_users[update.callback_query.message.chat.id],
                     )
+                )
+            else:
+                send_info_message(
+                    f"<u><b>{self.table_name.upper()}</b></u>\n\n{record_views[self.table_name].generic_extended_display(telegram_users[update.callback_query.message.chat.id].records_data[self.table_name],telegram_users[update.callback_query.message.chat.id])}"
                 )
 
         for column in database_views[self.table_name].columns:
@@ -2018,6 +2023,7 @@ class EditTimestampRecordValueView(EditDateRecordValueView):
 telegram_users: "dict[Any, TelegramUser]" = {}
 conversation_views: "dict[str, View]" = {}
 database_views: "dict[str, DatabaseView]" = {}
+record_views: "dict[str, RecordView]" = {}
 
 shortcuts = {}
 

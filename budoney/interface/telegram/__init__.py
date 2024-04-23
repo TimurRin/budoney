@@ -1,5 +1,6 @@
 import configs
 from loc import translate
+from dispatcher.telegram import send_info_message
 from interface.telegram.classes import (
     conversation_views,
     telegram_users,
@@ -10,7 +11,6 @@ from interface.telegram.classes import (
     send_unauthorized,
     text_filters,
 )
-
 import interface.telegram.section.main as main_section
 import interface.telegram.section.people as people_section
 import interface.telegram.section.organizations as organizations_section
@@ -40,20 +40,16 @@ def command_start(update: Update, context: CallbackContext):
         telegram_users[update.message.from_user.id] = TelegramUser(
             update.message.from_user.id, update.message.from_user.first_name
         )
-        print(
-            print_label,
-            f"{update.message.from_user.first_name} ({update.message.from_user.id}) has started a new session",
-        )
+        text = f"{update.message.from_user.first_name} ({update.message.from_user.id}) has started a new session"
+        send_info_message(text)
         return conversation_views["main"].state(
             update.message,
             f"{translate('_HOWDY')}, {update.message.from_user.first_name}! {translate('_HOWDY_2')}",
             False,
         )
     elif update.message.chat.type != "private":
-        print(
-            print_label,
-            f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are using {update.message.chat.type} ID {update.message.chat.id} to do so",
-        )
+        text = f"{update.message.from_user.first_name} ({update.message.from_user.id}) has tried to start a session, but they are using {update.message.chat.type} ID {update.message.chat.id} to do so"
+        send_info_message(text)
         if configs.telegram["reveal_unauthorized"]:
             update.message.reply_text(
                 f"{translate('_NO_GROUPS')}. {translate('_GET_YOUR_COPY')}",

@@ -40,10 +40,8 @@ def check_authorization(telegram_id):
 
 
 def send_unauthorized(message: Message):
-    print(
-        print_label,
-        f"{message.chat.first_name} ({message.chat.id}) has tried to use the bot, but they are not authorized",
-    )
+    text = f"{message.chat.first_name} ({message.chat.id}) has tried to use the bot, but they are not authorized"
+    send_info_message(text)
     # if configs.telegram["reveal_unauthorized"]:
     #     message.reply_text(
     #         f"{translate('_PRIVATE')}\n\n{translate('_ADMINISTRATION')}: @{configs.telegram['admin_telegram_username']}\n{translate('_YOUR_TELEGRAM_ID')}: `{message.chat.id}`",
